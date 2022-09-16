@@ -1,0 +1,49 @@
+\documentclass[
+letterpaper, % Stock and paper size.
+11pt, % Type size.
+onecolumn, % Only one column of text on a page.
+]{memoir}
+\input{preamble.tex}
+
+\author{6.1600 Staff}
+\title{6.1600 Foundations of Computer Security}
+
+\usepackage{lipsum} % Just to put in some text
+
+\begin{document}
+
+\frontmatter
+
+\maketitle
+
+\begin{abstract}
+	This is an introduction to the class
+\end{abstract}
+\clearpage
+
+\tableofcontents*
+\clearpage
+
+\mainmatter
+
+\chapter{What is Security?}
+
+\include{lectures/lec1}
+
+\chapter{Authenticating People}
+
+\include{lectures/lec2}
+
+\chapter{Collision Resistance and File Authentication}
+
+\include{lectures/lec3}
+
+\backmatter
+
+%%% BIBLIOGRAPHY
+%%% -------------------------------------------------------------
+
+% \bibliographystyle{utphysics}
+% \bibliography{ref}
+
+\end{document}

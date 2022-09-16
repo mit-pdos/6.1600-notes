@@ -1,0 +1,136 @@
+\section{Authentication}
+In this class, we will talk a lot about requests going to a computer system. And a lot of security comes down to looking at that request and deciding how to handle it. For this, it is crucial to know \textit{who} issued the request. Then, we can decide whether the class should be allowed.
+
+\begin{enumerate}
+	\item Authenticate: find the principal
+	\item Authorize: decide if the principal is authorized to make the request.
+\end{enumerate}
+
+\section{Passwords}
+Passwords are the most widespread way of authenticating someone. To make a request, a user will include their username and password with the request and pass it along to the computer system.
+
+Some passwords:
+\begin{itemize}
+	\item \ttt{password}
+	\item \ttt{PaSsW0rd1!}
+	\item \ttt{purple-student-hat}
+\end{itemize}
+
+Which of these are "good" and which are "bad"? Many sites would let you have \ttt{PaSsW0rd1!} but would not allow \ttt{purple-student-hat}. However, what really matters is the way that the adversary will guess passwords. And most likely, they will guess the most common passwords first.
+
+%% make graph of spikey entropy, decaying entropy when sorted by popularity
+
+Ideally, we would want all passwords to be equally as likely. But that is not the case. People have to remember their passwords, and it turns out that many people are likely to choose the same password
+
+%% chart of the top 20 passwords or something? I think that is interesting
+
+So what we really want is for our password to have high entropy. How do we get there?
+
+\begin{itemize}
+	\item Require longer password? If someone tries to use \ttt{abc123} as a password but it's not long enough, they might use \ttt{abc123456}---but this doesn't really add any real entropy. There are predictable ways to lengthen passwords.
+	\item No predictable english words?
+	\item Generate password for the user? Yes.
+	\item Force password changes? Makes it harder to remember their password, may actually decrease entropy. Forcing a password change may be more effective if the passowrd is definitely leaked. 
+\end{itemize}
+
+But passwords are still likely to have low entropy. What can we do about this?
+
+\subsection{Dealing with Low Entropy}
+A "good" password might have 20 bits of entropy---if an adversary is able to make $2^{20}$ passwords, they can expect to guess the password. And with current technology, guessing $2^20$ times is easy. So, we must limit guesses. 
+
+Strawman solution: allow 10 wrong guesses for each account, after which the user is logged in completely.
+\begin{itemize}
+	\item This likely does well to prevent any one account from being compromised.
+	\item However, it does not protect the account base overall---an adversary can guess the 10 most common passwords for each account and expect to get into many accounts that use those common passwords.
+	\item This also has a big functionality downside---users are likely to be locked out of their accounts (DoS).
+\end{itemize}
+
+So we also need to limit guessing across accounts. This normally takes the form of limiting entries per IP, or using something like a CAPTCHA, and so on.
+
+
+\subsection{Storing Passwords}
+The most obvious way to store passwords on a server would be to just store each username along with their password.
+
+\begin{tabular}{c|c}
+	user & password \\
+	\hline
+	alice & \ttt{abc123} \\
+	bob & \ttt{1234} \\
+\end{tabular}
+
+\textbf{Risk}: adversary steals the password table (by breaking in to the system, stealing the hard drive, etc). Now, every user's account is compromised. However, since many users use the same password across many sites, those other sites are now compromised too.
+
+So, it would be great if we could check whether a user's inputted password is correct without storing the actual password. To do this, we can use a \textit{hash function}. For our current purposes, a hash function is a deterministic way of scrambling the input such that it cannot easily be reversed. That is, the same input will always produce the same output, but given an output there is no easy way to determine the corresponding input.
+
+\begin{tabular}{c|c}
+	user & H(pw) \\
+	\hline
+	alice & $h_a$ \\
+	bob & $h_b$ \\
+\end{tabular}
+
+Now, if the database gets compromised, only the \textit{hashes} of those passwords are made public. Assuming we choose a \textit{one-way} hash function, meaning that there is no easy way to compute $pw$ given only $H(pw)$, the only way to find $pw$ and log into the user's account then is to figure out the mapping from each possible password to H(pw) and find the one that matches. 
+
+To make this more difficult, systems can make use of an expensive $H$ function. These are often called Key Derivation Functions to separate them from hashes that are meant to be fast. Examples are bcrypt and scrypt. In effect, stealing the database removes any rate limiting that is enforced by the server. But we can add cryptographic rate limiting by using a KDF to generate the hash.
+
+However, if all systems use the same hash function (hash functions are hard to make, so they are likely to), then many adversaries could get together and compute a \textit{rainbow table} that maps $H(pw)$ to $pw$. 
+
+\subsection{Avoiding pre-computation: salting}
+This precomputation attack only works when everyone is using the same hash function---the problem is that you can precompute some values and get a lot of use out of them---for many users across many systems. If we could have a hash function for each user, pre-computing would be ineffective as the generated table would be only applicable to a single user.
+
+Generating a brand new hash function is difficult, but we can use a \textit{salt} to break this precomputation. Now the table looks like this:
+
+\begin{tabular}{c|c|c}
+	user & salt & H(salt|pw) \\
+	\hline
+	alice & $r_a$ & $h_a$ \\
+	bob & $r_a$ & $h_b$ \\
+\end{tabular}
+
+What we have done is generated a number for each user. Then, instead of hashing just the password, we hash the password along with the salt and store that. So now, if an adversary wanted to brute-force the password for a given account, they would have to perform all the work for only that account---this greatly increases the cost of compromising an account. 
+
+
+\section{Authentication over the Network}
+We have so far been talking about manually entering a password. But what we normally do is log in to some server on the network---Facebook, Gmail, MIT, etc. And in this scenario, we can get much more creative.
+
+\subsection{Password Manager}
+A user can install a password manager on their computer that will generate random passwords for them. Since the user doesn't need to remember these passwords, they can have very high entropy---they are essentially \textit{keys}. Once the user logs into their computer, they can then access their randomly generated passwords and use them to log in to their websites. 
+
+\begin{tabular}{c|c}
+	server & pw/key \\ \hline
+	\ttt{amazon.com} & \ttt{3xyt42...} \\
+\end{tabular}
+
+But we are still sending this password over the network. If an adversary can watch our network, they can see our password. Things like TLS protect against this, but what if we could authenticate without ever sending the password over the network?
+
+\subsection{Challenge-Response}
+Assume that our computer has some key (password with high entropy) $k$, and the server also knows $k$. 
+
+% use the crypto latex library to make this nice
+\begin{enumerate}
+	\item The server chooses a random $r$ (we will call this a \textit{nonce})
+	\item The computer computes $F(k, r)$, where $F$ cannot be computed without knowing $k$, $F$ here is a Message Authentication Code, which we will talk more specifically about. However, it can be approximated as $MAC(k, r) \approx H(k||r)$.
+	\item The computer sends this value to the server, where it can compute the same value to check whether the computer knows $k$ without the computer actually transmitting $k$.
+\end{enumerate}
+
+Attack: man-in-the-middle---an adversary could sit between the server and Alice, get the nonce from the server, ask alice to log in, and then intercept alice's login request and change the request contents to perform some other function. To help with this, we can include the request itself in the MAC. Now, if the man in the middle changes the request, the MAC will become invalid.
+
+\subsection{Two-Factor Authentication}
+Passwords are unlikely to ever be perfect---whether by leaving it on a sticky not on your screen, an adversary stealing the database, or whatever else, a password can be leaked. A common solution is to combine a password with another method of authentication---importantly, one with a different failure mode. Common "classes" are:
+
+\begin{itemize}
+	\item Something you know: password, PIN, etc
+	\item Something you have: USB key, phone, etc
+	\item Something you are: biometrics (fingerprint, face ID)...
+\end{itemize}
+
+\subsubsection{Time-based One Time Passwords (TOTP)}
+In this scenario, the server requests a code along with the password. The user has a device (like a phone) that shares some key $k$ with the server, and they both agree on a protocol by which to generate this code---something like $MAC(k, \text{time / 30 seconds})$. The phone can generate the code, display it to the user, and the server can then verify the code by recomputing it.
+
+Attack: ask the user to give you the code---pretend to be tech support/customer service, etc. This is essentially a phishing attack. The code is then good for 30 seconds, so the attacker can then just enter the code into the website on their end. Similar attacks would include setting up a fake website that looks like the real one, etc.
+
+\subsubsection{Avoiding phishing: U2F (simplified)}
+We can add a bit of complexity to the protocol to avoid this attack. If we include the name of the server that the user is trying to log in to in the request that we sent to the device, the code won't be able to be used on any other site---now, the code might look something like $MAC$(k, r||name). If the attacker sets up \ttt{amason.com} and gets the user to visit it, the U2F device will only generate a code that is good for that site and not the real \ttt{amazon.com}. 
+	
+\subsection{Biometrics}
+Biometrics are things like fingerprints, your face, etc. They are very convenient, since you won't forget them, but they are not great for authenticating over the network because they are not replaceable and because they are not particularly secret. An adversary knowing what your fingerprint looks like should not allow them to log in to your account. Biometrics are much more useful if you have a trusted input path that can guarantee that a real human who owns that biometric is on the other end.

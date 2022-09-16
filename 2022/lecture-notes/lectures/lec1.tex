@@ -1,0 +1,111 @@
+\section{Overview}
+\textbf{Big Idea}: Big ideas for securing computers.
+\begin{itemize}
+	\item Lectures: ask questions!
+	\item Labs (coding) + psets (theory)
+	\item Midterm + final
+\end{itemize}
+
+\section{What is Security}
+Security is a very broad property, but generally the goal is that our system is "ok" even in the face of an "adversary" whose goal is to foil the system. To get there, we will need some kind of systematic plan. If we try to do it ad-hoc, the adversary will find a way around. We'll structure our plan in terms of a goal, a threat model, and an implementation.
+
+\begin{itemize}
+	\item Goal: what we want to achieve, such as "only Alice can read the file F"
+	\item Threat Model: delineates our assumptions about the world---what the adversary can and cannot do. By defining the threat model, we can make the problem tractable. For example, "the aversary can guess passwords, but cannot steal the server".
+	\item Implementation: how we achieve the goal. For example, we might set permissions on F, use linux to enforce those permissions, and require 2FA.
+\end{itemize}
+
+Together, the goal and the threat model create our \textit{definition} of security. As such, they cannot be "wrong"---the goal might turn out to not be exactly what we needed, but together they define what we are achieving. The implementation, on the other hand, can definitely be wrong---if it does not guarantee the goal given the threat model, due to bugs or oversights or supply chain vulnerabilities or anything else, the implementation has a mistake.
+
+\subsection{Security is Hard}
+Security inherently if defined in terms of negative goals, such as "\textbf{only} TAs can access grades". It is easy to test if a TA can access grades, but it is much harder to test if there is some sequence of interactions that allow \textit{anyone else} to access the grades. For example, someone besides a TA might be able to access the grades through:
+
+\begin{itemize}
+	\item Bug in server software
+	\item Break into a TA's office
+	\item Access an admin account
+	\item Trick the TA
+	\item Break the server's cryptography
+	\item Get a job at the registrar and make yourself a TA
+\end{itemize}
+
+And the list never ends. Because of this, \textbf{security is never perfect}. There will almost always be \textit{some} attacker than can break your system.
+
+This is why we need a threat model: the threat model defines what kinds of attacks we worry about and which we decide are out of scope.
+
+\subsection{Building a threat model}
+Building a threat model is all about comparing the cost of defending against an attack with the cost of that attack if it were to happen. It is almost always impractical to exactly calculate these costs, but this framework is useful conceptually. Cheap defenses that block major holes are likely to be worth implementing, but defending against an esoteric RF side channel that could leak unimportant information is likely not.
+
+Building a threat model always requires iterating---you will not get it right on the first try. There is likely to be some type of attack that you didn't consider at first that ends up being important.
+
+\subsection{Techniques}
+We will focus largely in this class on techniques that have a big payoff---methods of developing software and tools to use that eliminate whole classes of attacks (or make them much harder). 
+
+\section{Examples}
+\subsection{Bad Goals}
+\subsubsection{Business-class airfare}
+An airline tried to add value to their business-class tickets by allowing them to be changed at any time with no fee. One customer realized that they could board the flight \textit{then} change their ticket.
+
+In this case, the airline's goal did not meet their real needs---perhaps they needed to add something like "every time someone takes a flight, we get paid".
+
+\subsubsection{Sarah Palin's Email}
+Sarah Palin had a Yahoo email account, and Yahoo used security questions for password reset---their goal may have been something like "no one can reset a user's password unless they know all of the user's security answers". As it turned out, all of Palin's answers could be looked up on her wikipedia page. Yahoo's implementation may have been perfect, but their goal did not provide any meaningful security.
+
+\subsubsection{Instruction Set Architecture Spec}
+When defining ISAs for processors, designers did not think that timing was important, and processors could be implemented to have instructions to take any number of cycles. This had big benefits for performance and for compatability, but as we'll talk about later in the semester, this variability has been exploited recently to perform sophisticated attacks on wide ranges of processors. The processor implmenetation matched the spec, but the spec itself allowed for this attack.
+
+\subsubsection{Fairfax VA School}
+This school had a system similar to Canvas with a somewhat complex structure: each teacher is in charge of some class, each class has many students, and each student has many files. Teachers cannot access student's files, and there is also a superintendent that has access to all the files. Teachers are able to change their students' passwords, and are able to add students to their class. It turned out that a teacher could add the superintendent as a student, change the superintendent's password, and then access all files via the superintendent's account.
+
+\subsubsection{Matt Honan's Gmail Account}
+A journalist for wired named Matt Honan had a Gmail account. Gmail's reset password feature avoided security questions, and instead used a backup email account. Honan used an Apple email for this.
+
+Apple's reset password feature then required the user's address and the last four digits of the credit card number. The attacker was able to find his address publically, but could not easily find his credit card digits.
+
+Amazon, which knew his credit card number, required a full CC\# in order to reset an account. However, Amazon allowed buying something for a certain account without logging in, so long as you provide a new credit card number. It also allowed \textit{saving} this credit card number to Amazon's account. After the attacker saved their own credit card number to Honan's Amazon account, they were able to reset Honan's Amazon password and access his Amazon account. The attacker was then able to see the last four digits of Honan's real credit card within his Amazon account, use that to reset his Apple mail account, and then use that to reset Honan's Gmail account.
+
+This complex chain can be very hard to reason about, but these interactions ultimately define security.
+
+\subsection{Problematic Assumptions}
+\subsubsection{Assuming specific strategy: CAPTCHA}
+CAPTCHAs were designed to be expensive to automate, but easy for a human to read. Indeed it would be expensive to build an OCR system for these, but attackers did not do this. Instead, they set up farms in countries where the cost of labor is cheap and paid people to solve CAPTCHAs. The result is that it costs some fraction of a cent to solve a CAPTCHA. This is still useful, but not nearly as useful as the original intent.
+
+\subsubsection{Computational Power: DES}
+There used to be an encryption standard called DES that had $2^{56}$ possible keys. At the time that it was designed, this was considered secure, but today it is easily crackable with a modern computer. As a result, MIT had to switch from DES to Kerberos for authentication.
+
+\subsubsection{Dependencies: 2FA via SMS}
+Many 2FA systems use a text message for authentication, but an attacker then just needs to convince the clerk at the AT\&T store to give them a new SIM card for your phone number.
+
+\subsubsection{Software Versions: Xcode}
+iPhone apps are normally created and compiled on a developer's machine, sent to Apple's App Store, and sent to iPhones from there. iPhone apps are created using a tool called Xcode that is normally downloaded from Apple servers. However, Xcode is a big piece of software and for developers behind China's firewall, it was very slow to download. Someone within China set up a much faster mirror of Xcode, and lots of developers in China used the version of Xcode from this mirror. However, this mirror was not serving exactly Apple's version of Xcode---instead, it was serving a slightly modified version of Xcode that would inject some malicious code into every app that was compiled with it. This took a long time to detect. 
+
+\subsection{Problematic Implementations}
+Bugs, misconfigurations, and other mistakes are the most common cause of security issues. A rule of thumb to keep in mind is that every 1000 lines of code will have around 1 bug. This is a very rough estimate, but the basic idea is that more code will have more bugs. An effective strategy to reduce security vulnerabilities is to reduce the amount of code in your system.
+
+\subsubsection{Missing Checks: iCloud}
+Apple's iCloud performs many functions---email, calendar, storage, and Find my iPhone. Each of these had their own way of logging in, but across all of them a common goal was to limit the attacker's ability to guess a user's password. To do this, they added rate limiting to all the login interfaces, allowing something like only 10 login attempts per hour---but they forgot the Find my iPhone login interface. Because this authentication code was duplicated all over the place, there were many places to remember to add this rate limiting, but the attacker only needed one weak login interface to brute-force a password. In general, avoiding this repition will make it much easier to build a secure system.
+
+\subsubsection{Insecure Defaults}
+When you set up a new service, they almost always come with some defaults to make the setup simpler. Wi-Fi routers come with default passwords, AWS S3 buckets come with default permissions, and so on. These defaults can be convenient, but they are very important to security because many people will forget or neglect to change the default. Because of this, the default becomes the way that the system operates. In order to build a secure system, it is important that the default is secure.
+
+
+
+\section{Improving}
+\subsection{Goals and Threat Models}
+\begin{itemize}
+	\item Creating simpler, more general goals
+	\item Avoiding assumptions (such as "no one else will be able to get a user's SIM card") by redesigning the system
+	\item Learn and iterate
+	\item Defense in Depth: don't rely on one single defense for all your security---it is useful to use backup defenses to guard against bugs that will inevitably come up in one defense.
+\end{itemize}
+
+\subsection{Implementation}
+\begin{itemize}
+	\item A simpler system will lead to fewer problems
+	\item Factor out security-critical part (for example, hardware security keys).
+	\item Reuse well-designed code, such as well-tested crypto libraries
+	\item Understand the corner cases
+\end{itemize}
+
+
+

@@ -1,0 +1,119 @@
+% packages
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[english]{babel}
+\usepackage[final]{microtype}
+\usepackage{hyperref}
+\usepackage{csquotes}
+
+\usepackage[lambda,adversary,advantage,asymptotics,sets,landau,probability,operators]{cryptocode}
+\usepackage{amsmath,amssymb,mathtools}
+
+% \usepackage{tikz} % Figures
+\usepackage{graphicx} % Include figures
+
+% page layout
+
+\setlrmarginsandblock{0.15\paperwidth}{*}{1} % Left and right margin
+\setulmarginsandblock{0.2\paperwidth}{*}{1}  % Upper and lower margin
+\checkandfixthelayout
+
+% sections
+
+\maxsecnumdepth{subsection} % Subsections (and higher) are numbered
+\setsecnumdepth{subsection}
+
+\makeatletter %
+\makechapterstyle{standard}{
+  \setlength{\beforechapskip}{0\baselineskip}
+  \setlength{\midchapskip}{1\baselineskip}
+  \setlength{\afterchapskip}{8\baselineskip}
+  \renewcommand{\chapterheadstart}{\vspace*{\beforechapskip}}
+  \renewcommand{\chapnamefont}{\centering\normalfont\Large}
+  \renewcommand{\printchaptername}{\chapnamefont \@chapapp}
+  \renewcommand{\chapternamenum}{\space}
+  \renewcommand{\chapnumfont}{\normalfont\Large}
+  \renewcommand{\printchapternum}{\chapnumfont \thechapter}
+  \renewcommand{\afterchapternum}{\par\nobreak\vskip \midchapskip}
+  \renewcommand{\printchapternonum}{\vspace*{\midchapskip}\vspace*{5mm}}
+  \renewcommand{\chaptitlefont}{\centering\bfseries\LARGE}
+  \renewcommand{\printchaptertitle}[1]{\chaptitlefont ##1}
+  \renewcommand{\afterchaptertitle}{\par\nobreak\vskip \afterchapskip}
+}
+\makeatother
+
+\chapterstyle{standard}
+
+\setsecheadstyle{\normalfont\large\bfseries}
+\setsubsecheadstyle{\normalfont\normalsize\bfseries}
+\setparaheadstyle{\normalfont\normalsize\bfseries}
+\setparaindent{0pt}\setafterparaskip{0pt}
+
+% header / footer
+
+\makepagestyle{standard} % Make standard pagestyle
+
+\makeatletter                 % Define standard pagestyle
+\makeevenfoot{standard}{}{}{} %
+\makeoddfoot{standard}{}{}{}  %
+\makeevenhead{standard}{\bfseries\thepage\normalfont\qquad\small\leftmark}{}{}
+\makeoddhead{standard}{}{}{\small\rightmark\qquad\bfseries\thepage}
+% \makeheadrule{standard}{\textwidth}{\normalrulethickness}
+\makeatother                  %
+
+\makeatletter
+\makepsmarks{standard}{
+\createmark{chapter}{both}{shownumber}{\@chapapp\ }{ \quad }
+\createmark{section}{right}{shownumber}{}{ \quad }
+\createplainmark{toc}{both}{\contentsname}
+\createplainmark{lof}{both}{\listfigurename}
+\createplainmark{lot}{both}{\listtablename}
+\createplainmark{bib}{both}{\bibname}
+\createplainmark{index}{both}{\indexname}
+\createplainmark{glossary}{both}{\glossaryname}
+}
+\makeatother                               %
+
+\makepagestyle{chap} % Make new chapter pagestyle
+
+\makeatletter
+\makeevenfoot{chap}{}{\small\bfseries\thepage}{} % Define new chapter pagestyle
+\makeoddfoot{chap}{}{\small\bfseries\thepage}{}  %
+\makeevenhead{chap}{}{}{}   %
+\makeoddhead{chap}{}{}{}    %
+% \makeheadrule{chap}{\textwidth}{\normalrulethickness}
+\makeatother
+
+\nouppercaseheads
+\pagestyle{standard}               % Choosing pagestyle and chapter pagestyle
+\aliaspagestyle{chapter}{chap} %
+
+% table of contents
+
+\maxtocdepth{subsection} % Only parts, chapters and sections in the table of contents
+\settocdepth{subsection}
+
+\AtEndDocument{\addtocontents{toc}{\par}} % Add a \par to the end of the TOC
+
+% new commands
+
+\newcommand{\ttt}[1]{\texttt{\detokenize{#1}}}
+
+\newtheorem{theorem}{Theorem}
+\newtheorem{definition}[theorem]{Definition}
+\newtheorem{remark}[theorem]{Remark}
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{corollary}[theorem]{Corollary}
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{claim}[theorem]{Claim}
+\newtheorem{observation}[theorem]{Observation}
+\newtheorem{fact}[theorem]{Fact}
+\newtheorem{assumption}[theorem]{Assumption}
+
+\newenvironment{proof}{\noindent{\bf Proof:} \hspace*{1mm}}{
+	\hspace*{\fill} $\Box$ }
+\newenvironment{proof_of}[1]{\noindent {\bf Proof of #1:}
+	\hspace*{1mm}}{\hspace*{\fill} $\Box$ }
+\newenvironment{proof_claim}{\begin{quotation} \noindent}{
+	\hspace*{\fill} $\diamond$ \end{quotation}}

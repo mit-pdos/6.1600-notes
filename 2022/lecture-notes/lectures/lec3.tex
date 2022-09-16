@@ -1,0 +1,127 @@
+In the last chapter, we focused on authenticating people---finding some verification that a person (or a request on behalf of that person) is likely who they claim to be. In this chapter, we will focus on authenticating files, code, and other data, and we will make use of a new tool called a \textit{collision-resistant hash function}, or CRHF, to do so.
+
+\section{Authenticating a file?}
+When we say that we want to authenticate a file, we mean that we want to verify that the file's contents are authentic---that is, that they are exactly as they were when we or someone we trust last viewed them.
+
+\section{CRHF Intuition}
+\begin{definition}[Hash Function]
+	A hash function $H$ maps a bitstring of any length onto a fixed size space of outputs. $H: \bin^* \rightarrow \bin^{\lambda}$.
+\end{definition}
+
+In order for a hash function to be \textit{collision-resistant}, we want it to be the case that for any input, the generated output should be \textquote{unique}. Of course, it cannot really be unique---we are mapping infinitely many inputs onto finitely many outputs---but we want it to be \textit{computationally infeasible} to find a case where they are not unique (a \textit{collision}.
+
+\textbf{Security Goal}: It is \textquote{computationally infeasible} to find two distinct inputs to a collision resistant hash function that hash to the same value.
+
+Importantly, CRHFs let you authenticate a long message ($f$) by authenticating a short string $H(f)$.
+
+\subsection{Applications}
+\subsubsection{Secure Mirroring}
+Last time, we saw the Xcode example of mirroring---some large file was difficult to download from far away, so someone set up a mirror in another location and claimed to host the same copy of Xcode, making it easier for people to download. However, we saw that this mirror was able to change the file they were hosting however they like---there was no verification that the downloaded file was an authentic Xcode binary.
+
+To help avoid this attack, we can add some authentication on the file that the mirror hosts. The real vendor can host the ouput of $H(\text{Xcode})$ on their server, and people from across the world can download this \textit{digest}. Then, no matter where they download the large file from, they can recompute the digest $H(\text{downloaded file})$. If $H$ is a CRHF, then if the output matches the vendor digest, the files are almost certainly identical.
+
+\subsubsection{Subresource Integrity}
+If a program fetches a file from some content delivery network, it can store the hash of that file locally and use it to verify that the contents of the file did not change since the application was developed.
+
+\subsubsection{Outsourced File Storage}
+If you want to store your files on a cloud provider, you want to be sure that the cloud provider does not maliciously modify the files without you noticing. To make sure of this, you can store $H(\text{files})$ locally (which takes very little storage space). Then, when you redownload your files locally, you can recompute the hash to verify that they were not tampered with.
+
+\section{Defining a CRHF (formally)}
+Note: This is likely the first formal cryptographic definition for many of you, so please ask questions.
+
+An adversary's goal in breaking a Collision Resistant Hash Function is to find a collision---a pair of values $m_0 \neq m_1$ such that $H(m_0) = H(m_1)$.
+
+\begin{definition}[Collision Resistance]
+	A function $H: \bin^* \rightarrow \bin^{\lambda})$ is collision-resistant if for all \textquote{efficient} adversaries A, there is some \textquote{negligible} function $\mu(\lambda)$ such that 
+
+	\[ \prob{H(m_0) = H(m_1), m_0 \neq m_1: (m_0, m_1) \leftarrow A()} \leq \mu{\lambda} \]
+
+\end{definition}
+
+	In words, this means that the probability of finding a collision is so small that no efficient adversary could hope to do it.
+
+There are two ways of thinking about the terms we use in this definition---values in practice and values in theory.
+
+\begin{itemize}
+	\item In Theory
+		\begin{itemize}
+			\item $\lambda$ is the \textit{security parameter}
+			\item An \textquote{efficient} algorithm is a randomized algorithm that runs in time polynomial in $\lambda$.
+			\item \textquote{Negligible} is a function that grows slower than the inverse of every polynomial---a function that is $O(\frac{1}{\lambda^c})\, \forall c \in \mathbb{N}$.  
+		\end{itemize}
+	\item In Practice
+		\begin{itemize}
+			\item $\lambda = 128, 256,$ or $512$
+			\item \textquote{efficient} = runs in time $\leq 2^{128}$.
+			\item \textquote{negligible} = probability $\leq 2^{-128}$.
+		\end{itemize}
+\end{itemize}
+
+\subsection{Where do these numbers come from?}
+
+\begin{table}[htpb]
+	\centering
+	\caption{Big numbers in terms of hashes}
+	\label{tab:exp-work}
+
+	\begin{tabular}{rl}
+		$2^{30}$ & operations/second on a laptop \\
+		$2^{58}$ & ops/sec on Fugaku supercomputer \\
+		$2^{68}$ & hashes/second on the Bitcoin network (as of Fall 2022) \\
+		$2^{92}$ & hashes/yr on the Bitcoin network \\
+		$2^{114}$ & hashes required to use enough energy to boil the ocean \\
+		$2^{140}$ & hashes required to use one year of the sun's energy \\
+	\end{tabular}
+\end{table}
+
+\begin{table}[htpb]
+	\centering
+	\caption{Exponents as probabilities}
+	\label{tab:exp-probability}
+
+	\begin{tabular}{rl}
+		$2^{-1}$ & fair coin lands heads \\
+		$2^{-28}$ & probability of winning Mega Millions \\
+		$2^{-128}$ & will never happen \\
+	\end{tabular}
+\end{table}
+
+The takeaway is that if our hash function has a $2^{-128}$ chance of a collision. We can be extremely sure that a collision will never occur.
+
+\section{Constructing a CRHF}
+Pretty much every CRHF that exists today follows the same two-step approach:
+
+\begin{enumerate}
+	\item Build a small CRHF $H_{small}: \bin^{2\lambda} \rightarrow \bin^\lambda$. This step is \textquote{more art than science}, and involves doing things that seem collision resistant and testing the result extensively to see if it seems breakable. The current standard for fast collision-resistant hashing is SHA256, which was designed by the NSA in 2001. Hash Functions can also be build from \textquote{nice} assumptions about hardness of problems such as factoring of large numbers, but hash functions based on these assumptions tend to be very slow so are almost never used in practice.
+	\item Use $H_{\text{small}}$ to construct $H: \bin^* \rightarrow \bin^\lambda$. This can be done very cleanly, and one approach is the \textquote{Merkle-Damgard} approach below.
+\end{enumerate}
+
+\subsection{Merkle-Damgard}
+Merkle-Damgard is based on splitting the message into $\lambda$-sized blocks $[m_1, \ldots, m_n]$ and successively hashing them together.
+
+First, start with a bitstring $0^\lambda$. and compute $h_1 = H_{\text{small}}(0^\lambda||m_1)$. Next, compute $h^2 = H_{small}(h_1||m_2)$, $h_3$, and so on through $h_n$. Finally, compute $h_{\text{final}} = H_{small}(h_n, n)$ and output $h_{\text{final}}$.
+
+We won't prove this here, but we can use the fact that $H_{small}$ is collision-resistant to prove that $H$ must also be collision-resistant. The basic idea of the proof is to show that given a collision in $H$, we can easily compute a collision in $H_{\text{small}}$. 
+
+\subsection{The Birthday Paradox}
+An important thing to note when dealing wiht hash functions is the birthday paradox, which says that given a hash function with $\lambda$-bit output, you can alays find a collision in time $O(\sqrt{2^\lambda}) = O(2^{\frac{\lambda}{2}})$. This means that a collision can be found in $2^\frac{\lambda}{2}$---if you want it to take $2^128$ to find a collision, you need 256-bit output from your hash function.
+
+\subsection{Domain Separation}
+Consider the case where we have a one-input CRHF (such as SHA2) $H: \bin^* \rightarrow \bin^{256}$ and want to construct a two-input CRHF $H_2(x, y)$. 
+
+\textbf{Bad Idea}: An obvious solution may be to just concatenate the two values, so that $H_2(x, y) = H(x || y)$. However, this allows two different pairs of messages to hash to the same value---$H_2(\text{"key", "value"}) = H_2(\text{"key", "value"})$. Both Amazon and Flickr had a bug arising from this---they concatenated all parameters before hashing, and had parameters such that two different intents had the same concatenation.
+
+\subsection{Length-Extension}
+Recall the concept of Message Authentication Codes (MAC) from the last lecture---a code that can be sent along with a message to verify that the message was not changed.
+
+Last time, we used $MAC(k, m) = H(k || m)$ as a very simple construction of a MAC. However, this construction has an easy attack---given $\text{MAC}(k, m)$, it is easy to compute $\text{MAC}(k, m||m')$ without knowing $k$ if using a hash function built with the Merkle-Damgard construction. To do this, you can hash the output of $\text{MAC}(k, m)$ with two more blocks---a new message $m''$ and another length block. Now, we have computed $\text{MAC}(k, m||m')$ where $m'$ is the original length block plus some custom message without knowing $k$. 
+
+This lesson here is that we were using a hash function that was only guaranteed to be collision-resistant, and assumed it had other properties (such as that it is guaranteed to be difficult to compute the hash of an extension of the original message).
+% the diagram here would be very helpful.
+
+\section{Applications}
+\subsection{Merkle Trees}
+In many cases, we would like to authenticate many files quickly. If we have $N$ files to authenticate, one option would be to store the hash of all $N$ files on the server. However, in this case the client needs to download every file in order to authenticate a single file. Another option would be to store the hashes for each file on the server, but then authenticating many files becomes difficult. A better option is to build a tree out of the files. 
+
+I think that the diagram from lecture is pretty important here. But the basic idea is that we build a tree by hashing together pairs of files, then hash each pair of hashes and so on until we eventually end up with a single root hash. Then, in order to verify any single file we need to download $\log N$ hashes, and to verify all files we only need to download a single root hash.
+
