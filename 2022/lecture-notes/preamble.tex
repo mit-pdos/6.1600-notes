@@ -6,7 +6,6 @@
 \usepackage[final]{microtype}
 \usepackage{hyperref}
 \usepackage{csquotes}
-\usepackage[right=2in,marginpar=1in]{geometry}
 
 \usepackage[lambda,adversary,advantage,asymptotics,sets,landau,probability,operators]{cryptocode}
 \usepackage{amsmath,amssymb,mathtools}
@@ -21,6 +20,9 @@
 %\checkandfixthelayout
 
 % sections
+
+% number down to subsections
+\setcounter{secnumdepth}{2}
 
 %\maxsecnumdepth{subsection} % Subsections (and higher) are numbered
 %\setsecnumdepth{subsection}
@@ -120,9 +122,6 @@
 \newenvironment{proof_claim}{\begin{quotation} \noindent}{
 	\hspace*{\fill} $\diamond$ \end{quotation}}
 
-\makeatletter
-\long\def\@ympar#1{%
-  \@savemarbox\@marbox{\raggedright \itshape \footnotesize #1}%
-  \global\setbox\@currbox\copy\@marbox
-  \@xympar}
-\makeatother
+
+\renewcommand{\subsubsection}[1]{\paragraph{#1.}}
+

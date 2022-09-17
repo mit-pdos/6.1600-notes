@@ -1,36 +1,35 @@
 \documentclass[
 letterpaper, % Stock and paper size.
-11pt, % Type size.
-onecolumn, % Only one column of text on a page.
 oneside
-]{memoir}
+]{tufte-book}
 \input{preamble.tex}
 
 \author{6.1600 Staff}
-\title{6.1600 Foundations of Computer Security}
+\title{6.1600\\Foundations of\\Computer Security}
 
 \usepackage{lipsum} % Just to put in some text
 
 \begin{document}
 
-\frontmatter
+\mainmatter
 
 \maketitle
 
-\begin{abstract}
-	This is an introduction to the class
-\end{abstract}
+%\begin{abstract}
+%	This is an introduction to the class
+%\end{abstract}
 \clearpage
 
 \tableofcontents*
 \clearpage
 
-\mainmatter
+%\mainmatter
 
 \chapter{What is Security?}
 
 \include{lectures/lec1}
 
+\part{Authentication}
 \chapter{Authenticating People}
 
 \include{lectures/lec2}

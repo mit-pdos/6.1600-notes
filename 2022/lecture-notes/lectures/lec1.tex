@@ -1,5 +1,6 @@
 \section{Overview}
 
+
 The goal of this course is to give you an overview of the 
 most important ``Big Ideas'' on securing computer systems.
 Throughout the course, we will touch on ideas from the fields
@@ -22,7 +23,7 @@ is to ensure that a particular computer system is
 ``behaves correctly'' even in the
 face of an ``adversary'' (or ``attacker'') whose goal is to foil the
 system.
-\marginpar{We will use the terms ``adversary'' and ``attacker''
+\sidenote{We will use the terms ``adversary'' and ``attacker''
 interchangeably throughout this course.}
 
 To achieve this goal, we will need some kind of
@@ -64,7 +65,7 @@ an \emph{implementation}.
 \end{itemize}
 
 Together, the goal and the threat model create our
-\textit{definition} of security.\marginpar{When you read
+\textit{definition} of security.\sidenote{When you read
 about security failures in the news, it is worth trying
 to understand the failure arose from a problem with the
 goal, the threat model, or the implementation.}
@@ -87,65 +88,111 @@ There are at least two broad reasons for this.
 \paragraph{Secure systems must defend against worst-case behavior.}
 First, a secure system must defend against
 \emph{all possible attacks} within the scope of 
-the threat model;
-to be secure, system must defend against 100\% of the
-attacks within the threat model.
+the threat model.
 In contrast, when we are just concerned about functionality or
-correctness, we are typically very happy with a system 
+correctness, we are typically satisfied with a system 
 that performs well 99.99999\% of the time.
-
 In other words, security is concerned with \emph{worst-case behavior},
 while correctness is usually about \emph{average-case behavior}
 
-
-----------------------------
-
--- worst 
-
-
-Security inherently if defined in terms of
-negative goals, such as "\textbf{only} TAs can
-access grades".
+For example, suppose that we have
+a student-information system that should achieve the security
+goal: ``\textbf{only} TAs can access grades.''
 It is easy to test if a TA can
-access grades, but it is much harder to test if
+access grades (correctness), but it is much harder to test whether
 there is some sequence of interactions that allow
-\textit{anyone else} to access the grades. For
-example, someone besides a TA might be able to
-access the grades through:
+\textit{anyone else} to access the grades (security).
 
+\paragraph{An implementation can never defend against all possible threats.}
+When we specify a threat model, we delimit the set of adversaries 
+against which our implementation must defend.
+But real-world adversaries can behave in ways that are 
+outside of our threat model and thereby violate our security goals.
+
+For example, someone besides a TA might be able to
+access the grades by:
 \begin{itemize}
-	\item Bug in server software
-	\item Break into a TA's office
-	\item Access an admin account
-	\item Trick the TA
-	\item Break the server's cryptography
-	\item Get a job at the registrar and make yourself a TA
+	\item finding a bug in the server software,
+	\item breaking into a TA's office,
+	\item stealing the password to an administrator's account,
+	\item tricking a TA into disclosing grades,
+	\item breaking the server's cryptography,
+	\item getting a job at the registrar and making herself a TA.
 \end{itemize}
 
-And the list never ends. Because of this, \textbf{security is never perfect}. There will almost always be \textit{some} attacker than can break your system.
+And the list never ends. Because our threat model cannot capture all
+possible threats, \textbf{security is never perfect}.
+There will essentially always be \textit{some} attacker than can break your system.
 
-This is why we need a threat model: the threat model defines what kinds of attacks we worry about and which we decide are out of scope.
+This is why we need a threat model: the threat
+model defines what kinds of attacks we worry about
+and which we decide are out of scope.
 
-\subsection{Building a threat model}
-Building a threat model is all about comparing the cost of defending against an attack with the cost of that attack if it were to happen. It is almost always impractical to exactly calculate these costs, but this framework is useful conceptually. Cheap defenses that block major holes are likely to be worth implementing, but defending against an esoteric RF side channel that could leak unimportant information is likely not.
+\subsection{Designing a threat model}
+Designing a threat model is all about comparing
+the cost of defending against an attack with the
+cost of that attack if it were to happen.
+It is almost always impractical to exactly calculate
+these costs, but this framework is useful
+conceptually.
+Cheap defenses that block major
+holes are likely to be worth implementing, but
+defending against an esoteric RF side channel that
+could leak unimportant information is likely not.
 
-Building a threat model always requires iterating---you will not get it right on the first try. There is likely to be some type of attack that you didn't consider at first that ends up being important.
+Building a threat model always requires iterating---you will not get it right on the first try.
+There is likely to be some type of attack that you didn't consider at first that ends up being important.
 
 \subsection{Techniques}
-We will focus largely in this class on techniques that have a big payoff---methods of developing software and tools to use that eliminate whole classes of attacks (or make them much harder). 
+We will focus largely in this class on techniques
+that have a big payoff---methods of developing
+software and tools to use that eliminate entire
+classes of attacks (or make them much harder). 
 
 \section{Examples}
 \subsection{Bad Goals}
 \subsubsection{Business-class airfare}
-An airline tried to add value to their business-class tickets by allowing them to be changed at any time with no fee. One customer realized that they could board the flight \textit{then} change their ticket.
+An airline tried to add value to their
+business-class tickets by allowing ticket-holders to 
+change the ticket (i.e., the departure date, origin, and destination)
+at any time with no fee.
+One customer realized that they could board the flight
+\textit{then} change their ticket.
+The customer could then take an unlimited number of
+business-class flights for the price of one.
 
-In this case, the airline's goal did not meet their real needs---perhaps they needed to add something like "every time someone takes a flight, we get paid".
+In this case, the airline's goal did not meet
+their real needs---perhaps they needed to add
+an additional goal of the form ``every time someone takes a flight,
+we get paid.''
 
 \subsubsection{Sarah Palin's Email}
-Sarah Palin had a Yahoo email account, and Yahoo used security questions for password reset---their goal may have been something like "no one can reset a user's password unless they know all of the user's security answers". As it turned out, all of Palin's answers could be looked up on her wikipedia page. Yahoo's implementation may have been perfect, but their goal did not provide any meaningful security.
+Sarah Palin had a Yahoo email account, and Yahoo
+used security questions for password reset---their
+goal may have been something like ``no one can
+reset a user's password unless they know all of
+the answers to the user's security questions.''
+(The security questions are typically things like
+``What is your mother's maiden name?'')
+As it turned out, it was possible to find the answer
+to all of Palin's account-recovery security questions 
+on her wikipedia page.
+Yahoo's implementation may have been perfect, but their
+goal did not provide any meaningful security for certain users.
 
-\subsubsection{Instruction Set Architecture Spec}
-When defining ISAs for processors, designers did not think that timing was important, and processors could be implemented to have instructions to take any number of cycles. This had big benefits for performance and for compatability, but as we'll talk about later in the semester, this variability has been exploited recently to perform sophisticated attacks on wide ranges of processors. The processor implmenetation matched the spec, but the spec itself allowed for this attack.
+\subsubsection{Instruction Set Architecture (ISA) Specification}
+When defining ISAs for processors, designers did
+not think that timing was important, and
+processors could take a variable number of cycles
+to execute a particular instruction.
+This had big benefits for performance and for
+compatibility, but as we'll talk about later in
+the semester, researchers have recently exploited
+this timing variability to perform sophisticated
+attacks on wide ranges of processors. The
+processor implementation matched the
+specification, but the specification itself
+allowed for this attack.
 
 \subsubsection{Fairfax VA School}
 This school had a system similar to Canvas with a somewhat complex structure: each teacher is in charge of some class, each class has many students, and each student has many files. Teachers cannot access student's files, and there is also a superintendent that has access to all the files. Teachers are able to change their students' passwords, and are able to add students to their class. It turned out that a teacher could add the superintendent as a student, change the superintendent's password, and then access all files via the superintendent's account.
