@@ -56,13 +56,62 @@ an \emph{implementation}.
     For example, in analyzing the security of a password-based login system,
     our threat model might specify that 
     the adversary can guess passwords, but cannot steal the server.
-  \item \textbf{Implementation:} how we achieve the goal. For example, we might set permissions on F, use linux to enforce those permissions, and require 2FA.
+  \item \textbf{Implementation:}
+    The implementation is how we achieve the goal.
+    For example, we might set permissions on a file $F$, 
+    use Linux to enforce those permissions, 
+    and require two-factor authentication to access the system.
 \end{itemize}
 
-Together, the goal and the threat model create our \textit{definition} of security. As such, they cannot be "wrong"---the goal might turn out to not be exactly what we needed, but together they define what we are achieving. The implementation, on the other hand, can definitely be wrong---if it does not guarantee the goal given the threat model, due to bugs or oversights or supply chain vulnerabilities or anything else, the implementation has a mistake.
+Together, the goal and the threat model create our
+\textit{definition} of security.\marginpar{When you read
+about security failures in the news, it is worth trying
+to understand the failure arose from a problem with the
+goal, the threat model, or the implementation.}
+As such, they
+cannot be ``wrong''---the goal might turn out to
+not be exactly what we needed, 
+the threat model might not have captured all of
+the attacks that our system might actually face
+in the real world, 
+but together the goal and threat model define 
+the security properties that we set out to achieve.
+The implementation, on the other hand, can definitely be wrong---if 
+the implementation does not guarantee the goal under the threat model, due to bugs or oversights or supply chain vulnerabilities or anything else, the implementation has a mistake.
 
 \subsection{Security is Hard}
-Security inherently if defined in terms of negative goals, such as "\textbf{only} TAs can access grades". It is easy to test if a TA can access grades, but it is much harder to test if there is some sequence of interactions that allow \textit{anyone else} to access the grades. For example, someone besides a TA might be able to access the grades through:
+
+Building secure systems is challenging.
+There are at least two broad reasons for this.
+
+\paragraph{Secure systems must defend against worst-case behavior.}
+First, a secure system must defend against
+\emph{all possible attacks} within the scope of 
+the threat model;
+to be secure, system must defend against 100\% of the
+attacks within the threat model.
+In contrast, when we are just concerned about functionality or
+correctness, we are typically very happy with a system 
+that performs well 99.99999\% of the time.
+
+In other words, security is concerned with \emph{worst-case behavior},
+while correctness is usually about \emph{average-case behavior}
+
+
+----------------------------
+
+-- worst 
+
+
+Security inherently if defined in terms of
+negative goals, such as "\textbf{only} TAs can
+access grades".
+It is easy to test if a TA can
+access grades, but it is much harder to test if
+there is some sequence of interactions that allow
+\textit{anyone else} to access the grades. For
+example, someone besides a TA might be able to
+access the grades through:
 
 \begin{itemize}
 	\item Bug in server software
