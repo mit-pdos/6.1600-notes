@@ -6,6 +6,7 @@
 \usepackage[final]{microtype}
 \usepackage{hyperref}
 \usepackage{csquotes}
+\usepackage[right=2in,marginpar=1in]{geometry}
 
 \usepackage[lambda,adversary,advantage,asymptotics,sets,landau,probability,operators]{cryptocode}
 \usepackage{amsmath,amssymb,mathtools}
@@ -15,15 +16,15 @@
 
 % page layout
 
-\setlrmarginsandblock{0.15\paperwidth}{*}{1} % Left and right margin
-\setulmarginsandblock{0.2\paperwidth}{*}{1}  % Upper and lower margin
-\checkandfixthelayout
+%\setlrmarginsandblock{0.15\paperwidth}{*}{1} % Left and right margin
+%\setulmarginsandblock{0.2\paperwidth}{*}{1}  % Upper and lower margin
+%\checkandfixthelayout
 
 % sections
 
-\maxsecnumdepth{subsection} % Subsections (and higher) are numbered
-\setsecnumdepth{subsection}
-
+%\maxsecnumdepth{subsection} % Subsections (and higher) are numbered
+%\setsecnumdepth{subsection}
+\iffalse
 \makeatletter %
 \makechapterstyle{standard}{
   \setlength{\beforechapskip}{0\baselineskip}
@@ -97,6 +98,7 @@
 \AtEndDocument{\addtocontents{toc}{\par}} % Add a \par to the end of the TOC
 
 % new commands
+\fi
 
 \newcommand{\ttt}[1]{\texttt{\detokenize{#1}}}
 
@@ -117,3 +119,10 @@
 	\hspace*{1mm}}{\hspace*{\fill} $\Box$ }
 \newenvironment{proof_claim}{\begin{quotation} \noindent}{
 	\hspace*{\fill} $\diamond$ \end{quotation}}
+
+\makeatletter
+\long\def\@ympar#1{%
+  \@savemarbox\@marbox{\raggedright \itshape \footnotesize #1}%
+  \global\setbox\@currbox\copy\@marbox
+  \@xympar}
+\makeatother

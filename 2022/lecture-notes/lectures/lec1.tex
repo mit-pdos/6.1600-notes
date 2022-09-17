@@ -1,18 +1,62 @@
 \section{Overview}
+
+The goal of this course is to give you an overview of the 
+most important ``Big Ideas'' on securing computer systems.
+Throughout the course, we will touch on ideas from the fields
+of computer security, cryptography, and (to some extent)
+computer systems.
+
+\iffalse
 \textbf{Big Idea}: Big ideas for securing computers.
 \begin{itemize}
 	\item Lectures: ask questions!
 	\item Labs (coding) + psets (theory)
 	\item Midterm + final
 \end{itemize}
+\fi
 
-\section{What is Security}
-Security is a very broad property, but generally the goal is that our system is "ok" even in the face of an "adversary" whose goal is to foil the system. To get there, we will need some kind of systematic plan. If we try to do it ad-hoc, the adversary will find a way around. We'll structure our plan in terms of a goal, a threat model, and an implementation.
+\section{What is Security?}
+Security is a very broad property, but generally
+the goal of computer security 
+is to ensure that a particular computer system is 
+``behaves correctly'' even in the
+face of an ``adversary'' (or ``attacker'') whose goal is to foil the
+system.
+\marginpar{We will use the terms ``adversary'' and ``attacker''
+interchangeably throughout this course.}
+
+To achieve this goal, we will need some kind of
+systematic plan.
+That is, we will have to carefully define 
+what it means for our system to ``behave correctly''
+and we will have to specify the class of 
+``adversaries'' against which we want to defend.
+
+For the purposes of this course, we will typically
+structure our plan in terms of three components:
+a \emph{goal}, 
+a \emph{threat model}, and
+an \emph{implementation}.
 
 \begin{itemize}
-	\item Goal: what we want to achieve, such as "only Alice can read the file F"
-	\item Threat Model: delineates our assumptions about the world---what the adversary can and cannot do. By defining the threat model, we can make the problem tractable. For example, "the aversary can guess passwords, but cannot steal the server".
-	\item Implementation: how we achieve the goal. For example, we might set permissions on F, use linux to enforce those permissions, and require 2FA.
+  \item \textbf{Goal:} 
+    The security goal defines what we want our system to achieve.
+    For example, a informal goal might be that ``only Alice can read the file $F$,''
+    or ``if anyone tampers with the file $F$, Alice will detect it.''
+    As you will learn throughout the course, figuring out exactly what your
+    security goal should be is often quite subtle and challenging.
+
+  \item \textbf{Threat model:} 
+    The threat model (or ``adversary model'') specifies the class of 
+    adversaries against which we want to defend.
+    Or, put another way, the threat model specifies the adversary's power:
+    what can the adversary do to break our security goal?
+    By defining a threat model, we can make it
+    tractable to achieve a security goal. 
+    For example, in analyzing the security of a password-based login system,
+    our threat model might specify that 
+    the adversary can guess passwords, but cannot steal the server.
+  \item \textbf{Implementation:} how we achieve the goal. For example, we might set permissions on F, use linux to enforce those permissions, and require 2FA.
 \end{itemize}
 
 Together, the goal and the threat model create our \textit{definition} of security. As such, they cannot be "wrong"---the goal might turn out to not be exactly what we needed, but together they define what we are achieving. The implementation, on the other hand, can definitely be wrong---if it does not guarantee the goal given the threat model, due to bugs or oversights or supply chain vulnerabilities or anything else, the implementation has a mistake.
