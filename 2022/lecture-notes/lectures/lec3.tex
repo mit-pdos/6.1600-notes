@@ -1,59 +1,107 @@
-In the last chapter, we focused on authenticating people---finding some verification that a person (or a request on behalf of that person) is likely who they claim to be. In this chapter, we will focus on authenticating files, code, and other data, and we will make use of a new tool called a \textit{collision-resistant hash function}, or CRHF, to do so.
+In the last chapter, we focused on authenticating people---ensuring that
+a person (or a request on behalf of that person) is likely who they claim to be.
+In this chapter, we will focus on authenticating
+files, code, and other data.
+When we say that we want to authenticate a file,
+we mean that we want to verify that the file's
+contents are exactly as they were when we or
+someone we trust last viewed them.
+The key new tool we use to do so is a \textit{collision-resistant hash function}. 
 
-\section{Authenticating a file?}
-When we say that we want to authenticate a file, we mean that we want to verify that the file's contents are authentic---that is, that they are exactly as they were when we or someone we trust last viewed them.
-
-\section{CRHF Intuition}
+\section{Intuition: Collision resistance}
 \begin{definition}[Hash Function]
-	A hash function $H$ maps a bitstring of any length onto a fixed size space of outputs. $H: \bin^* \rightarrow \bin^{\lambda}$.
+	A hash function $H$ maps a bitstring of any length onto a fixed-size space of outputs. $H: \bin^* \rightarrow \bin^{\lambda}$.
 \end{definition}
 
-In order for a hash function to be \textit{collision-resistant}, we want it to be the case that for any input, the generated output should be \textquote{unique}. Of course, it cannot really be unique---we are mapping infinitely many inputs onto finitely many outputs---but we want it to be \textit{computationally infeasible} to find a case where they are not unique (a \textit{collision}.
+In order for a hash function to be \textit{collision-resistant}, we want it to be the case that for any input, the generated output should be \textquote{unique.} Of course, it cannot really be unique---we are mapping infinitely many inputs onto finitely many outputs---but we want it to be \textit{computationally infeasible} to find a 
+pair of distinct inputs that have the same hash values (a ``\textit{collision}'').
 
-\textbf{Security Goal}: It is \textquote{computationally infeasible} to find two distinct inputs to a collision resistant hash function that hash to the same value.
+\begin{framed}
+  \textbf{Security goal for collision-resistant hash functions:}
+  It is \textquote{computationally infeasible} to find two distinct inputs 
+  to a collision resistant hash function that hash to the same value.
+\end{framed}
 
-Importantly, CRHFs let you authenticate a long message ($f$) by authenticating a short string $H(f)$.
+Collision-resistant hash functions let you authenticate 
+a long message $m$ by authenticating a short fixed-length string $H(m)$.
+We often call the hash value $H(m)$ a \emph{digest}.
 
 \subsection{Applications}
-\subsubsection{Secure Mirroring}
-Last time, we saw the Xcode example of mirroring---some large file was difficult to download from far away, so someone set up a mirror in another location and claimed to host the same copy of Xcode, making it easier for people to download. However, we saw that this mirror was able to change the file they were hosting however they like---there was no verification that the downloaded file was an authentic Xcode binary.
+\subsubsection{Secure File Mirroring}
+Often a user wants to download large files (e.g., software updates) from a far-away server.
+To speed up this process, a company or Internet-service provider may set up local \emph{mirrors}
+of the remote files.
+Users can then download the files from the nearby mirror instead of the far-away server.
+However, without additional security measures, the mirror may 
+server users a different file than the one the mirror fetched from the origin server.
+If the mirror is malicious, it can, for example, trick the user into installing
+a backdoored software update.
+(We saw an attack based on mirrors in~\cref{sec:intro:xcode}.)
 
-To help avoid this attack, we can add some authentication on the file that the mirror hosts. The real vendor can host the ouput of $H(\text{Xcode})$ on their server, and people from across the world can download this \textit{digest}. Then, no matter where they download the large file from, they can recompute the digest $H(\text{downloaded file})$. If $H$ is a CRHF, then if the output matches the vendor digest, the files are almost certainly identical.
+To protect against a malicious mirror, we can add some authentication on the file that the mirror hosts.
+Say that the origin server publishes a large software update~$f$.
+The origin server will send the file $f$ to its mirrors and the origin
+server itself will serve the hash digest $d\gets H(f)$ to anyone who asks for it.
+A user who wants to fetch the update can download $d$ from the origin server directly---this
+will be fast since the digest is tiny.
+Then, the client can fetch the update itself from a (potentially untrustworthy) mirror.
+When the client receives a file $\hat f$ from the mirror, it can check that $d = H(\hat f)$
+to ensure that $\hat f$ is the true software update.
+If $H$ is collision resistant, then if the hash value $H(\hat f)$ matches the origin server's digest $d$,
+the files are almost certainly identical.
 
 \subsubsection{Subresource Integrity}
-If a program fetches a file from some content delivery network, it can store the hash of that file locally and use it to verify that the contents of the file did not change since the application was developed.
+If a program fetches a file from some content
+delivery network, it can store the hash of that
+file locally and use it to verify that the
+contents of the file did not change since the
+application was developed.
 
 \subsubsection{Outsourced File Storage}
-If you want to store your files on a cloud provider, you want to be sure that the cloud provider does not maliciously modify the files without you noticing. To make sure of this, you can store $H(\text{files})$ locally (which takes very little storage space). Then, when you redownload your files locally, you can recompute the hash to verify that they were not tampered with.
+If you want to store your files on a cloud
+provider, you want to be sure that the cloud
+provider does not maliciously modify the files
+without you noticing. To make sure of this, you
+can store $H(\text{files})$ locally, which takes
+very little storage space. Then, when you
+redownload your files locally, you can recompute
+the hash to verify that they were not tampered
+with.
 
-\section{Defining a CRHF (formally)}
-Note: This is likely the first formal cryptographic definition for many of you, so please ask questions.
-
-An adversary's goal in breaking a Collision Resistant Hash Function is to find a collision---a pair of values $m_0 \neq m_1$ such that $H(m_0) = H(m_1)$.
+\section{Defining collision resistance (slightly more formally)}
+An adversary's goal in breaking a collision
+resistant hash function is to find a collision---a
+pair of values $m_0, m_1 \in \zo^*$ such that
+$m_0 \neq m_1$ and $H(m_0) = H(m_1)$.
 
 \begin{definition}[Collision Resistance]
-	A function $H: \bin^* \rightarrow \bin^{\lambda})$ is collision-resistant if for all \textquote{efficient} adversaries A, there is some \textquote{negligible} function $\mu(\lambda)$ such that 
-
-	\[ \prob{H(m_0) = H(m_1), m_0 \neq m_1: (m_0, m_1) \leftarrow A()} \leq \mu{\lambda} \]
-
+	A function $H: \bin^* \rightarrow \bin^{\lambda}$ is collision-resistant 
+  if for all \textquote{efficient} adversaries $\calA$, we have that:
+  \[ \Pr[H(m_0) = H(m_1), m_0 \neq m_1: (m_0, m_1) \leftarrow \calA()] \leq \text{``negligible''} \]
 \end{definition}
 
-	In words, this means that the probability of finding a collision is so small that no efficient adversary could hope to do it.
+In words, this means that the probability of finding a collision is so small that no efficient adversary could hope to do it.
 
-There are two ways of thinking about the terms we use in this definition---values in practice and values in theory.
+There are two ways of thinking about the terms ``efficient'' and ``negligible'' that 
+we use in this definition---one mindset we use in practice and the other mindset we use in theory.
 
 \begin{itemize}
-	\item In Theory
+	\item In theory$\ldots$
 		\begin{itemize}
-			\item $\lambda$ is the \textit{security parameter}
+      \item All of our cryptographic constructions are parameterized by an integer $\lambda \in \{1, 2, 3, \dots\}$
+            that we call the \textit{security parameter}.
+            So instead of a single collision-resistant hash function $H$, we have a family of functions
+            $\{ H_1, H_2, H_3, \dots \}$, where the function $H_\lambda$ has $\lambda$-bit output. 
 			\item An \textquote{efficient} algorithm is a randomized algorithm that runs in time polynomial in $\lambda$.
-			\item \textquote{Negligible} is a function that grows slower than the inverse of every polynomial---a function that is $O(\frac{1}{\lambda^c})\, \forall c \in \mathbb{N}$.  
+			\item A \textquote{negligible} function is one that grows slower than the inverse of every polynomial---a function that is $O(\frac{1}{\lambda^c})$
+            for all constants $c \in \mathbb{N}$.  
 		\end{itemize}
-	\item In Practice
+	\item In practice$\ldots$
 		\begin{itemize}
-			\item $\lambda = 128, 256,$ or $512$
-			\item \textquote{efficient} = runs in time $\leq 2^{128}$.
-			\item \textquote{negligible} = probability $\leq 2^{-128}$.
+			\item We use a fixed hash function $H$ with a fixed-length output,
+        which might be as 256 or 512 bits.
+			\item An \textquote{efficient} adversary is one that runs in time $\leq 2^{128}$.
+			\item A \textquote{negligible} probability is some very small constant, like one smaller than $2^{-128}$.
 		\end{itemize}
 \end{itemize}
 
@@ -68,7 +116,7 @@ There are two ways of thinking about the terms we use in this definition---value
 		$2^{30}$ & operations/second on a laptop \\
 		$2^{58}$ & ops/sec on Fugaku supercomputer \\
 		$2^{68}$ & hashes/second on the Bitcoin network (as of Fall 2022) \\
-		$2^{92}$ & hashes/yr on the Bitcoin network \\
+    $2^{92}$ & hashes/yr on the Bitcoin network (TODO: Cite)\\
 		$2^{114}$ & hashes required to use enough energy to boil the ocean \\
 		$2^{140}$ & hashes required to use one year of the sun's energy \\
 	\end{tabular}
@@ -104,12 +152,12 @@ First, start with a bitstring $0^\lambda$. and compute $h_1 = H_{\text{small}}(0
 We won't prove this here, but we can use the fact that $H_{small}$ is collision-resistant to prove that $H$ must also be collision-resistant. The basic idea of the proof is to show that given a collision in $H$, we can easily compute a collision in $H_{\text{small}}$. 
 
 \subsection{The Birthday Paradox}
-An important thing to note when dealing wiht hash functions is the birthday paradox, which says that given a hash function with $\lambda$-bit output, you can alays find a collision in time $O(\sqrt{2^\lambda}) = O(2^{\frac{\lambda}{2}})$. This means that a collision can be found in $2^\frac{\lambda}{2}$---if you want it to take $2^128$ to find a collision, you need 256-bit output from your hash function.
+An important thing to note when dealing wiht hash functions is the birthday paradox, which says that given a hash function with $\lambda$-bit output, you can alays find a collision in time $O(\sqrt{2^\lambda}) = O(2^{\frac{\lambda}{2}})$. This means that a collision can be found in $2^\frac{\lambda}{2}$---if you want it to take $2^{128}$ to find a collision, you need 256-bit output from your hash function.
 
 \subsection{Domain Separation}
 Consider the case where we have a one-input CRHF (such as SHA2) $H: \bin^* \rightarrow \bin^{256}$ and want to construct a two-input CRHF $H_2(x, y)$. 
 
-\textbf{Bad Idea}: An obvious solution may be to just concatenate the two values, so that $H_2(x, y) = H(x || y)$. However, this allows two different pairs of messages to hash to the same value---$H_2(\text{"key", "value"}) = H_2(\text{"key", "value"})$. Both Amazon and Flickr had a bug arising from this---they concatenated all parameters before hashing, and had parameters such that two different intents had the same concatenation.
+\textbf{Bad Idea}: An obvious solution may be to just concatenate the two values, so that $H_2(x, y) = H(x || y)$. However, this allows two different pairs of messages to hash to the same value---$H_2(\text{"key", "value"}) = H_2(\text{"ke", "yvalue"})$. Both Amazon and Flickr had a bug arising from this---they concatenated all parameters before hashing, and had parameters such that two different intents had the same concatenation.
 
 \subsection{Length-Extension}
 Recall the concept of Message Authentication Codes (MAC) from the last lecture---a code that can be sent along with a message to verify that the message was not changed.

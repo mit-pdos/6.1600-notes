@@ -6,9 +6,10 @@
 \usepackage[final]{microtype}
 \usepackage{hyperref}
 \usepackage{csquotes}
+\usepackage{framed}
 
-\usepackage[lambda,adversary,advantage,asymptotics,sets,landau,probability,operators]{cryptocode}
-\usepackage{amsmath,amssymb,mathtools}
+%\usepackage[lambda,adversary,advantage,asymptotics,sets,landau,probability,operators]{cryptocode}
+\usepackage{amsmath,amssymb,amsthm,mathtools}
 
 \usepackage{capt-of}
 
@@ -23,6 +24,7 @@
 
 % sections
 
+\usepackage{cleveref}
 % number down to subsections
 \setcounter{secnumdepth}{2}
 
@@ -106,24 +108,7 @@
 
 \newcommand{\ttt}[1]{\texttt{\detokenize{#1}}}
 
-\newtheorem{theorem}{Theorem}
-\newtheorem{definition}[theorem]{Definition}
-\newtheorem{remark}[theorem]{Remark}
-\newtheorem{lemma}[theorem]{Lemma}
-\newtheorem{corollary}[theorem]{Corollary}
-\newtheorem{proposition}[theorem]{Proposition}
-\newtheorem{claim}[theorem]{Claim}
-\newtheorem{observation}[theorem]{Observation}
-\newtheorem{fact}[theorem]{Fact}
-\newtheorem{assumption}[theorem]{Assumption}
-
-\newenvironment{proof}{\noindent{\bf Proof:} \hspace*{1mm}}{
-	\hspace*{\fill} $\Box$ }
-\newenvironment{proof_of}[1]{\noindent {\bf Proof of #1:}
-	\hspace*{1mm}}{\hspace*{\fill} $\Box$ }
-\newenvironment{proof_claim}{\begin{quotation} \noindent}{
-	\hspace*{\fill} $\diamond$ \end{quotation}}
-
 
 \renewcommand{\subsubsection}[1]{\paragraph{#1.}}
 
+\input{latexdefs}
