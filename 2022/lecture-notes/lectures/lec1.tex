@@ -23,7 +23,7 @@ is to ensure that a particular computer system is
 ``behaves correctly'' even in the
 face of an ``adversary'' (or ``attacker'') whose goal is to foil the
 system.
-\sidenote{We will use the terms ``adversary'' and ``attacker''
+\marginnote{We will use the terms ``adversary'' and ``attacker''
 interchangeably throughout this course.}
 
 To achieve this goal, we will need some kind of
@@ -65,7 +65,7 @@ an \emph{implementation}.
 \end{itemize}
 
 Together, the goal and the threat model create our
-\textit{definition} of security.\sidenote{When you read
+\textit{definition} of security.\marginnote{When you read
 about security failures in the news, it is worth trying
 to understand the failure arose from a problem with the
 goal, the threat model, or the implementation.}
@@ -98,7 +98,7 @@ while correctness is usually about \emph{average-case behavior}
 For example, suppose that we have
 a student-information system that should achieve the security
 goal: ``\textbf{only} TAs can access grades.''
-It is easy to test if a TA can
+It is easy to test if a random sample of TAs can
 access grades (correctness), but it is much harder to test whether
 there is some sequence of interactions that allow
 \textit{anyone else} to access the grades (security).
@@ -128,8 +128,9 @@ This is why we need a threat model: the threat
 model defines what kinds of attacks we worry about
 and which we decide are out of scope.
 
-\subsection{Designing a threat model}
-Designing a threat model is all about comparing
+\subsection{Designing security goals and a threat model}
+Specifying security goals and
+a threat model is all about comparing
 the cost of defending against an attack with the
 cost of that attack if it were to happen.
 It is almost always impractical to exactly calculate
@@ -143,13 +144,17 @@ could leak unimportant information is likely not.
 Building a threat model always requires iterating---you will not get it right on the first try.
 There is likely to be some type of attack that you didn't consider at first that ends up being important.
 
-\subsection{Techniques}
+\subsection{Designing an implementation}
 We will focus largely in this class on techniques
 that have a big payoff---methods of developing
 software and tools to use that eliminate entire
 classes of attacks (or make them much harder). 
 
 \section{Examples}
+
+We give a handful of examples of security failures arising from poor
+choices of security goals or threat model.
+
 \subsection{Bad Goals}
 \subsubsection{Business-class airfare}
 An airline tried to add value to their
@@ -176,7 +181,7 @@ the answers to the user's security questions.''
 ``What is your mother's maiden name?'')
 As it turned out, it was possible to find the answer
 to all of Palin's account-recovery security questions 
-on her wikipedia page.
+on the Internet.\cite{palin}
 Yahoo's implementation may have been perfect, but their
 goal did not provide any meaningful security for certain users.
 
@@ -194,27 +199,90 @@ processor implementation matched the
 specification, but the specification itself
 allowed for this attack.
 
-\subsubsection{Fairfax VA School}
-This school had a system similar to Canvas with a somewhat complex structure: each teacher is in charge of some class, each class has many students, and each student has many files. Teachers cannot access student's files, and there is also a superintendent that has access to all the files. Teachers are able to change their students' passwords, and are able to add students to their class. It turned out that a teacher could add the superintendent as a student, change the superintendent's password, and then access all files via the superintendent's account.
+\subsubsection{Complicated access-control policies}
+A school in Fairfax, Virginia used an online
+course-management software with a somewhat complex
+access-control structure: each teacher is in charge of some
+class, each class has many students, and each
+student has many files. Teachers cannot access
+student's files, and there is also
+a superintendent that has access to all the files.
+Teachers are able to change their students'
+passwords, and are able to add students to their
+class. It turned out that a teacher could add the
+superintendent as a student, change the
+superintendent's password, and then access all
+files via the superintendent's account.
+While each of the access-control policies individually
+sounds reasonable, together they lead to a bad outcome.
 
-\subsubsection{Matt Honan's Gmail Account}
-A journalist for wired named Matt Honan had a Gmail account. Gmail's reset password feature avoided security questions, and instead used a backup email account. Honan used an Apple email for this.
 
-Apple's reset password feature then required the user's address and the last four digits of the credit card number. The attacker was able to find his address publically, but could not easily find his credit card digits.
+\subsubsection{Mat Honan's Gmail Account}
+A journalist for wired named Mat Honan had his Gmail account compromised via a clever attack.\cite{honan}
+Honan had a Gmail account.
+Gmail's reset-password feature avoided using security questions, and instead used a backup email account.
+The attacker triggered the reset-password feature, which sent a reset link
+to Honan's Apple email account.
 
-Amazon, which knew his credit card number, required a full CC\# in order to reset an account. However, Amazon allowed buying something for a certain account without logging in, so long as you provide a new credit card number. It also allowed \textit{saving} this credit card number to Amazon's account. After the attacker saved their own credit card number to Honan's Amazon account, they were able to reset Honan's Amazon password and access his Amazon account. The attacker was then able to see the last four digits of Honan's real credit card within his Amazon account, use that to reset his Apple mail account, and then use that to reset Honan's Gmail account.
+The attacker then attempted to gain access to Honan's Apple email account.
+The attacker triggered the reset-password feature on the Apple account.
+Apple's reset-password feature, in turn, required Honan's address and the last four digits of the credit card number.
+The attacker was able to find Honan's address publicly, but could not easily find his credit-card number.
 
-This complex chain can be very hard to reason about, but these interactions ultimately define security.
+The attacker found this credit-card information through Honan's Amazon account.
+Amazon, which knew his credit card number, required a full credit-card in order to reset an account.
+However, Amazon allowed buying something for a certain account without logging in, 
+so long as you provide a new credit card number.
+It also allowed \textit{saving} this new credit card number to the user's Amazon account.
+So, the attacker made a purchase on Amazon with the attacker's credit card.
+Then, the attacker saved their own credit card number to Honan's Amazon account.
+Next, the attacker triggered Amazon's reset-password feature, and---using the credit-card
+number saved to the account---were able to reset Honan's 
+Amazon password and access his Amazon account.
+The attacker was then able to see the last four
+digits of Honan's real credit card within his
+Amazon account, use that to reset his Apple mail
+account, and then use that to reset Honan's Gmail
+account.
 
-\subsection{Problematic Assumptions}
+Complex chains of systems like this can be very hard to reason about,
+but these interactions ultimately are security-critical.
+
+\subsection{Bad Threat Models}
+
 \subsubsection{Assuming specific strategy: CAPTCHA}
-CAPTCHAs were designed to be expensive to automate, but easy for a human to read. Indeed it would be expensive to build an OCR system for these, but attackers did not do this. Instead, they set up farms in countries where the cost of labor is cheap and paid people to solve CAPTCHAs. The result is that it costs some fraction of a cent to solve a CAPTCHA. This is still useful, but not nearly as useful as the original intent.
+CAPTCHAs were designed to be expensive to
+solve via automation, but easy for a human to read.
+Indeed it might be expensive to build an optical-character recognition 
+system for CAPTCHAs in general, but attackers who want
+to bypass CAPTCHAs do not do this.
+Instead, they set up computer centers in countries where the cost of
+labor is cheap. Attackers then pay people working in these 
+centers to solve CAPTCHAs.
+The result is that it costs some fraction of
+a cent to solve a CAPTCHA. 
+The cost of solving a CAPTCHA is still non-zero,
+but the cost is much lower than the system designers
+may have intended.
 
 \subsubsection{Computational Power: DES}
-There used to be an encryption standard called DES that had $2^{56}$ possible keys. At the time that it was designed, this was considered secure, but today it is easily crackable with a modern computer. As a result, MIT had to switch from DES to Kerberos for authentication.
+There used to be an encryption standard called DES that had $2^{56}$ possible keys.
+At the time that it was designed, the U.S.~government standards agencies asserted that it was
+secure against even powerful attackers,
+but today a modern computer can try all $2^{56}$ keys at only modest cost.
+(Academic researchers even at the time of DES's
+design understood that 56-bit keys were not large
+enough to prevent exhaustive
+cryptanalysis.\cite{DH77})
 
-\subsubsection{Dependencies: 2FA via SMS}
-Many 2FA systems use a text message for authentication, but an attacker then just needs to convince the clerk at the AT\&T store to give them a new SIM card for your phone number.
+Because of the weakness of DES against modern computers,
+everyone using the standard had to upgrade their block ciphers.
+For example, MIT had to switch from using DES for authentication 
+to newer block ciphers with longer keys, such as AES.
+
+\subsubsection{Dependencies: Two-factor authentication (2FA) via SMS}
+Many 2FA systems use a text message for authentication, but an attacker then
+just needs to convince the clerk at the AT\&T store to give them a new SIM card for your phone number.
 
 \subsubsection{Software Versions: Xcode}
 iPhone apps are normally created and compiled on a developer's machine, sent to Apple's App Store, and sent to iPhones from there. iPhone apps are created using a tool called Xcode that is normally downloaded from Apple servers. However, Xcode is a big piece of software and for developers behind China's firewall, it was very slow to download. Someone within China set up a much faster mirror of Xcode, and lots of developers in China used the version of Xcode from this mirror. However, this mirror was not serving exactly Apple's version of Xcode---instead, it was serving a slightly modified version of Xcode that would inject some malicious code into every app that was compiled with it. This took a long time to detect. 
@@ -228,23 +296,21 @@ Apple's iCloud performs many functions---email, calendar, storage, and Find my i
 \subsubsection{Insecure Defaults}
 When you set up a new service, they almost always come with some defaults to make the setup simpler. Wi-Fi routers come with default passwords, AWS S3 buckets come with default permissions, and so on. These defaults can be convenient, but they are very important to security because many people will forget or neglect to change the default. Because of this, the default becomes the way that the system operates. In order to build a secure system, it is important that the default is secure.
 
-
-
-\section{Improving}
+\section{What are the general principles for secure system design?}
 \subsection{Goals and Threat Models}
 \begin{itemize}
-	\item Creating simpler, more general goals
-	\item Avoiding assumptions (such as "no one else will be able to get a user's SIM card") by redesigning the system
-	\item Learn and iterate
-	\item Defense in Depth: don't rely on one single defense for all your security---it is useful to use backup defenses to guard against bugs that will inevitably come up in one defense.
+	\item Create simple, general goals.
+	\item Avoid assumptions (such as ``no one else will be able to get a user's SIM card'').
+	\item Learn and iterate.
+	\item Practice Defense in Depth: don't rely on one single defense for all your security---it is useful to use backup defenses to guard against bugs that will inevitably come up in one defense.
 \end{itemize}
 
 \subsection{Implementation}
 \begin{itemize}
-	\item A simpler system will lead to fewer problems
-	\item Factor out security-critical part (for example, hardware security keys).
-	\item Reuse well-designed code, such as well-tested crypto libraries
-	\item Understand the corner cases
+	\item A simpler system will lead to fewer problems.
+	\item Factor out the security-critical part into a small separate system or piece of code (for example, hardware security keys).
+	\item Reuse well-designed code, such as well-tested crypto libraries.
+	\item Understand and test the corner cases.
 \end{itemize}
 
 
