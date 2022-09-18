@@ -1,42 +1,117 @@
 \section{Authentication}
-In this class, we will talk a lot about requests going to a computer system. And a lot of security comes down to looking at that request and deciding how to handle it. For this, it is crucial to know \textit{who} issued the request. Then, we can decide whether the class should be allowed.
+In this class, we will talk a lot about requests
+going to a computer system.
+And a lot of security comes down to looking at that request and deciding
+how to handle it.
+For this, it is crucial to know
+\textit{who} issued the request. Then, we can
+decide whether the class should be allowed.
 
+Typically, a computer system performs two steps before processing
+a request:
 \begin{enumerate}
-	\item Authenticate: find the principal
-	\item Authorize: decide if the principal is authorized to make the request.
+  \item \textbf{Authenticate:} Identify the person or machine (the ``\emph{principal}'') making the request.
+  \item \textbf{Authorize:} Decide if the principal is authorized to make the request.
 \end{enumerate}
 
 \section{Passwords}
-Passwords are the most widespread way of authenticating someone. To make a request, a user will include their username and password with the request and pass it along to the computer system.
+Passwords are the most widespread method 
+that humans use to authenticate to computer systems.
+We use passwords to authenticate to ATMs,
+our phones, our computers, and so on.
 
-Some passwords:
+Examples of human-chosen passwords are:
 \begin{itemize}
 	\item \ttt{password}
 	\item \ttt{PaSsW0rd1!}
 	\item \ttt{purple-student-hat}
 \end{itemize}
 
-Which of these are "good" and which are "bad"? Many sites would let you have \ttt{PaSsW0rd1!} but would not allow \ttt{purple-student-hat}. However, what really matters is the way that the adversary will guess passwords. And most likely, they will guess the most common passwords first.
+Which of these passwords are ``good'' and which
+are ``bad?''
+Many sites would let you use
+\ttt{PaSsW0rd1!} as your password but would not allow
+you to use \ttt{purple-student-hat}.
+However, what really matters is the adversary's
+uncertainty about your password.
+That is, what we really care about is that the adversary
+will not be able to guess your password in
+a small number of guesses.
 
-%% make graph of spikey entropy, decaying entropy when sorted by popularity
+%And most likely, they will guess the
+%most common passwords first.
 
-Ideally, we would want all passwords to be equally as likely. But that is not the case. People have to remember their passwords, and it turns out that many people are likely to choose the same password
+%% TODO: make graph of spikey entropy, decaying entropy when sorted by popularity
 
-%% chart of the top 20 passwords or something? I think that is interesting
+Ideally, we would want all passwords to be equally as likely,
+from the adversary's perspective.
+But that is not the case.
+People have to remember their passwords,
+and it turns out that many people are likely to choose the same password.
 
-So what we really want is for our password to have high entropy. How do we get there?
+\marginnote[-2in]{
+  \begin{tabular}{cc}
+    Rank & Password \\
+1 & \ttt{123456}\\
+2 & \ttt{123456789}\\
+    3 & 12345\\
+    4 & qwerty\\
+    5& password\\
+    6& 12345678\\
+    7& 111111\\
+    8& 123123\\
+    9& 1234567890\\
+    10& 1234567\\
+    11& qwerty123\\
+    12& 000000\\
+    13& 1q2w3e\\
+    14& aa12345678\\
+    15& abc123\\
+    16& password1\\
+    17& 1234\\
+    18& qwertyuiop\\
+    19& 123321\\
+    20& password123
+  \end{tabular}
+  \medskip
+  \captionof{table}{The most popular passwords in 2021, according to 
+  NordPass, \url{https://nordpass.com/most-common-passwords-list/}.}
+}
+
+How do we convince humans to choose hard-to-guess passwords? 
 
 \begin{itemize}
-	\item Require longer password? If someone tries to use \ttt{abc123} as a password but it's not long enough, they might use \ttt{abc123456}---but this doesn't really add any real entropy. There are predictable ways to lengthen passwords.
-	\item No predictable english words?
-	\item Generate password for the user? Yes.
-	\item Force password changes? Makes it harder to remember their password, may actually decrease entropy. Forcing a password change may be more effective if the passowrd is definitely leaked. 
+  \item \emph{Require longer passwords?} If someone tries to use 
+    \ttt{abc123} as a password but it's not long
+    enough, they might use \ttt{abc123456}---but
+    this doesn't really add much uncertainty.
+    There are standard ways to lengthen passwords,
+    and a clever attacker will try these first.
+  \item \emph{Prohibit using common English words in passwords?}
+    It's not clear that this is a good idea.
+    Five randomly chosen words from the dictionary will
+    form a strong password, and prohibiting English words
+    in passwords may make passwords much more difficult to remember.
+      
+  \item \emph{Force password changes?}
+    This makes it harder for users to remember their password, and
+    may actually cause users to choose easier-to-guess passwords
+    (since these may be easier to remember).
+    Forcing a password change may be more effective if the system has
+    suffered a breach and the users' passwords have leaked out.
+  \item \emph{Generate password for the user?} This is the only way
+    to be guaranteed a strong password. But then the user is stuck
+    having to memorize a random string.
+
 \end{itemize}
 
 But passwords are still likely to have low entropy. What can we do about this?
 
-\subsection{Dealing with Low Entropy}
-A "good" password might have 20 bits of entropy---if an adversary is able to make $2^{20}$ passwords, they can expect to guess the password. And with current technology, guessing $2^20$ times is easy. So, we must limit guesses. 
+-------------------------------
+
+\subsection{Dealing with poor passwords}
+A ``good'' password might have 20 bits of entropy---if an adversary is able to make $2^{20}$ passwords, they can expect to guess the password.
+And with current technology, guessing $2^{20}$ times is easy. So, we must limit guesses. 
 
 Strawman solution: allow 10 wrong guesses for each account, after which the user is logged in completely.
 \begin{itemize}
@@ -63,7 +138,7 @@ The most obvious way to store passwords on a server would be to just store each 
 So, it would be great if we could check whether a user's inputted password is correct without storing the actual password. To do this, we can use a \textit{hash function}. For our current purposes, a hash function is a deterministic way of scrambling the input such that it cannot easily be reversed. That is, the same input will always produce the same output, but given an output there is no easy way to determine the corresponding input.
 
 \begin{tabular}{c|c}
-	user & H(pw) \\
+  user & $H(\text{pw})$ \\
 	\hline
 	alice & $h_a$ \\
 	bob & $h_b$ \\
@@ -109,7 +184,7 @@ Assume that our computer has some key (password with high entropy) $k$, and the 
 % use the crypto latex library to make this nice
 \begin{enumerate}
 	\item The server chooses a random $r$ (we will call this a \textit{nonce})
-	\item The computer computes $F(k, r)$, where $F$ cannot be computed without knowing $k$, $F$ here is a Message Authentication Code, which we will talk more specifically about. However, it can be approximated as $MAC(k, r) \approx H(k||r)$.
+	\item The computer computes $F(k, r)$, where $F$ cannot be computed without knowing $k$, $F$ here is a Message Authentication Code, which we will talk more specifically about.
 	\item The computer sends this value to the server, where it can compute the same value to check whether the computer knows $k$ without the computer actually transmitting $k$.
 \end{enumerate}
 
