@@ -1,0 +1,98 @@
+So far, we have talked about authenticating \emph{people} and authenticating \emph{files}. In this section, we will discuss authenticating \emph{communication}. If we have two parties that are communicating over the network, we want some way to guarantee to each party that the message they received really came from the other party and was not tampered with along the way.
+
+At a first glance, this seems impossible. If there is some eavesdropper Eve in between the two parties, they can just replace the message with one of their own choosing and the other party will have no idea. To make this possible, we need to relax the scenario a bit and add an assumption---that the two parties share some secret key $k$. 
+
+With this shared key $k$ between the two parties, our goal will be to add some \textquote{tag} onto the message that validates its authenticity. Necessarily, this tag will be a function of this shared key $k$. If this were not the case, the eavesdropper would be able to compute a valid tag herself---the secret $k$ is the only information in this scenario that Eve does not know.
+
+% figure out how to use cryptocode and make a diagram like
+
+%    k              k 
+% client -------> server
+%         m, tag
+\procedureblock
+
+\section{Defining MAC}
+
+\begin{definition}[Message Authentication Code]
+	A Message Authentication Code (MAC) consists of two algorithms $(S, V)$ and a message space $\mathcal{M}$ and a key space $\mathcal{K}$.
+
+	\begin{itemize}
+		\item $S(m, k) \rightarrow \sigma$: The signing algorithm $S$ takes as input a message $m$ and a key $k$ and outputs a tag.
+	\item $V(m, k, \sigma) \rightarrow \bin$: The verification algorithm $V$ takes $m$, $k$, and a tag and outputs $\bin$.
+	\end{itemize}
+	
+\end{definition}
+
+In practice, there is only a single signing algorithm $S$---the verification algorithm can simply re-run the signing algorithm and compare the output. This function is typically denoted by $\mathsf{MAC}$.
+
+In order for this to be useful, we need a MAC to satisfy some properties.
+
+\subsection{Completeness}
+We need a MAC to function correctly:
+
+\[ \forall m \in \mathcal{M}, \forall k \in \mathcal{K}, V(k, m, S(k, m)) = 1 \]
+
+\subsection{Security}
+To create our security goal, we need to consider the goal of the adversary and the power of the adversary.
+
+Given our use case above, the goal of the adversary is to compute a valid MAC of any $m\in \mathcal{M}$. But it's not entirely obvious why we care about the adversary signing \textit{any} message---if the adversary signs a message that is jibberish, they are unlikely to be able to do any harm. But we would like to have our MAC function be generally applicable. There will certainly be applications that authenticate messages that violate whatever definition of \textquote{non-jibberish} we define.
+
+We have some basic limits of the power of the adversary from cryptography in general---the adversary must be an algorithm that runs in polynomial time, for example. But in order to create meaningful security, we need to expand the adversary's power a bit. For example, if an adversary is watching our network, they are able to see every message that we send---including its MAC. So we must allow the adversary to see tagged messages. \marginnote{This has some interesting implications---importantly, the adversary can store these messages along with their MAC and replay them later.}
+
+If we allow the adversary to see tagged messages, we need to decide \emph{which} messages we allow them to see. To have our MAC be effective, we need to allow the adversary to see a tag for any message they like. Not only does this cover every possible application, in some cases the adversary really has this power.
+
+\begin{definition}[Existentially Unforgeable against Adaptive Chosen Message Attacks]
+	A MAC for a message space $\mathcal{M}$ is secure (existentially unforgeable against adaptive chosen message attacks) if any poly-time adversary $\mathcal{A}$\marginnote{In practice, \textquote{a poly-time adversary} means \textquote{any real-life adversary}. But we need to place some mathematical bound on real-life to make the proofs work out.} wins the following game with at most negligible probability.
+
+	The adversary chooses any message $m_1$ and sends it to the challenger (who has a key $k \leftarrow \mathcal{K})$. The challenger then must respond with $\mathsf{MAC}(k, m_1)$. The adversary can repeat this process as many times as they like, asking for messages $m_2, m_3, \ldots, m_n$ and receiving $\mathsf{MAC}(k, m_2), \mathsf{MAC}(k, m_3), \ldots, \mathsf{MAC}(k, m_n)$. Then, the adversary generates some message $m^*$ and $t^*$. The adversary wins if $\mathsf{MAC}(k, m^*) = t^*$ and $m^* \notin \set{m_1, m_2, \ldots, m_n}$
+
+	% TODO: finish this diagram
+	\procedureblock{MAC Security}{
+		$\mathcal{A}$ \> \> \textbf{Ch} \\
+	}
+\end{definition}
+
+\section{Constructing a MAC}
+The fact that it is even possible to construct a MAC seems a bit surprising---in effect, for a MAC to satisfy the definition, the tag has to effectively be random. But the only \textquote{randomness} that we have is the key $k$---to generate tags for arbitrarily many messages, we need much more randomness than one key's worth. This seems impossible.
+
+However, since our adversary is polynomially bounded, values that an adversary sees as \textquote{random} can be much less random than values that are actually truly random. This allows us to create functions that generate \textquote{randomness} of arbitrary length from a short and truly random key.
+
+\subsection{Pseudorandom Functions}
+\begin{definition}[Pseudorandom Function (PRF)]
+	A function $F: \mathcal{K} \cross \bin^n \rightarrow \bin^m$ is a PRF if any poly-time (efficient) algorithm $\mathcal{A}$ wins the following game with probability $\tfrac{1}{2} + \text{\textquote{negl}}$: 
+
+	First, the challenger will sample a random $b \leftarrow \bin$ and a key $k \leftarrow \mathcal{K}$. The adversary can then supply arbitrarily many inputs $x_i$ to the challenger. If $b=0$, then the challenger will supply the adversary with $F(k, x_i)$, otherwise the challenger will generate a truly random value as a function of $x_i$ and supply that to the adversary. The adversary's job is to tell whether the value supplied from the challenger is truly random or is psuedorandom. The adversary can request as many values from the challenger as they like, and then must choose $b^*$. The adversary wins if $b^* = b$, where $b$ is the bit sampled by the challenger.
+
+	The adversary can trivially win this game with probability $\tfrac{1}{2}$ by just guessing. But this definition says that they should not be able to meaningfully exceed this.
+\end{definition}
+
+If we had such a PRF, we could easily construct a MAC---we can just use the message as the input to the PRF along with the key: $\mathsf{MAC}(k, m) = F(k, m)$.
+
+Luckily, we can generate such a PRF thanks to the fact that our adversary is polynomially bounded. To do this, we will use some kind of computational hardness to fool the adversary.
+
+\begin{theorem}
+	Psueodorandom functions exist given that one-way functions exist.
+\end{theorem}
+
+\begin{definition}[One-Way Function]
+	A function is one-way if it is difficult to invert. % TODO: insert real definition here	
+\end{definition}
+
+In practice, we use the Advanced Encryption Standard (AES) as a PRF. $\mathsf{AES}_k: \bin^{128} \rightarrow \bin^{128}$ is a function that takes a 128 bit input and generates a 128 bit output that we believe to be pseudorandom. \marginnote{We don't have any mathematical proof that AES is a PRF. However, it has been very thoroughly tested and no one has been able to break it yet.} 
+
+\subsection{From PRFs to MAC}
+With this 128-bit PRF, we can generate a MAC function for 128-bit messages as described above: $\mathsf{MAC}(k, m) = \mathsf{AES}_k(m)$. However, since AES takes only 128 bits as input, we can generate MACs for 128-bit messages. 
+
+To sign longer messages, we need to combine this \textquote{small MAC} to construct a \textquote{big MAC}. 
+
+A strawman solution to this problem would be to just chop our message up into 128-bit chunks and MAC each one separately. Our tag, then, would look something like $\left(\mathsf{AES}_k(m[0]), \mathsf{AES}_k(m[1]))\right)$. However, there is a problem! Given the tag for a message $(m[0], m[1]) = (t_0, t_1)$, we can easily generate a valid tag for $(m[1], m[0])$ --- $(t_1, t_0)$. 
+
+To solve this reordering attack, we can \emph{chain} the output of each of these calls to AES. Given our chopped message $(m[0], m[1], \ldots, m[n])$, we will generate $t_0 = \mathsf{AES}_k(m[0])$ as before. When generating $t_1$, however, we will first XOR $t_0$ into the input: $t_1 = \mathsf{AES}_k(m[1] \oplus t_0)$. This continues until the end of the message, at which point we output $t_n$.
+
+% TODO: the chaining diagram is very useful here.
+
+However, this too has an attack! Given $t_1 = MAC(k, (m[0], m[1])$, we can generate a valid tag for $(m[0], m[1], m[2])$ given only $\mathsf{MAC}(k, m_2 \oplus t_1)$---the tags of $(m[0], m[1], m[2])$ and $(m[2] \oplus t_1)$ are identical.
+
+	To solve this, we do one final MAC before outputting \emph{with a new key}. Instead of outputting $t_n$, we output $\mathsf{AES}_{k'}(t_n)$. % TOOD: explanation of why we need a second key here would be useful
+
+% TODO: diagram
