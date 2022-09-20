@@ -9,7 +9,7 @@ With this shared key $k$ between the two parties, our goal will be to add some \
 %    k              k 
 % client -------> server
 %         m, tag
-\procedureblock
+%\procedureblock
 
 \section{Defining MAC}
 
@@ -47,9 +47,9 @@ If we allow the adversary to see tagged messages, we need to decide \emph{which}
 	The adversary chooses any message $m_1$ and sends it to the challenger (who has a key $k \leftarrow \mathcal{K})$. The challenger then must respond with $\mathsf{MAC}(k, m_1)$. The adversary can repeat this process as many times as they like, asking for messages $m_2, m_3, \ldots, m_n$ and receiving $\mathsf{MAC}(k, m_2), \mathsf{MAC}(k, m_3), \ldots, \mathsf{MAC}(k, m_n)$. Then, the adversary generates some message $m^*$ and $t^*$. The adversary wins if $\mathsf{MAC}(k, m^*) = t^*$ and $m^* \notin \set{m_1, m_2, \ldots, m_n}$
 
 	% TODO: finish this diagram
-	\procedureblock{MAC Security}{
-		$\mathcal{A}$ \> \> \textbf{Ch} \\
-	}
+	%\procedureblock{MAC Security}{
+	%	$\mathcal{A}$ \> \> \textbf{Ch} \\
+	%}
 \end{definition}
 
 \section{Constructing a MAC}

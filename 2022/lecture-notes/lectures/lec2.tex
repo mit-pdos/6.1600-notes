@@ -41,7 +41,14 @@ a small number of guesses.
 %And most likely, they will guess the
 %most common passwords first.
 
-%% TODO: make graph of spikey entropy, decaying entropy when sorted by popularity
+\begin{figure}
+  \includegraphics[width=\textwidth]{figs/password-dist.pdf}
+  \caption{The most common passwords, according to
+  NordPass (\url{https://nordpass.com/most-common-passwords-list/}),
+  sorted by their frequency descending.
+  A small number of common passwords dominate.
+  \todo{Fix the $y$-axis here.}}
+\end{figure}
 
 Ideally, we would want all passwords to be equally as likely,
 from the adversary's perspective.
@@ -99,32 +106,63 @@ How do we convince humans to choose hard-to-guess passwords?
     (since these may be easier to remember).
     Forcing a password change may be more effective if the system has
     suffered a breach and the users' passwords have leaked out.
+
   \item \emph{Generate password for the user?} This is the only way
     to be guaranteed a strong password. But then the user is stuck
     having to memorize a random string.
+    Few systems take this approach, mostly because it is so inconvenient
+    for the system's users.
 
 \end{itemize}
 
-But passwords are still likely to have low entropy. What can we do about this?
-
--------------------------------
+So, in spite of our best efforts, users will likely choose
+easy-to-guess passwords.
+What can we do about this?
 
 \subsection{Dealing with poor passwords}
-A ``good'' password might have 20 bits of entropy---if an adversary is able to make $2^{20}$ passwords, they can expect to guess the password.
-And with current technology, guessing $2^{20}$ times is easy. So, we must limit guesses. 
+A ``good'' password might be sampled from a distribution with roughly
+20 bits of \marginnote{\emph{Entropy} is a
+quantitative way to talk about the adversary's uncertainty about
+a value sampled using a random process, or from a particular probability distribution.
+If a distribution has $b$ bits of entropy, then
+it will take at least roughly $2^b$ guesses for an attacker to correctly
+guess a value sampled from this distribution.
 
-Strawman solution: allow 10 wrong guesses for each account, after which the user is logged in completely.
-\begin{itemize}
-	\item This likely does well to prevent any one account from being compromised.
-	\item However, it does not protect the account base overall---an adversary can guess the 10 most common passwords for each account and expect to get into many accounts that use those common passwords.
-	\item This also has a big functionality downside---users are likely to be locked out of their accounts (DoS).
-\end{itemize}
+The uniform distribution over 128-bit strings has 128 bits of entropy.
+The distribution from which humans typically choose their passwords
+has much less entropy---empirically, more like 20 bits.}
+entropy---if an adversary is able to make $2^{20}$ guesses
+at the password, they can expect to guess the password correctly.
+And with current technology, guessing $2^{20}$ times is easy.
+So when using passwords as an authentication mechanism,
+we must find a way to limit guesses. 
 
-So we also need to limit guessing across accounts. This normally takes the form of limiting entries per IP, or using something like a CAPTCHA, and so on.
+A standard way to deal with the fact that passwords are easily
+guessable is to limit the number of guesses an attacker gets
+at the password.
+For example, some phones allow 10 guesses at the screen-lock PIN 
+before the device resets itself.
+Limiting the number of guesses effectively prevents a \emph{single}
+account from being compromised---provided that the password is not
+too too weak.
+One downside is guess limits create the possibility for denial-of-service
+attacks: an attacker can potentially make 10 guesses at your password and lock
+you out of your phone or online-banking account.
 
+In addition, in many physical computer systems have multiple authorized 
+users, each with their own password.
+If the guess limit is enforced only on a per-user basis, then an attacker
+can often compromise \emph{some} account on the machine if it is allowed
+10 guesses at \emph{every} user's password.
+Preventing these types of attacks requires some additional measures: websites
+that use password authentication rate-limit guesses by IP, or use CAPTCHAs, etc.
 
 \subsection{Storing Passwords}
-The most obvious way to store passwords on a server would be to just store each username along with their password.
+
+\iffalse
+The most obvious way to store passwords on
+a server would be to just store each username
+along with their password.
 
 \begin{tabular}{c|c}
 	user & password \\
@@ -151,35 +189,81 @@ To make this more difficult, systems can make use of an expensive $H$ function. 
 However, if all systems use the same hash function (hash functions are hard to make, so they are likely to), then many adversaries could get together and compute a \textit{rainbow table} that maps $H(pw)$ to $pw$. 
 
 \subsection{Avoiding pre-computation: salting}
-This precomputation attack only works when everyone is using the same hash function---the problem is that you can precompute some values and get a lot of use out of them---for many users across many systems. If we could have a hash function for each user, pre-computing would be ineffective as the generated table would be only applicable to a single user.
+\fi
 
-Generating a brand new hash function is difficult, but we can use a \textit{salt} to break this precomputation. Now the table looks like this:
+Since, as we have seen, passwords are easy to guess, avoiding 
+password-based authentication entirely is the safest option where
+possible.
 
+When a system must use passwords for authentication, the safest
+way to store them (e.g., on a server) is using an 
+\emph{salted cryptographic password-hashing function}.
+The goal is to make it as difficult as possible for an attacker
+to recover the plaintext passwords, given the hashed values stored on the server.
+
+To describe how this works: when a user creates an account with password pw,
+the server chooses a random 128-bit string, called a \emph{salt},
+and the server stores the salt and the hash value
+$h=H(\text{salt}\|\text{pw})$, where $H$ is a special password-hashing function.
+
+The server then stores a table that looks like this:
+
+\medskip
 \begin{tabular}{c|c|c}
-	user & salt & H(salt|pw) \\
+  user & salt & $H(\text{salt}\|\text{pw})$ \\
 	\hline
 	alice & $r_a$ & $h_a$ \\
 	bob & $r_a$ & $h_b$ \\
 \end{tabular}
+\medskip
 
-What we have done is generated a number for each user. Then, instead of hashing just the password, we hash the password along with the salt and store that. So now, if an adversary wanted to brute-force the password for a given account, they would have to perform all the work for only that account---this greatly increases the cost of compromising an account. 
+Later on, when the user sends a password $\text{pw}'$ to the server to authenticate, 
+the server can use the salt and hash function to compute a value $h' = H(\text{salt}\|\text{pw}')$.
+If this hash value $h'$ matches the server's stored value $h$ for this user,
+the server accepts the password.
+
+To explain the rationale for this design:
+\begin{itemize}
+  \item The password-hashing function $H$ is designed to be relatively expensive
+        to compute---possibly using a large amount of RAM and taking a second or 
+        more of computation.
+        This makes it more difficult for an attacker to brute-force invert the
+        hash value, since each guess at the password requires a second of computation
+        (instead of the microseconds required to compute a standard hash function,
+        such as SHA256).
+  \item The use of a per-user random salt ensures that guesses at one user's password
+        are useless in inverting another user's password hash.
+        Salting also defeats \emph{precomputation attacks}, in which an attacker
+        precomputes the hashes of many common passwords to speed up this hash-inversion
+        step later on.
+\end{itemize}
 
 
 \section{Authentication over the Network}
 We have so far been talking about manually entering a password. But what we normally do is log in to some server on the network---Facebook, Gmail, MIT, etc. And in this scenario, we can get much more creative.
 
 \subsection{Password Manager}
-A user can install a password manager on their computer that will generate random passwords for them. Since the user doesn't need to remember these passwords, they can have very high entropy---they are essentially \textit{keys}. Once the user logs into their computer, they can then access their randomly generated passwords and use them to log in to their websites. 
+A user can install a password manager on their computer that will generate random passwords for them. Since the user doesn't need to remember these passwords, they can be sampled truly at random from a high-entropy distribution. Once the user logs into their computer, they can then access their randomly generated passwords and use them to log in to their websites. 
 
+\medskip
 \begin{tabular}{c|c}
 	server & pw/key \\ \hline
 	\ttt{amazon.com} & \ttt{3xyt42...} \\
 \end{tabular}
+\medskip
 
-But we are still sending this password over the network. If an adversary can watch our network, they can see our password. Things like TLS protect against this, but what if we could authenticate without ever sending the password over the network?
+But password-based authentication, even with a strong password,
+still requires sending our passwords over the network.
+If an adversary can watch our network, they can see our password.
+Transport-later security, which we will discuss later on, can
+protect against this, but a better solution is to
+authenticate without ever sending the password over the network.
 
 \subsection{Challenge-Response}
-Assume that our computer has some key (password with high entropy) $k$, and the server also knows $k$. 
+Assume that our computer has some key $k$
+(e.g., a random 128-bit string), and the server also knows $k$. 
+
+-----------------------------
 
 % use the crypto latex library to make this nice
 \begin{enumerate}
