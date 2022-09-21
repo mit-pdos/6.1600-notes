@@ -256,7 +256,7 @@ sent along with a message to verify that the message was not changed.
 \paragraph{Bad idea.}
 Poorly designed software uses $\MAC(k, m) = H(k \| m)$ as a very simple construction of a MAC.
 However, this construction has an easy attack---given $\MAC(k, m)$, it is easy to compute $\MAC(k, m\|m')$ 
-without knowing the key $k$ if $H$ is a hash function built with the Merkle-Damg\a{}rd construction.
+without knowing the key $k$ if $H$ is a hash function built with the Merkle-Damg\aa{}rd construction.
 To do this, the attacker hashes the output of $\MAC(k, m)$ with two more blocks---a new 
 message $m''$ and another length block. Now, we
 have computed $\MAC(k, m\|m')$ where $m'$ is the
