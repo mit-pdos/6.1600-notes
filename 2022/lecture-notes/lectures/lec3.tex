@@ -14,12 +14,13 @@ The key new tool we use to do so is a \textit{collision-resistant hash function}
 \end{definition}
 
 In order for a hash function to be \textit{collision-resistant}, we want it to be the case that for any input, the generated output should be \textquote{unique.} Of course, it cannot really be unique---we are mapping infinitely many inputs onto finitely many outputs---but we want it to be \textit{computationally infeasible} to find a 
-pair of distinct inputs that have the same hash values (a ``\textit{collision}'').
+pair of distinct inputs that have the same hash values (a ``collision'').
 
 \begin{framed}
-  \textbf{Security goal for collision-resistant hash functions:}
-  It is \textquote{computationally infeasible} to find two distinct inputs 
-  to a collision resistant hash function that hash to the same value.
+\noindent
+\textbf{Security goal:} A hash function $H$ is collision resistant if
+it is \textquote{computationally infeasible} to find two distinct inputs 
+$x$ and $x'$ such that $H(x) = H(x')$.
 \end{framed}
 
 Collision-resistant hash functions let you authenticate 
@@ -105,7 +106,12 @@ we use in this definition---one mindset we use in practice and the other mindset
 		\end{itemize}
 \end{itemize}
 
-\subsection{Where do these numbers come from?}
+\subsection{Understanding which attacks are feasible}
+
+Typically, we think of an attack that runs in more than $2^{128}$ time
+as infeasible and an event that happens with probability less than $2^{-128}$
+is one that will never happen.
+These seemingly magic constants come from empirical considerations:
 
 \begin{table}[htpb]
 	\centering
@@ -116,7 +122,7 @@ we use in this definition---one mindset we use in practice and the other mindset
 		$2^{30}$ & operations/second on a laptop \\
 		$2^{58}$ & ops/sec on Fugaku supercomputer \\
 		$2^{68}$ & hashes/second on the Bitcoin network (as of Fall 2022) \\
-    $2^{92}$ & hashes/yr on the Bitcoin network (TODO: Cite)\\
+    $2^{92}$ & hashes/yr on the Bitcoin network \todo{Cite}\\
 		$2^{114}$ & hashes required to use enough energy to boil the ocean \\
 		$2^{140}$ & hashes required to use one year of the sun's energy \\
 	\end{tabular}
@@ -129,47 +135,165 @@ we use in this definition---one mindset we use in practice and the other mindset
 
 	\begin{tabular}{rl}
 		$2^{-1}$ & fair coin lands heads \\
-		$2^{-28}$ & probability of winning Mega Millions \\
-		$2^{-128}$ & will never happen \\
+    $2^{-13}$ & \parbox{3.5in}{probability that a randomly sampled\\[-3pt] MIT grad is a Nobel Prize winner}\\
+    $2^{-19}$ & probability of being struck by lightning next year\\
+		$2^{-28}$ & probability of winning the Mega Millions jackpot\\
+		$2^{-128}$ & will essentially never happen \\
 	\end{tabular}
 \end{table}
 
-The takeaway is that if our hash function has a $2^{-128}$ chance of a collision. We can be extremely sure that a collision will never occur.
+\marginnote{For most cryptosystems, there is a tradeoff between the
+attacker's running time and success probability.
+For example, an attacker running in time $T$ can find a collision in
+a hash function with $n$-bit output with probability $T^2/2^n$.
+So, as the attack runs for more time, it has a better chance of
+finding a collision.
+}
+The takeaway is that if an attacker finds a collision with probability
+$2^{-128}$, we can be extremely sure that a collision will never occur.
 
-\section{Constructing a CRHF}
-Pretty much every CRHF that exists today follows the same two-step approach:
+\section{Constructing a collision-resistant hash function}
+The current standard for fast collision-resistant
+hashing is SHA256 (a.k.a. SHA2), which was designed by the NSA in 2001.
+The SHA2 hash functions are designed using the following common
+two-step approach:
+
+\marginnote{
+We can also build collision-resistant hash functions
+that are secure under \textquote{nice} cryptographic assumptions,
+such as the assumption that factoring large numbers is hard.
+Unfortunately, hash functions based on
+these nice assumptions tend to be very slow and, as a result, 
+are almost never used in practice.
+}
 
 \begin{enumerate}
-	\item Build a small CRHF $H_{small}: \bin^{2\lambda} \rightarrow \bin^\lambda$. This step is \textquote{more art than science}, and involves doing things that seem collision resistant and testing the result extensively to see if it seems breakable. The current standard for fast collision-resistant hashing is SHA256, which was designed by the NSA in 2001. Hash Functions can also be build from \textquote{nice} assumptions about hardness of problems such as factoring of large numbers, but hash functions based on these assumptions tend to be very slow so are almost never used in practice.
-	\item Use $H_{\text{small}}$ to construct $H: \bin^* \rightarrow \bin^\lambda$. This can be done very cleanly, and one approach is the \textquote{Merkle-Damgard} approach below.
+  \item Build a small collision-resistant hash
+    function on a fixed-size domain $H_{small}: \bin^{2\lambda} \rightarrow \bin^\lambda$.
+    This step is, to some degree, \textquote{more art than science}.
+    The standard practice is to design a hash function that
+    defeats all known collision-finding attacks.
+    If no known attack works well, we declare the
+    candidate function to be collision resistant.
+
+	\item Use $H_{\text{small}}$ to construct $H: \bin^* \rightarrow \bin^\lambda$.
+    This can be done very cleanly using the \textquote{Merkle-Damg\aa{}rd} approach described
+    below.
+    This step requires no additional assumptions:
+    we can prove unconditionally that if $H_{\text{small}}$ is
+    collision resistant, then $H$ is as well.
 \end{enumerate}
 
-\subsection{Merkle-Damgard}
-Merkle-Damgard is based on splitting the message into $\lambda$-sized blocks $[m_1, \ldots, m_n]$ and successively hashing them together.
+\marginnote{Another way to build collision-resistant hash functions
+is to use the so-called ``sponge'' construction.
+It is similar to the approach described here in that we start
+with a small primitive, which we assume secure in some sense, 
+and then we use the small primitive to build a hash function
+on a large domain.}
 
-First, start with a bitstring $0^\lambda$. and compute $h_1 = H_{\text{small}}(0^\lambda||m_1)$. Next, compute $h^2 = H_{small}(h_1||m_2)$, $h_3$, and so on through $h_n$. Finally, compute $h_{\text{final}} = H_{small}(h_n, n)$ and output $h_{\text{final}}$.
+\subsection{Merkle-Damg\aa{}rd}
+The Merkle-Damg\aa{}rd construction gives a way to construct
+a collision-resistant hash function for all bitstrings (i.e., $\zo^*$)
+from a collision resistant hash function that maps $2\lambda$-bit strings
+down to $\lambda$-bit strings.
 
-We won't prove this here, but we can use the fact that $H_{small}$ is collision-resistant to prove that $H$ must also be collision-resistant. The basic idea of the proof is to show that given a collision in $H$, we can easily compute a collision in $H_{\text{small}}$. 
+\todo{Insert picture here}
+The Merkle-Damg\aa{}rd construction first splits the
+message into $\lambda$-sized blocks $[m_1, \ldots, m_n]$ and successively hashes them together.
+In the following pseudocode,
+the function $\mathsf{ToBlock}$ converts an integer, representing the length of the input message
+in blocks, into a $\lambda$-bit string.
+Then the Merkle-Damg\aa{}rd construction is:
+\begin{framed}
+\noindent
+  $H(m_1, \dots, m_n)$: \qquad \text{// Merkle-Damg\aa{}rd construction}
+\begin{itemize}[noitemsep]
+  \item Let $b \gets 0^\lambda$.
+  \item For $i = 1, \dots, n$:
+   \begin{itemize}
+     \item Let $b \gets H_\text{small}(b, m_i)$.
+   \end{itemize}
+ \item Output $H_\text{small}(b, \mathsf{ToBlock}(n))$.
+\end{itemize}
+\end{framed}
+(Here, we are assuming that the message is at most 
+$\lambda 2^{\lambda}$ bits long.)
+\marginnote{In practice, standard hash functions have limits on the
+length of the messages that they can hash. For example, SHA256 can
+hash messages of length up to $2^{64}-1$ bits.}
+
+We won't prove it here, but we can use the fact that $H_{small}$ is collision-resistant to prove that $H$ must also be collision-resistant. The basic idea of the proof is to show that given a collision in $H$, we can easily compute a collision in $H_{\text{small}}$. 
 
 \subsection{The Birthday Paradox}
-An important thing to note when dealing wiht hash functions is the birthday paradox, which says that given a hash function with $\lambda$-bit output, you can alays find a collision in time $O(\sqrt{2^\lambda}) = O(2^{\frac{\lambda}{2}})$. This means that a collision can be found in $2^\frac{\lambda}{2}$---if you want it to take $2^{128}$ to find a collision, you need 256-bit output from your hash function.
+\marginnote{If you sample $2^{\lambda/2}$ random $10\lambda$-bit strings and hash them
+with a hash function that has $\lambda$-bit outputs, you will find a collision 
+among these inputs with constant probability.}
+An important thing to understand when dealing with hash functions is the ``Birthday Paradox,'' 
+which states that given a hash function with $\lambda$-bit output, you can 
+always find a collision in time $O(\sqrt{2^\lambda}) = O(2^{\lambda/2})$.
+So, if you want to force an attacker to use at least $2^{128}$ to find a collision,
+you must use a hash function with at least 256 bits of output.
 
 \subsection{Domain Separation}
-Consider the case where we have a one-input CRHF (such as SHA2) $H: \bin^* \rightarrow \bin^{256}$ and want to construct a two-input CRHF $H_2(x, y)$. 
+In many applications, we have a one-input CRHF (such as SHA256) $H: \bin^* \rightarrow \bin^{256}$ 
+and we need to construct a two-input CRHF $H_2(x, y)$. 
 
-\textbf{Bad Idea}: An obvious solution may be to just concatenate the two values, so that $H_2(x, y) = H(x || y)$. However, this allows two different pairs of messages to hash to the same value---$H_2(\text{"key", "value"}) = H_2(\text{"ke", "yvalue"})$. Both Amazon and Flickr had a bug arising from this---they concatenated all parameters before hashing, and had parameters such that two different intents had the same concatenation.
+\paragraph{Bad idea.} An obvious solution to construct the two-input hash function $H_2$ 
+is to concatenate the two values, so that $H_2(x, y) = H(x || y)$.
+However, this construction allows two different pairs of messages to hash to the same value:
+\[ _2(\text{"key", "value"}) = H_2(\text{"ke", "yvalue"}).\]
+Both Amazon and Flickr had a bug arising from
+this---they concatenated all parameters before
+hashing, and had parameters such that two
+different intents had the same concatenation.\cite{flickr}
 
 \subsection{Length-Extension}
-Recall the concept of Message Authentication Codes (MAC) from the last lecture---a code that can be sent along with a message to verify that the message was not changed.
+Recall the concept of Message Authentication Codes
+(MAC) from the last lecture---a code that can be
+sent along with a message to verify that the message was not changed.
+(We will see the formal definition in \cref{lec:mac}.)
 
-Last time, we used $MAC(k, m) = H(k || m)$ as a very simple construction of a MAC. However, this construction has an easy attack---given $\text{MAC}(k, m)$, it is easy to compute $\text{MAC}(k, m||m')$ without knowing $k$ if using a hash function built with the Merkle-Damgard construction. To do this, you can hash the output of $\text{MAC}(k, m)$ with two more blocks---a new message $m''$ and another length block. Now, we have computed $\text{MAC}(k, m||m')$ where $m'$ is the original length block plus some custom message without knowing $k$. 
+\paragraph{Bad idea.}
+Poorly designed software uses $\MAC(k, m) = H(k \| m)$ as a very simple construction of a MAC.
+However, this construction has an easy attack---given $\MAC(k, m)$, it is easy to compute $\MAC(k, m\|m')$ 
+without knowing the key $k$ if $H$ is a hash function built with the Merkle-Damg\a{}rd construction.
+To do this, the attacker hashes the output of $\MAC(k, m)$ with two more blocks---a new 
+message $m''$ and another length block. Now, we
+have computed $\MAC(k, m\|m')$ where $m'$ is the
+original length block plus some custom message
+without knowing the key~$k$. 
 
-This lesson here is that we were using a hash function that was only guaranteed to be collision-resistant, and assumed it had other properties (such as that it is guaranteed to be difficult to compute the hash of an extension of the original message).
-% the diagram here would be very helpful.
+This problem here is that we were using a hash
+function that was \emph{only} guaranteed to be
+collision resistant, but we assumed that it had other
+properties (such as that it is guaranteed to be
+difficult to compute the hash of an extension of
+the original message).
+\todo{the diagram here would be very helpful}
 
-\section{Applications}
-\subsection{Merkle Trees}
-In many cases, we would like to authenticate many files quickly. If we have $N$ files to authenticate, one option would be to store the hash of all $N$ files on the server. However, in this case the client needs to download every file in order to authenticate a single file. Another option would be to store the hashes for each file on the server, but then authenticating many files becomes difficult. A better option is to build a tree out of the files. 
+\section{Applications: Merkle Trees}
+In many settings, an origin server has $N$ files (e.g., Android app binaries)
+and wants to serve these files from potentially untrustworthy mirror servers
+(e.g., Akamai servers) distributed around the globe.
 
-I think that the diagram from lecture is pretty important here. But the basic idea is that we build a tree by hashing together pairs of files, then hash each pair of hashes and so on until we eventually end up with a single root hash. Then, in order to verify any single file we need to download $\log N$ hashes, and to verify all files we only need to download a single root hash.
+To do this, the origin server can put the $N$ files at the leaves of a
+binary tree.
+Then the server hashes together pairs of files, then hashes each pair of
+hashes and so on until it eventually ends up with
+a single root hash $h$.
+The client fetches the root hash $h$ from the origin
+server directly.
+
+Later on, the client can download any one of the $N$
+files from the untrustworthy mirror server.
+The mirror can produce the file, along
+with $O(\log N)$ hashes---the sibling
+nodes of each node on every path from the file's
+leaf to the root.
+The client can use the root hash $h$ it got from
+the origin server, along with the additional hashes
+from the mirror server, to be convinced that the mirrored
+file it downloaded was authentic.
+
+\todo{Add diagram from lecture.}
 
