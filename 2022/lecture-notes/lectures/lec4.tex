@@ -13,31 +13,27 @@ With this shared key $k$ between the two parties, our goal will be to add some \
 %         m, tag
 %\procedureblock
 
-\section{Defining MAC}
+\section{Defining message authentication codes}
 
-\begin{definition}[Message Authentication Code]
-	A Message Authentication Code (MAC) consists of two algorithms $(S, V)$ and a message space $\mathcal{M}$ and a key space $\mathcal{K}$.
+\paragraph{Syntax.}
+A message authentication code (MAC) 
+over key space $\mathcal{K}$ and
+message space $\mathcal{M}$ 
+is an efficient algorithm $\MAC$.
+The algorithm $\MAC$ takes as input a key $k \in \calK$,
+and a message in $m \in \calM$ and outputs a tag. 
 
-	\begin{itemize}
-		\item $S(m, k) \rightarrow \sigma$: The signing algorithm $S$ takes as input a message $m$ and a key $k$ and outputs a tag.
-	  \item $V(m, k, \sigma) \rightarrow \bin$: The verification algorithm $V$ takes $m$, $k$, and a tag and outputs $\bin$.
-	\end{itemize}
-	
-\end{definition}
+In order for a MAC to be useful, it must be \emph{secure},
+in a sense that we define now.
 
-In practice, there is only a single signing algorithm $S$---the verification algorithm can simply re-run the signing algorithm and compare the output. This function is typically denoted by $\mathsf{MAC}$.
-
-In order for this to be useful, we need a MAC to satisfy some properties.
-
-\subsection{Completeness}
-We need a MAC to function correctly:
-
-\[ \forall m \in \mathcal{M}, \forall k \in \mathcal{K}, V(k, m, S(k, m)) = 1 \]
+----------------------------------------
 
 \subsection{Security}
-To create our security goal, we need to consider the goal of the adversary and the power of the adversary.
+To formulate our security notion, we need to define
+the adversary's goal and the adversary's power.
 
-Given our use case above, the goal of the adversary is to compute a valid MAC of any $m\in \mathcal{M}$. But it's not entirely obvious why we care about the adversary signing \textit{any} message---if the adversary signs a message that is jibberish, they are unlikely to be able to do any harm. But we would like to have our MAC function be generally applicable. There will certainly be applications that authenticate messages that violate whatever definition of \textquote{non-jibberish} we define.
+Given our message-authentication use case, the goal of the adversary is to compute a valid MAC of any $m\in \mathcal{M}$.
+But it's not entirely obvious why we care about the adversary signing \textit{any} message---if the adversary signs a message that is jibberish, they are unlikely to be able to do any harm. But we would like to have our MAC function be generally applicable. There will certainly be applications that authenticate messages that violate whatever definition of \textquote{non-jibberish} we define.
 
 We have some basic limits of the power of the adversary from cryptography in general---the adversary must be an algorithm that runs in polynomial time, for example. But in order to create meaningful security, we need to expand the adversary's power a bit. For example, if an adversary is watching our network, they are able to see every message that we send---including its MAC. So we must allow the adversary to see tagged messages. \marginnote{This has some interesting implications---importantly, the adversary can store these messages along with their MAC and replay them later.}
 
