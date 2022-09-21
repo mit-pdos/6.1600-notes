@@ -89,10 +89,38 @@ A strawman solution to this problem would be to just chop our message up into 12
 
 To solve this reordering attack, we can \emph{chain} the output of each of these calls to AES. Given our chopped message $(m[0], m[1], \ldots, m[n])$, we will generate $t_0 = \mathsf{AES}_k(m[0])$ as before. When generating $t_1$, however, we will first XOR $t_0$ into the input: $t_1 = \mathsf{AES}_k(m[1] \oplus t_0)$. This continues until the end of the message, at which point we output $t_n$.
 
-% TODO: the chaining diagram is very useful here.
+\begin{figure}[htpb]
+	\centering
+	\begin{tikzpicture}
+		\node (m0) [draw] {$m_0$};
+		\node[below =1cm of m0] (f0) [draw] {$F_k$};
+		\node[below =0.5cm of f0] (t0) [draw] {$t_0$};
+		\draw [->] (m0) edge (f0) (f0) edge (t0);
+
+		\node[right=0.75cm of m0] (m1) [draw] {$m_1$};
+		\node[below =0.25cm of m1] (m1xt0) {$\oplus$};
+		\draw [->] (t0) - ++(0.75,0) -- ++(0.75,1.83) -- (m1xt0);
+		\node[below =1cm of m1] (f1) [draw] {$F_k$};
+		\node[below =0.5cm of f1] (t1) [draw] {$t_1$};
+		\draw [->] (m1) edge (m1xt0) (m1xt0) edge (f1) (f1) edge (t1);
+
+		\node[right=0.75cm of m1] (m2) [draw] {$m_2$};
+		\node[below =0.25cm of m2] (m2xt1) {$\oplus$};
+		\draw [->] (t1) - ++(0.75,0) -- ++(0.75,1.83) -- (m2xt1);
+		\node[below =1cm of m2] (f2) [draw] {$F_k$};
+		\node[below =0.5cm of f2] (t2) [draw] {$t_2$};
+		\draw [->] (m2) edge (f2) (f2) edge (t2);
+	\end{tikzpicture}
+	\caption{A better, but still insecure, MAC construction.}
+	\label{fig:}
+\end{figure}
 
 However, this too has an attack! Given $t_1 = MAC(k, (m[0], m[1])$, we can generate a valid tag for $(m[0], m[1], m[2])$ given only $\mathsf{MAC}(k, m_2 \oplus t_1)$---the tags of $(m[0], m[1], m[2])$ and $(m[2] \oplus t_1)$ are identical.
 
-	To solve this, we do one final MAC before outputting \emph{with a new key}. Instead of outputting $t_n$, we output $\mathsf{AES}_{k'}(t_n)$. % TOOD: explanation of why we need a second key here would be useful
+	To solve this, we do one final MAC before outputting \emph{with a new key}. Instead of outputting $t_n$, we output $\mathsf{AES}_{k'}(t_n)$. This construction is called CBC-MAC or CMAC. % TOOD: explanation of why we need a second key here would be useful---the diagram in lecture 9/21 was very useful to understand the same-key attack.
+
+	Intuitively, the purpose of this second AES is to avoid giving the adversary \textit{any} tag computed with key $k$. 
+
+	If we do not use a new key, an adversary can achieve a length extension attack. If the adversary asks for $t = \mathsf{MAC}(k, m_0)$ and $t' = \mathsc{MAC}(k, t)$, $t'$ is also a valid key for the original message with two zero blocks attached $\mathsf{MAC}(k, m_0 || 0 || 0)$. The chain of AES applications becomes equivalent, since zero blocks are equivalent to skipping the XOR and adding AES applications.
 
 % TODO: diagram

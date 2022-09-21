@@ -1,0 +1,87 @@
+In the last section, our strategy for authentication depended on sharing some secret key between two parties. However, we completely left out of the picture how these parties should exchange this key. Our implication was that they went to some whisper-room and exchanged the key in secret, but in many cases this is not practical: if they could whisper a key, why not just whisper the message?
+
+Luckily, there is a way to get around this requirement for a shared secret using \emph{public-key cryptography}. % TODO: cite DH
+
+The basic idea of public-key cryptography when applied to authentication is that each party will generate two linked keys---a secret key and a verification key. The verification key will be good enough to verify that a signature is valid, but not to generate a new signature.
+
+\begin{definition}[Signature Scheme]
+	A signature scheme is associated with a message space $\calM$ and three probabilistic polynomial time algorithms $(\Gen, \Sign, \Ver)$.
+
+	\begin{itemize}
+		\item $\Gen$ takes as input $1^\lambda$, where $\lambda$ is the security parameter that outputs a pair $(\sk, \vk)$ containing a signing key and verification key respectively.
+		\item $\Sign$ takes as input $\sk$ and $m \in \calM$ and outputs a signature $\sigma$.
+	\item $\Ver$ takes as input a verification key $\vk$, a message $m \in \calM$, and a signature $\sig$, and outputs $\bin$.
+	\end{itemize}
+	
+\end{definition}
+
+Our definitions of completeness and security will be quite similar as in the MAC case.
+
+\begin{definition}[Completeness]
+	$\forall \lambda \in \N, \forall (\sk, \vk) \leftarrow \Gen(1^\lambda), \forall m \in \calM$
+	\[ \text{Pr}\left[\Ver(\vk, m, \Sign}(sk, m)) = 1\right] = 1 \]
+
+	In English, this says that the probability that $\Ver$ outputs 1 on a correctly signed message is 1.
+\end{definition}
+
+\begin{definition}[Security]
+	$\forall \ppt \A$ wins the following game with negligible probability:
+
+	The challenger first generates $(\sk, \vk) \leftarrow \Gen(1^\lambda)$ and sends $\vk$ to the adversary. The adversary can then send the challenger as many messages $(m_1, m_2, \ldots, m_3)$ as he likes, and the challenger must respond with $\sig_1 = \Sign(\sk, m_1), \sig_2 = \Sign(\sk, m_2), \ldots, \sig_n = \Sign(\sk, m_3)$. Then, the adversary wins if he can output $(m^*, \sig^*)$ such that $\Ver(\vk, m^*, \sig^*) = 1 \land m^* \notin \set{m_1, \ldots, m_n}$. % TODO: diagram
+\end{definition}
+
+\section{Constructing a Signature Scheme}
+We will generate a signature scheme that is secure, but is not practical. For pracical signature schemes, see RSA et al. We will construct this scheme in three stages:
+
+\begin{enumerate}
+	\item Construct a \emph{one-time secure} signature scheme for \emph{bounded messages}, where the security can be broken if an adversary sees more than a single signature and where $\abs{\sk} > \abs{m}$ (the size of the secret key is larger than the size of the message). This is called the Lamport Scheme. %TODO: cite
+	\item Construct a one-time secure scheme for messages in $\bin^*$, removing the restriction that the secret key is longer than the message.
+	\item Construct a many-time secure scheme for messages in $\bin^*$.
+\end{enumerate}
+
+\begin{definition}[One-Time Security]
+	A signature scheme is one-time secure if $\forall \ppt \A$ wins the following game with negligible probability:
+
+	The challenger generates $(\sk, \vk) \leftarrow \Gen(1^\lambda)$ and sends $\vk$ to the adversary. The adversary can then ask for a \emph{single} signature over a message $m$, and the challenger must respond with $\sig = \Sign(\sk, m)$. $\A$ wins if he outputs $(m^*, \sig^*)$ where $\Ver(\vk, m^*, \sig^*) = 1$ and $m^* \neq m$.
+\end{definition}
+
+% TODO: why we are defining one-way 
+
+\begin{definition}[One-Way]
+	A function $f: X \rightarrow Y$ is one-way if it is poly-time computable and the probability of an adversary given $y=f(x)$ finding $x$ such that $f(x) = y$ is negigible. Formally,
+
+	% TODO: probability function, formalize notation here
+	\[ \forall \ppt \A, \exists \mu(\lambda) \text{s.t. } \text{Pr}_{x \leftarrow X, y = f(x)}\left[\A(y) = x' \text{s.t.} f(x')=y\right] \leq \mu(\lambda) \]
+\end{definition}
+
+\subsection{Lamport Signature Scheme}
+We first construct a one-time secure signature scheme for messages in $\bin^n$. To do this, we will define the following algorithms:
+
+
+\begin{itemize}
+	\item Choose at random, with elements sampled from $X$, and where $f$ is a one-way function.
+
+\[ \sk = \begin{pmatrix}
+	x_{10} & \ldots & x_{n0} \\
+	x_{11} & \ldots & x_{n1} \\
+	\end{pmatrix}, \vk = \begin{pmatrix}
+	f(x_{10}) & \ldots & f(x_{n0}) \\
+	f(x_{11}) & \ldots & f(x_{n1}) \\
+\end{pmatrix}\]
+	\item $\Sign(\sk, m)$ outputs $(x_{1m_1}, \ldots x_{nm_n})$, where $m_1 \ldots m_n$ are the individual bits of the length-$n$ message $m$.
+	\item $\Ver(\vk, m, \sig)$ parses $\sig$ into its individual bits $\sig = (x_1^*, \ldots x_n^*)$ and $\sig$ into the matrix above. Accept if the application of the one-way function $f$ to each bit $i$ of the signature matches the corresponding value in the verification key. In math terms, output 1 if $\forall i \in [n], f(x^*_i) = \vk_{im_i}$, and otherwise output 0.
+\end{itemize}
+
+This scheme is obviously impractical since the keys are so large, and if an adversary can ask for two messages there is an obvious attack: the adversary should first ask for $0^n$ and recieve $\sig_1 = (x_{10}, \ldots, x_{n0})$, and then ask for the signature of $m_2 = 1^n$ and recieve $\sig_2 = (x_{11}, \ldots, x_{n1})$. At this point, the adversary can reconstruct the entire secret key $\sk = \begin{smallmatrix} \sigma_1 \\ \sig_2 \end{smallmatrix}$! However, we will argue that if the adversary can see only a single message, this scheme is indeed secure.
+
+\textbf{Claim:} This scheme is one-time secure assuming $f$ is a one-way function.
+
+In cryptography, they way we generally do these proofs is by \emph{reduction}---we will show that \emph{if an adversary exists that breaks the security}, then we can construct an adversary to break one of our assumptions. If we do this, there is a contradiction, so the first adversary cannot exist.
+
+\textbf{Proof (sketch):} Suppose there exists an adversary $\A$ that wins the game in our security definition with non-negligible probability, meaning that the adversary can generate $(m^*, \sig^*)$ such that $\Ver(\vk, m^*, \sig^*) = 1$ and $m \neq m^*$ given only $\sig_1 = \Sign(\sk, m_1)$. We can then construct an adversary $\B$ that can use $\A$ to break the one-way function.
+
+% TODO: Fix this. I didn't have time to write it well/finish it
+First, $\B$ should generate a key pair ($\B$ is the challenger in this case.
+
+Since $m \neq m^*$ and $\sig$ in this scheme depends on the bits of $m$, it must be the case that $\sig^*$ varies from $\sig_1$ in at least one bit. Therefore, the adversary has some value of the secret key matrix that was not given to them as part of $\sig_1$ and the corresponding value of
+
