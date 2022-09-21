@@ -122,7 +122,7 @@ What can we do about this?
 \subsection{Dealing with poor passwords}
 A ``good'' password might be sampled from a distribution with roughly
 20 bits of \marginnote{\emph{Entropy} is a
-quantitative way to talk about the adversary's uncertainty about
+way to quantify the adversary's uncertainty about
 a value sampled using a random process, or from a particular probability distribution.
 If a distribution has $b$ bits of entropy, then
 it will take at least roughly $2^b$ guesses for an attacker to correctly
@@ -240,42 +240,84 @@ To explain the rationale for this design:
 
 
 \section{Authentication over the Network}
-We have so far been talking about manually entering a password. But what we normally do is log in to some server on the network---Facebook, Gmail, MIT, etc. And in this scenario, we can get much more creative.
+We have so far been talking about a human manually
+authenticating to a device (ATM, phone, laptop, etc.)
+by physically entering a PIN or password into the device.
+But we often log in to some server on the network---Facebook,
+Gmail, MIT, and so on. 
+In this scenario, we can get much more creative
+with the authentication mechanism we use and the
+security properties we can demand.
 
 \subsection{Password Manager}
-A user can install a password manager on their computer that will generate random passwords for them. Since the user doesn't need to remember these passwords, they can be sampled truly at random from a high-entropy distribution. Once the user logs into their computer, they can then access their randomly generated passwords and use them to log in to their websites. 
+When using passwords to authenticate to a website, 
+a user can install a password manager on their
+computer that will generate random passwords for them.
+Since the user doesn't need to remember these passwords,
+they can be sampled truly at random from a high-entropy distribution.
+Once the user logs into their computer, they can
+then access their randomly generated passwords and
+use them to log in to their websites. 
+
+Internally, the password-manager software maintains a table of 
+servers and the corresponding passwords:
 
 \medskip
-\begin{tabular}{c|c}
-	server & pw/key \\ \hline
-	\ttt{amazon.com} & \ttt{3xyt42...} \\
+\begin{tabular}{c|c|c}
+  server & user & pw \\ \hline
+  \ttt{amazon.com} & \ttt{alice} & \ttt{3xyt42...} \\
+  \ttt{mit.edu} & \ttt{alice4} & \ttt{a21\$z...} \\
 \end{tabular}
 \medskip
 
 But password-based authentication, even with a strong password,
-still requires sending our passwords over the network.
+still requires sending passwords over the network.
 If an adversary can watch our network, they can see our password.
 Transport-later security, which we will discuss later on, can
-protect against this, but a better solution is to
+protect against network eavesdroppers, but a better solution is to
 authenticate without ever sending the password over the network.
 
-\subsection{Challenge-Response}
-Assume that our computer has some key $k$
-(e.g., a random 128-bit string), and the server also knows $k$. 
+\subsection{Challenge-Response Protocols}
+We now assume that our computer has some key~$k$
+(e.g., a random 128-bit string), 
+and the server also holds the same key~$k$. 
+Then a challenge-response protocol proceeds as follows:
 
------------------------------
+\todo{use the crypto latex library to make this nice}
 
-% use the crypto latex library to make this nice
 \begin{enumerate}
-	\item The server chooses a random $r$ (we will call this a \textit{nonce})
-	\item The computer computes $F(k, r)$, where $F$ cannot be computed without knowing $k$, $F$ here is a Message Authentication Code, which we will talk more specifically about.
-	\item The computer sends this value to the server, where it can compute the same value to check whether the computer knows $k$ without the computer actually transmitting $k$.
+	\item The server chooses a long random string~$r$, which we often call a \textit{nonce} and sends it to the authenticating client.
+  \item The client computes an authentication ``tag'' $t \gets \MAC(k, r)$, where $\MAC(\cdot, r)$ is hard to compute without knowing $k$.
+    (The function $\MAC$ here is a Message Authentication Code, which we will talk more specifically about
+        in \cref{lec:mac}.)
+        The sends the MAC tag $t$ to the server.
+  \item The server receives a tag $t'$ from the client and ensures that $t' = \MAC(k,r)$.
+        If so, the server considers the authentication successful.
 \end{enumerate}
 
-Attack: man-in-the-middle---an adversary could sit between the server and Alice, get the nonce from the server, ask alice to log in, and then intercept alice's login request and change the request contents to perform some other function. To help with this, we can include the request itself in the MAC. Now, if the man in the middle changes the request, the MAC will become invalid.
+\marginnote{An \textbf{unsafe} way for the client to simultaneously authenticate to the 
+server and send a request would be for the client to compute the MAC tag $t \gets \MAC(k,r)$
+and then send $(t, \mathsf{req})$ to the server.
+A network attacker could modify the client's request to $(t, \mathsf{req'})$ en
+route to the server without the server being able to detect this attack.}
+In practice, the client often wants to simultaneously authenticate to the server
+and send a request $\mathsf{req}$, such as $\mathsf{req} = \ttt{rm file.txt}$.
+To accomplish this, the client can compute the MAC tag $t$ as
+$t_{\mathsf{req}} \gets \MAC(k, r \| \mathsf{req})$.,
+Then the client sends the pair $(t_{\mathsf{req}}, \mathsf{req})$ to the server.
+In this way, the server can simultaneously authenticate the client
+and be sure that the request $\mathsf{req}$ came from the client.
 
 \subsection{Two-Factor Authentication}
-Passwords are unlikely to ever be perfect---whether by leaving it on a sticky not on your screen, an adversary stealing the database, or whatever else, a password can be leaked. A common solution is to combine a password with another method of authentication---importantly, one with a different failure mode. Common "classes" are:
+As we have already seen, passwords are a weak authentication
+mechanism: humans are bad at choosing strong passwords and 
+attackers have become good at stealing password databases
+and recovering many users' passwords at once.
+
+A common technique to harden password-based authentication systems
+is to combine passwords with a second method of 
+authentication---one with a different failure mode. 
+Common authentication schemes are:
 
 \begin{itemize}
 	\item Something you know: password, PIN, etc
@@ -283,13 +325,50 @@ Passwords are unlikely to ever be perfect---whether by leaving it on a sticky no
 	\item Something you are: biometrics (fingerprint, face ID)...
 \end{itemize}
 
-\subsubsection{Time-based One Time Passwords (TOTP)}
-In this scenario, the server requests a code along with the password. The user has a device (like a phone) that shares some key $k$ with the server, and they both agree on a protocol by which to generate this code---something like $MAC(k, \text{time / 30 seconds})$. The phone can generate the code, display it to the user, and the server can then verify the code by recomputing it.
+\subsubsection{Time-based One-Time Passwords (TOTP)}
+In this scenario, the server requests a code along
+with the password. The user has a device, such as 
+a phone, that shares a secret key $k$ (e.g., a random 128-bit string) 
+with the server.
+Both parties agree on a protocol by which to
+generate this code---something like $\MAC(k, \texttt{gettimeofday() / 30})$.
+The phone can generate the code, display it to the user, and the server
+can then verify the code by recomputing it.
 
-Attack: ask the user to give you the code---pretend to be tech support/customer service, etc. This is essentially a phishing attack. The code is then good for 30 seconds, so the attacker can then just enter the code into the website on their end. Similar attacks would include setting up a fake website that looks like the real one, etc.
+\textbf{A common attack.}\marginnote{A \emph{phishing} attack is one
+in which an attacker tricks a user into giving away their Gmail password,
+for example, by creating a website that looks, for example, like the \ttt{gmail.com}
+login page.}
+Time-based one-time passwords are also an imperfect authentication mechanism.
+For example, an attacker can simply ask the user to give her the one-time code by pretend to be tech support, 
+or the user's employer, or a customer-service representative.
+This is essentially a phishing attack.
+The code is then good for 30 seconds, so the attacker can then
+just enter the code into the website on their end.
+Similar attacks would include setting up a fake
+website that looks like the real one, etc.
+One benefit of TOTP codes (unlike passwords) is that the attacker
+must use a stolen TOTP code within $\approx$30 seconds of stealing
+it, which requires a much more sophisticated attack.
 
 \subsubsection{Avoiding phishing: U2F (simplified)}
-We can add a bit of complexity to the protocol to avoid this attack. If we include the name of the server that the user is trying to log in to in the request that we sent to the device, the code won't be able to be used on any other site---now, the code might look something like $MAC$(k, r||name). If the attacker sets up \ttt{amason.com} and gets the user to visit it, the U2F device will only generate a code that is good for that site and not the real \ttt{amazon.com}. 
+To prevent phishing attacks entirely, we can use a more complex authentication protocol.
+If we include the name of the server that the user is trying to log in to in the request that we sent to the device,
+the code will be bound to a particular website.
+For example, the code might look something like $\MAC(k, r\|\ttt{amazon.com})$.
+U2F key fobs use a protocol along these lines for authentication.
+If the attacker sets up \ttt{amason.com} and gets the user to visit it,
+the U2F device will only generate a code that is good for \ttt{amason.com}
+and not the real \ttt{amazon.com}. 
 	
 \subsection{Biometrics}
-Biometrics are things like fingerprints, your face, etc. They are very convenient, since you won't forget them, but they are not great for authenticating over the network because they are not replaceable and because they are not particularly secret. An adversary knowing what your fingerprint looks like should not allow them to log in to your account. Biometrics are much more useful if you have a trusted input path that can guarantee that a real human who owns that biometric is on the other end.
+Biometrics are physical features like your fingerprints, your face, etc.
+They are very convenient to use for authentication, since you will not forget them and cannot easily lose them.
+Biometrics most useful when authenticating in person to a device, such as for phone unlock, or
+to grant a person access to a secure vault.
+In these settings, the device performing the authentication has a ``trusted input path''
+that can more or less guarantee that a real human who owns that biometric is on the other end.
+Biometrics are not so useful for authenticating over a network because they are not particularly secret.
+In particular, if we used biometrics for network authentication,
+an adversary who knows what your fingerprints looks like could log in to your account.
+(Since biometrics are essentially impossible to change, this is a major drawback.)

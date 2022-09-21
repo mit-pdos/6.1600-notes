@@ -1,3 +1,5 @@
+\label{lec:mac}
+
 So far, we have talked about authenticating \emph{people} and authenticating \emph{files}. In this section, we will discuss authenticating \emph{communication}. If we have two parties that are communicating over the network, we want some way to guarantee to each party that the message they received really came from the other party and was not tampered with along the way.
 
 At a first glance, this seems impossible. If there is some eavesdropper Eve in between the two parties, they can just replace the message with one of their own choosing and the other party will have no idea. To make this possible, we need to relax the scenario a bit and add an assumption---that the two parties share some secret key $k$. 
@@ -18,7 +20,7 @@ With this shared key $k$ between the two parties, our goal will be to add some \
 
 	\begin{itemize}
 		\item $S(m, k) \rightarrow \sigma$: The signing algorithm $S$ takes as input a message $m$ and a key $k$ and outputs a tag.
-	\item $V(m, k, \sigma) \rightarrow \bin$: The verification algorithm $V$ takes $m$, $k$, and a tag and outputs $\bin$.
+	  \item $V(m, k, \sigma) \rightarrow \bin$: The verification algorithm $V$ takes $m$, $k$, and a tag and outputs $\bin$.
 	\end{itemize}
 	
 \end{definition}
@@ -121,6 +123,6 @@ However, this too has an attack! Given $t_1 = MAC(k, (m[0], m[1])$, we can gener
 
 	Intuitively, the purpose of this second AES is to avoid giving the adversary \textit{any} tag computed with key $k$. 
 
-	If we do not use a new key, an adversary can achieve a length extension attack. If the adversary asks for $t = \mathsf{MAC}(k, m_0)$ and $t' = \mathsc{MAC}(k, t)$, $t'$ is also a valid key for the original message with two zero blocks attached $\mathsf{MAC}(k, m_0 || 0 || 0)$. The chain of AES applications becomes equivalent, since zero blocks are equivalent to skipping the XOR and adding AES applications.
+	If we do not use a new key, an adversary can achieve a length extension attack. If the adversary asks for $t = \mathsf{MAC}(k, m_0)$ and $t' = \mathsf{MAC}(k, t)$, $t'$ is also a valid key for the original message with two zero blocks attached $\mathsf{MAC}(k, m_0 || 0 || 0)$. The chain of AES applications becomes equivalent, since zero blocks are equivalent to skipping the XOR and adding AES applications.
 
 % TODO: diagram
