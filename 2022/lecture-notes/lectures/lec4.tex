@@ -187,50 +187,94 @@ a pseudorandom function. However,
 it has undergone a tremendous amount of cryptanalysis and the best attacks on AES are only marginally better than the obvious brute-force attacks.}
 
 \subsection{From pseudorandom functions to MACs}
-With this 128-bit PRF, we can build a MAC for 128-bit messages as described above: $\mathsf{MAC}(k, m) = \mathsf{AES}_k(m)$. 
+
+\paragraph{MACs for short messages.}
+Using AES as a pseudorandom function on a 128-bit domain,
+we can build a MAC for 128-bit messages as described above
+: $\MAC(k, m) \deq \mathsf{AES}_k(m)$. 
 However, since AES takes only 128 bits as input, using AES
-directly, we can only generate MACs for 128-bit messages. 
+directly, we can only authenticate 128-bit messages. 
 
-To sign longer messages, we need to combine this \textquote{small MAC} to construct a \textquote{big MAC}. 
+\paragraph{Insecure ways to construct a MAC for long messages.}
+A bad way to construct a MAC for long messages from a pseudorandom 
+function $F$ for 128-bit messages is
+just to chop our message $m$ up into 128-bit blocks
+$m = (m_1, m_2, \dots)$
+and MAC each block separately.
+Our tag, then, would look something like $\left(F(k,m_1), F(k,m_1)\right)$.
+However, there is a problem! Given the tag $t = (t_1, t_2)$ for a message $m=(m_1, m_2)$, we can easily generate a valid tag 
+$t' = (t_2, t_1)$ for a different message $m'=(m_2, m_1)$. 
 
-------------------------
+\paragraph{MACs for long messages: The easy way.}
+\marginnote{
+Notice that we cannot use AES as the pseudorandom
+function $F$ in this construction, since AES only
+takes a 128-bit input.
+In this case, we would need a collision-resistant
+hash function $H \colon \zo^* \to \zo^{128}$,
+but it is always possible to find collisions
+in hash functions with 128-bit output in time $2^{64}$.
+So such a MAC can never be secure against attackers running
+in time $2^{64}$.
+}
+If we have a pseudorandom function $F$ with an input space of 256-bits,
+we can construct a MAC on arbitrary-length messages using the ``hash-and-sign'' paradigm.
+In particular, we use a collision-resistant hash function $H\colon \zo^* \to \zo^{256}$ 
+(\cref{def:crhf}) and we define the MAC on message space $\zo^*$ as:
+\[ \MAC(k,m) \deq F(k, H(m)).\]
 
-A strawman solution to this problem would be to just chop our message up into 128-bit chunks and MAC each one separately. Our tag, then, would look something like $\left(\mathsf{AES}_k(m[0]), \mathsf{AES}_k(m[1]))\right)$. However, there is a problem! Given the tag for a message $(m[0], m[1]) = (t_0, t_1)$, we can easily generate a valid tag for $(m[1], m[0])$ --- $(t_1, t_0)$. 
 
-To solve this reordering attack, we can \emph{chain} the output of each of these calls to AES. Given our chopped message $(m[0], m[1], \ldots, m[n])$, we will generate $t_0 = \mathsf{AES}_k(m[0])$ as before. When generating $t_1$, however, we will first XOR $t_0$ into the input: $t_1 = \mathsf{AES}_k(m[1] \oplus t_0)$. This continues until the end of the message, at which point we output $t_n$.
+In practice, we typically do not construct MACs in this way because
+collision-resistant hash functions are typically more expensive to
+compute (per bit of input) than pseudorandom functions, such as AES.
+
+\paragraph{MACs for long messages: The hard way.}
+
+
+\marginnote{
+Applying the PRF to the last block using an independent random key is important.
+If we do not use a new key, an adversary can mount a length-extension attack.
+That is, if the adversary asks for $t = \mathsf{MAC}(k, m_1)$ and $t' = \mathsf{MAC}(k, t)$, $t'$ is also a valid key for the original message with two zero blocks attached $\mathsf{MAC}(k, m_1 \| 0 \| 0)$. The chain of AES applications becomes equivalent, since zero blocks are equivalent to skipping the XOR and adding AES applications.
+}
+
+A common and secure way to construct a MAC for long messages from a MAC for short messages
+is to \emph{chain} the output of each of these calls to the pseudorandom function.
+Given our chopped message $(m_1, m_2, \ldots, m_n)$, we will generate $t_1 = F(k,m_1)$ as before. When generating $t_2$, we will first XOR $t_1$ into the input: 
+$t_2 = F(k, m_2 \oplus t_1)$. This continues until the end of the message, at which point have a tag $t_n$.
+Finally, we apply the PRF \emph{with a different key} $k'$ to the value $t_n$ and output this tag $t \gets F(k', t_n)$. 
+This construction is called CBC-MAC or CMAC. % TOOD: explanation of why we need a second key here would be useful---the diagram in lecture 9/21 was very useful to understand the same-key attack.
+
 
 \begin{figure}[htpb]
 	\centering
 	\begin{tikzpicture}
-		\node (m0) [draw] {$m_0$};
-		\node[below =1cm of m0] (f0) [draw] {$F_k$};
-		\node[below =0.5cm of f0] (t0) [draw] {$t_0$};
+		\node (m0) [draw] {$m_1$};
+    \node[below =1cm of m0] (f0) [draw] {$F(k, \cdot)$};
+		\node[below =0.5cm of f0] (t0) [draw] {$t_1$};
 		\draw [->] (m0) edge (f0) (f0) edge (t0);
 
-		\node[right=0.75cm of m0] (m1) [draw] {$m_1$};
+		\node[right=0.75cm of m0] (m1) [draw] {$m_2$};
 		\node[below =0.25cm of m1] (m1xt0) {$\oplus$};
 		\draw [->] (t0) - ++(0.75,0) -- ++(0.75,1.83) -- (m1xt0);
-		\node[below =1cm of m1] (f1) [draw] {$F_k$};
-		\node[below =0.5cm of f1] (t1) [draw] {$t_1$};
+    \node[below =1cm of m1] (f1) [draw] {$F(k, \cdot)$};
+		\node[below =0.5cm of f1] (t1) [draw] {$t_2$};
 		\draw [->] (m1) edge (m1xt0) (m1xt0) edge (f1) (f1) edge (t1);
 
-		\node[right=0.75cm of m1] (m2) [draw] {$m_2$};
+		\node[right=0.75cm of m1] (m2) [draw] {$m_3$};
 		\node[below =0.25cm of m2] (m2xt1) {$\oplus$};
 		\draw [->] (t1) - ++(0.75,0) -- ++(0.75,1.83) -- (m2xt1);
-		\node[below =1cm of m2] (f2) [draw] {$F_k$};
-		\node[below =0.5cm of f2] (t2) [draw] {$t_2$};
+    \node[below =1cm of m2] (f2) [draw] {$F(k, \cdot)$};
+		\node[below =0.5cm of f2] (t2) [draw] {$t_3$};
+    \node[right=0.5cm of t2] (out) [draw] {$F(k', \cdot)$};
+    \node[right=0.5cm of out] (outp) [draw] {$t$};
 		\draw [->] (m2) edge (f2) (f2) edge (t2);
+    \draw [->] (t2) edge (out);
+    \draw [->] (out) edge (outp);
 	\end{tikzpicture}
-	\caption{A better, but still insecure, MAC construction.}
+  \caption{The CBC-MAC construction.}
 	\label{fig:}
 \end{figure}
 
-However, this too has an attack! Given $t_1 = MAC(k, (m[0], m[1])$, we can generate a valid tag for $(m[0], m[1], m[2])$ given only $\mathsf{MAC}(k, m_2 \oplus t_1)$---the tags of $(m[0], m[1], m[2])$ and $(m[2] \oplus t_1)$ are identical.
-
-	To solve this, we do one final MAC before outputting \emph{with a new key}. Instead of outputting $t_n$, we output $\mathsf{AES}_{k'}(t_n)$. This construction is called CBC-MAC or CMAC. % TOOD: explanation of why we need a second key here would be useful---the diagram in lecture 9/21 was very useful to understand the same-key attack.
-
-	Intuitively, the purpose of this second AES is to avoid giving the adversary \textit{any} tag computed with key $k$. 
-
-	If we do not use a new key, an adversary can achieve a length extension attack. If the adversary asks for $t = \mathsf{MAC}(k, m_0)$ and $t' = \mathsf{MAC}(k, t)$, $t'$ is also a valid key for the original message with two zero blocks attached $\mathsf{MAC}(k, m_0 || 0 || 0)$. The chain of AES applications becomes equivalent, since zero blocks are equivalent to skipping the XOR and adding AES applications.
-
 % TODO: diagram
+
+\todo{Describe GMAC}

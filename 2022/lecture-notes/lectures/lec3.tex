@@ -75,7 +75,7 @@ resistant hash function is to find a collision---a
 pair of values $m_0, m_1 \in \zo^*$ such that
 $m_0 \neq m_1$ and $H(m_0) = H(m_1)$.
 
-\begin{definition}[Collision Resistance]
+\begin{definition}[Collision Resistance]\label{def:crhf}
 	A function $H: \bin^* \rightarrow \bin^{\lambda}$ is collision-resistant 
   if for all \textquote{efficient} adversaries $\calA$, we have that:
   \[ \Pr[H(m_0) = H(m_1), m_0 \neq m_1: (m_0, m_1) \leftarrow \calA()] \leq \text{``negligible''} \]
@@ -204,6 +204,7 @@ In the following pseudocode,
 the function $\mathsf{ToBlock}$ converts an integer, representing the length of the input message
 in blocks, into a $\lambda$-bit string.
 Then the Merkle-Damg\aa{}rd construction is:
+\begin{figure}
 \begin{framed}
 \noindent
   $H(m_1, \dots, m_n)$: \qquad \text{// Merkle-Damg\aa{}rd construction}
@@ -213,9 +214,15 @@ Then the Merkle-Damg\aa{}rd construction is:
    \begin{itemize}
      \item Let $b \gets H_\text{small}(b, m_i)$.
    \end{itemize}
- \item Output $H_\text{small}(b, \mathsf{ToBlock}(n))$.
+ \item Let $b \gets H_\text{small}(b, \mathsf{ToBlock}(n))$.
+ \item Output $b$.
 \end{itemize}
 \end{framed}
+\caption{The Merkle-Damg\aa{}rd construction of a large-domain
+collision-resistant hash function $H$ from a small-domain
+collision-resistant hash function $H_\text{small}$.}
+  \label{fig:md}
+\end{figure}
 (Here, we are assuming that the message is at most 
 $\lambda 2^{\lambda}$ bits long.)
 \marginnote{In practice, standard hash functions have limits on the
@@ -223,6 +230,15 @@ length of the messages that they can hash. For example, SHA256 can
 hash messages of length up to $2^{64}-1$ bits.}
 
 We won't prove it here, but we can use the fact that $H_{small}$ is collision-resistant to prove that $H$ must also be collision-resistant. The basic idea of the proof is to show that given a collision in $H$, we can easily compute a collision in $H_{\text{small}}$. 
+
+\paragraph{Note:} In 
+the Merkle-Damg\aa{}rd construction of \cref{fig:md},
+we initialize the variable $b$ to the all-zeros string.
+The construction is collision-resistant if we omit the all-zeros
+string and start by setting $b \gets m_1$ and then continue by hashing $m_2, m_3, \dots$.
+The construction is \emph{not} collision resistant if we omit the length block
+$\mathsf{ToBlock}(n)$ that we hash in at the end.
+
 
 \subsection{The Birthday Paradox}
 \marginnote{If you sample $2^{\lambda/2}$ random $10\lambda$-bit strings and hash them
