@@ -53,7 +53,13 @@ honest signer. Formally, we have:
   \[ \Pr\big[\Ver(\vk, m, \Sign(\sk, m)) = 1 \colon (\sk, \vk) \gets \Gen(\lambda) \big] = 1. \]
 \end{definition}
 
-\begin{definition}[Digital signatures: Security]
+The standard security notion for digital signatures is very similar
+to that for MACs (\cref{def:mac-sec}).
+The only difference here is that a digital-signature scheme splits the single
+secret MAC key into two keys: a secret signing key and a public verification key.
+Otherwise the definition is essentially identical.
+
+\begin{definition}[Digital signatures: Security -- existential unforgeability under chosen message attack]\label{def:sig-sec}
   All efficient adversaries $\calA$ win the following security 
   game with only negligible probability:
   \begin{itemize}[noitemsep]
@@ -68,13 +74,23 @@ honest signer. Formally, we have:
   \end{itemize}
 \end{definition}
 
+Notice that the security definition here allows an attacker, given a valid
+message-signature pair $(m, \sigma)$ to produce additional valid message-signature
+pairs on the same message: $(m, \sigma'), (m, \sigma''), \dots$.
+Standard digital-signature schemes, such as the elliptic-curve digital signature
+algorithm (EC-DSA) have this property.
 
-------------------
+In some applications, we want to prohibit an attacker from finding \emph{any}
+new message-signature pair. We call this security notion ``\emph{strong} existential unforgeability under chosen message attack.'' 
 
-\todo{Discuss relation to MAC security notion}
-\todo{Mention strong security}
+The definition is the same as in \cref{def:sig-sec} except that we require
+the adversary to find a valid-message signature pair $(m^*, \sigma^*)$
+such that $(m^*, \sigma^*) \not \in \{ (m_1, \sigma_1), (m_2, \sigma_2), \dots \}$.
 
 \section{Constructing a Signature Scheme}
+In the following sections, we will show how to construct a digital-signature
+scheme from one-way functions.
+
 We will generate a signature scheme that is secure, but is not practical. For pracical signature schemes, see RSA et al. We will construct this scheme in three stages:
 
 \begin{enumerate}

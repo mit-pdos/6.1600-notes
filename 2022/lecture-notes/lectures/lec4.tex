@@ -26,7 +26,7 @@ in the following sense.
 We first give the definition and then explain why it is a useful
 one:
 
-\begin{definition}[MAC Security: Existentially unforgeability against adaptive chosen message attacks]
+\begin{definition}[MAC Security: Existentially unforgeability against adaptive chosen message attacks]\label{def:mac-sec}
 A MAC $\MAC$ over key space $\calK$ and message space $\mathcal{M}$ is secure 
 (existentially unforgeable against adaptive chosen
 message attacks) if any poly-time adversary
@@ -172,6 +172,13 @@ and therefore psuedorandom functions do not exist.
 \begin{theorem}
 Psueodorandom functions exist if and only if one-way functions exist.
 \end{theorem}
+
+In practice, we assume that:
+\begin{itemize}
+  \item the SHA256 hash function is a one-way function, 
+  \item the function $AES(k, 0^128)$ 
+\end{itemize}
+  \item the SHA256 hash function is a one-way function, 
 
 \subsection{Pseudorandom functions in practice}
 
