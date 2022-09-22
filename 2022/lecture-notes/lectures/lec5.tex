@@ -1,34 +1,78 @@
-In the last section, our strategy for authentication depended on sharing some secret key between two parties. However, we completely left out of the picture how these parties should exchange this key. Our implication was that they went to some whisper-room and exchanged the key in secret, but in many cases this is not practical: if they could whisper a key, why not just whisper the message?
+In the last section, our strategy for
+authentication depended on two parties sharing a
+secret key.
+In that discussion, we completely left
+out of the picture how these parties should
+exchange this secret key.
+Our implication was that they
+went to some private room and exchanged the key in
+secret, but in many cases this is not practical:
+if they could whisper a key, why not just whisper the message?
 
-Luckily, there is a way to get around this requirement for a shared secret using \emph{public-key cryptography}. % TODO: cite DH
+Luckily, there is a way to get around this requirement for a shared secret using \emph{public-key cryptography}.\cite{DH76} % TODO: cite DH
+\marginnote{The original Diffie-Hellman paper from 1976, which introduced
+public-key cryptography, is a fascinating read.}
 
-The basic idea of public-key cryptography when applied to authentication is that each party will generate two linked keys---a secret key and a verification key. The verification key will be good enough to verify that a signature is valid, but not to generate a new signature.
+\section{Definitions}
+The basic idea of public-key cryptography, applied
+to authentication, is that each party will
+generate two linked keys---a secret signing key
+and a public verification key.
+The verification key will be good enough to verify that a signature
+is valid, but not to generate new signatures.
 
 \begin{definition}[Signature Scheme]
-	A signature scheme is associated with a message space $\calM$ and three probabilistic polynomial time algorithms $(\Gen, \Sign, \Ver)$.
+	A signature scheme is associated with a message space $\calM$ and three efficient algorithms $(\Gen, \Sign, \Ver)$.
 
+      \marginnote{In theoretical papers, people will write $\Gen(1^\lambda)$ to indicate that the key-generation
+      algorithm takes as input a length-$\lambda$ string of ones.
+      This is just a hack to make the input given to $\Gen$ $\lambda$ bits long so that the
+      $\Gen$ algorithm can run in time polynomial in its input length: $\poly(\lambda)$.
+      If we express $\lambda$ in binary, then $\Gen(\lambda)$ gets a $\log_2 \lambda$-bit input
+      and can only run in time $\poly(\log \lambda)$.
+      This distinction is really unimportant, but if you see the $1^\lambda$ notation, you will
+      now know what it means.}
 	\begin{itemize}
-		\item $\Gen$ takes as input $1^\lambda$, where $\lambda$ is the security parameter that outputs a pair $(\sk, \vk)$ containing a signing key and verification key respectively.
-		\item $\Sign$ takes as input $\sk$ and $m \in \calM$ and outputs a signature $\sigma$.
-	\item $\Ver$ takes as input a verification key $\vk$, a message $m \in \calM$, and a signature $\sig$, and outputs $\bin$.
+    \item $\Gen(\lambda) \to (\sk, \vk)$.
+      The key-generation algorithm as input a security parameter $\lambda \in \N$ and outputs a secret signing key $\sk$ and public verification key $\vk$.
+      The algorithm $\Gen$ runs in time $\poly(\lambda)$.
+    \item $\Sign(\sk, m) \to \sigma$.
+      The signing algorithm takes as input a secret key $\sk$ and a message $m \in \calM$, and outputs a signature $\sigma$.
+    \item $\Ver(\vk, m \sigma) \to \zo$.
+      The signature-verification algorithm takes as input a public verification key $\vk$, a message $m \in \calM$, and a signature $\sig$, 
+      and outputs $\bin$, indicating acceptance or rejection.
 	\end{itemize}
 	
 \end{definition}
 
-Our definitions of completeness and security will be quite similar as in the MAC case.
+For a signature to be useful, a correct verifier must always accept messages from an
+honest signer. Formally, we have:
 
-\begin{definition}[Completeness]
-	$\forall \lambda \in \N, \forall (\sk, \vk) \leftarrow \Gen(1^\lambda), \forall m \in \calM$
-  \[ \text{Pr}\left[\Ver(\vk, m, \Sign(sk, m)) = 1\right] = 1 \]
-
-	In English, this says that the probability that $\Ver$ outputs 1 on a correctly signed message is 1.
+\begin{definition}[Digital signatures: Correctness]
+  For all $\lambda \in \N$, for all messages $m \in \calM$:
+  \[ \Pr\big[\Ver(\vk, m, \Sign(\sk, m)) = 1 \colon (\sk, \vk) \gets \Gen(\lambda) \big] = 1. \]
 \end{definition}
 
-\begin{definition}[Security]
-	$\forall \ppt \A$ wins the following game with negligible probability:
-
-	The challenger first generates $(\sk, \vk) \leftarrow \Gen(1^\lambda)$ and sends $\vk$ to the adversary. The adversary can then send the challenger as many messages $(m_1, m_2, \ldots, m_3)$ as he likes, and the challenger must respond with $\sig_1 = \Sign(\sk, m_1), \sig_2 = \Sign(\sk, m_2), \ldots, \sig_n = \Sign(\sk, m_3)$. Then, the adversary wins if he can output $(m^*, \sig^*)$ such that $\Ver(\vk, m^*, \sig^*) = 1 \land m^* \notin \set{m_1, \ldots, m_n}$. % TODO: diagram
+\begin{definition}[Digital signatures: Security]
+  All efficient adversaries $\calA$ win the following security 
+  game with only negligible probability:
+  \begin{itemize}[noitemsep]
+    \item The challenger runs $(\sk, \vk) \gets \Gen(\lambda)$ and sends $\vk$ to the adversary.
+    \item For $i = 1, 2, \dots$  (polynomially many times)
+      \begin{itemize}
+        \item The adversary sends a message $m_i \in \calM$ to the challenger.
+        \item The challenger replies with $\sigma_i \gets \Sign(\sk, m_i)$.
+      \end{itemize}
+    \item The adversary outputs a message-signature pair $(m^*, \sigma^*)$.
+    \item The adversary wins if $\Ver(\vk, m^*, \sigma^*) = 1$ and $m^* \not \in \{m_1, m_2, \dots\}$.
+  \end{itemize}
 \end{definition}
+
+
+------------------
+
+\todo{Discuss relation to MAC security notion}
+\todo{Mention strong security}
 
 \section{Constructing a Signature Scheme}
 We will generate a signature scheme that is secure, but is not practical. For pracical signature schemes, see RSA et al. We will construct this scheme in three stages:
