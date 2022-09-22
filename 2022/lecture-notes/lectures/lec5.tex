@@ -38,18 +38,19 @@ is valid, but not to generate new signatures.
       The algorithm $\Gen$ runs in time $\poly(\lambda)$.
     \item $\Sign(\sk, m) \to \sigma$.
       The signing algorithm takes as input a secret key $\sk$ and a message $m \in \calM$, and outputs a signature $\sigma$.
-    \item $\Ver(\vk, m \sigma) \to \zo$.
+    \item $\Ver(\vk, m, \sigma) \to \zo$.
       The signature-verification algorithm takes as input a public verification key $\vk$, a message $m \in \calM$, and a signature $\sig$, 
       and outputs $\bin$, indicating acceptance or rejection.
 	\end{itemize}
 	
 \end{definition}
 
-For a signature to be useful, a correct verifier must always accept messages from an
+For a signature scheme to be useful, a correct verifier must always accept messages from an
 honest signer. Formally, we have:
 
 \begin{definition}[Digital signatures: Correctness]
-  For all $\lambda \in \N$, for all messages $m \in \calM$:
+  A digital-signature scheme $(\Gen, \Sign, \Ver)$ is \emph{correct} if,
+  for all messages $m \in \calM$:
   \[ \Pr\big[\Ver(\vk, m, \Sign(\sk, m)) = 1 \colon (\sk, \vk) \gets \Gen(\lambda) \big] = 1. \]
 \end{definition}
 
@@ -60,7 +61,8 @@ secret MAC key into two keys: a secret signing key and a public verification key
 Otherwise the definition is essentially identical.
 
 \begin{definition}[Digital signatures: Security -- existential unforgeability under chosen message attack]\label{def:sig-sec}
-  All efficient adversaries $\calA$ win the following security 
+  A digital-signature scheme $(\Gen, \Sign, \Ver)$ is \emph{secure} if
+  all efficient adversaries win the following security 
   game with only negligible probability:
   \begin{itemize}[noitemsep]
     \item The challenger runs $(\sk, \vk) \gets \Gen(\lambda)$ and sends $\vk$ to the adversary.
@@ -89,59 +91,212 @@ such that $(m^*, \sigma^*) \not \in \{ (m_1, \sigma_1), (m_2, \sigma_2), \dots \
 
 \section{Constructing a Signature Scheme}
 In the following sections, we will show how to construct a digital-signature
-scheme from one-way functions.
+scheme from any one-way function (\cref{def:owf}).
 
-We will generate a signature scheme that is secure, but is not practical. For pracical signature schemes, see RSA et al. We will construct this scheme in three stages:
+We will generate a signature scheme that is secure, but that has a relatively large
+signatures and public keys: to achieve security against attackers running
+in time $2^\lambda$, this signature scheme has signatures of $O(\lambda^2)$ bits.
+Widely used modern digital signature schemes (e.g., EC-DSA) have signatures
+of $O(\lambda)$ bits.\marginnote{One benefit of the signature scheme that 
+we present here is that---unlike EC-DSA, RSA, DSA, and other widely used
+signature schemes---this one is plausibly secure even against \emph{quantum}
+adversaries.\todo{Cite NIST PQ signature schemes and compare}
+}
+
+We will construct this scheme in three stages:
 
 \begin{enumerate}
-	\item Construct a \emph{one-time secure} signature scheme for \emph{bounded messages}, where the security can be broken if an adversary sees more than a single signature and where $\abs{\sk} > \abs{m}$ (the size of the secret key is larger than the size of the message). This is called the Lamport Scheme. %TODO: cite
-	\item Construct a one-time secure scheme for messages in $\bin^*$, removing the restriction that the secret key is longer than the message.
-	\item Construct a many-time secure scheme for messages in $\bin^*$.
+	\item Construct a \emph{one-time secure} signature scheme for \emph{fixed-length messages}.
+        With this scheme, an attacker who sees two signatures under the same signing key can forge signatures.
+        In addition, the secret signing key for this scheme will be larger than the size of the message 
+        being signed.
+      \item Construct a \emph{one-time secure} scheme for \emph{arbitrary-length messages}.
+        Here, we construct a one-time signature scheme whose secret signing key is independent of 
+        the length of the signed message.
+
+      \item Construct a \emph{many-time secure} scheme (i.e., a fully secure one under 
+        \cref{def:sig-sec}) for \emph{arbitrary-length messages}.
+        This last scheme is a fully secure and fully functional digital-signature scheme.
 \end{enumerate}
 
-\begin{definition}[One-Time Security]
-	A signature scheme is one-time secure if $\forall \ppt \A$ wins the following game with negligible probability:
 
-	The challenger generates $(\sk, \vk) \leftarrow \Gen(1^\lambda)$ and sends $\vk$ to the adversary. The adversary can then ask for a \emph{single} signature over a message $m$, and the challenger must respond with $\sig = \Sign(\sk, m)$. $\A$ wins if he outputs $(m^*, \sig^*)$ where $\Ver(\vk, m^*, \sig^*) = 1$ and $m^* \neq m$.
+\section{One-time-secure Signatures (Lamport Signatures)}
+
+In this section we give a very simple and elegant construction 
+of one-time-secure digital signatures, due to Lamport.\cite{L79}
+Before giving the construction, we define one-time security for 
+digital-signature schemes.
+This signature scheme is not generally useful on its own, but is
+useful as a building block.
+
+\begin{definition}[Digital signatures: One-Time Security]\label{def:sig-once}
+A digital-signature scheme $(\Gen, \Sign, \Ver)$ over message space $\calM$ is \emph{one-time secure} if all efficient adversaries win
+the following game with negligible probability:
+  \begin{itemize}[noitemsep]
+    \item The challenger generates $(\sk, \vk) \leftarrow \Gen(\lambda)$ and sends $\vk$ to the adversary.
+    \item The adversary sends the challenger \emph{single} message $m \in \calM$.
+    \item The challenger responds with $\sig = \Sign(\sk, m)$.
+    \item The adversary outputs $(m^*, \sig^*)$.
+    \item The adversary wins the game if $\Ver(\vk, m^*, \sig^*) = 1$ and $m^* \neq m$.
+\end{itemize}
 \end{definition}
 
-% TODO: why we are defining one-way 
-
-\begin{definition}[One-Way]
-	A function $f: X \rightarrow Y$ is one-way if it is poly-time computable and the probability of an adversary given $y=f(x)$ finding $x$ such that $f(x) = y$ is negigible. Formally,
-
-	% TODO: probability function, formalize notation here
-	\[ \forall \ppt \A, \exists \mu(\lambda) \text{s.t. } \text{Pr}_{x \leftarrow X, y = f(x)}\left[\A(y) = x' \text{s.t.} f(x')=y\right] \leq \mu(\lambda) \]
-\end{definition}
-
-\subsection{Lamport Signature Scheme}
-We first construct a one-time secure signature scheme for messages in $\bin^n$. To do this, we will define the following algorithms:
-
-
+\paragraph{Lamport signatures.}
+We now construct a one-time secure signature scheme for messages in $\bin^n$,
+for some fixed message length $n \in \N$. 
+To do this, we will define the following algorithms, which make use of a
+one-way function $f \colon \calX \to \calY$:
 \begin{itemize}
-	\item Choose at random, with elements sampled from $X$, and where $f$ is a one-way function.
-
-\[ \sk = \begin{pmatrix}
+  \item $\Gen() \to (\sk, \vk)$. 
+    \marginnote{In this construction, we leave the security parameter $\lambda$
+    implicit.
+    To be fully formal, $\Gen$ would take $\lambda$ an input.
+    The one-way function $f$ and its domain $\calX$ would both
+    depend on $\lambda$. So we would write $f_\lambda$ and $\calX_\lambda$.
+    }
+    Choose $2n$ random elements from $\calX$,
+    the domain of the one-way function $f$.
+    Arrange these values in to a $2 \times n$
+    matrix, which forms the secret signing key $\sk$.
+    The public verification key just consists of the $2n$
+    images of these values under the one-way function $f$:
+\[ \sk \gets \begin{pmatrix}
 	x_{10} & \ldots & x_{n0} \\
 	x_{11} & \ldots & x_{n1} \\
-	\end{pmatrix}, \vk = \begin{pmatrix}
+	\end{pmatrix},\quad \vk \gets \begin{pmatrix}
 	f(x_{10}) & \ldots & f(x_{n0}) \\
 	f(x_{11}) & \ldots & f(x_{n1}) \\
-\end{pmatrix}\]
-	\item $\Sign(\sk, m)$ outputs $(x_{1m_1}, \ldots x_{nm_n})$, where $m_1 \ldots m_n$ are the individual bits of the length-$n$ message $m$.
-	\item $\Ver(\vk, m, \sig)$ parses $\sig$ into its individual bits $\sig = (x_1^*, \ldots x_n^*)$ and $\sig$ into the matrix above. Accept if the application of the one-way function $f$ to each bit $i$ of the signature matches the corresponding value in the verification key. In math terms, output 1 if $\forall i \in [n], f(x^*_i) = \vk_{im_i}$, and otherwise output 0.
+\end{pmatrix}.\]
+	\item $\Sign(\sk, m) \to \sigma$ outputs $(x_{1m_1}, \ldots x_{nm_n})$, where $m_1 \dots m_n$ 
+    are the individual bits of the length-$n$ message $m \in \zo^n$.
+	\item $\Ver(\vk, m, \sig) \to \zo$ parses the 
+    the message into bits $m = m_1\dots m_n \in \zon$ and
+    the signature $\sig$ into its individual symbols $\sig = (x_1^*, \ldots x_n^*) \in \calX^n$.
+    The signing routine accepts if, for all $i \in \{1, \dots, n\}$:
+    \begin{equation}
+      f(x^*_i) = \vk_{i,m_i}.\label{eq:lamport}
+    \end{equation}
+    In other words, the routine accepts if applying the one-way function $f$ to each symbol
+    of the signature matches the corresponding value in the verification key.
+    (Otherwise, the signing routine rejects.)
 \end{itemize}
 
-This scheme is obviously impractical since the keys are so large, and if an adversary can ask for two messages there is an obvious attack: the adversary should first ask for $0^n$ and recieve $\sig_1 = (x_{10}, \ldots, x_{n0})$, and then ask for the signature of $m_2 = 1^n$ and recieve $\sig_2 = (x_{11}, \ldots, x_{n1})$. At this point, the adversary can reconstruct the entire secret key $\sk = \begin{smallmatrix} \sigma_1 \\ \sig_2 \end{smallmatrix}$! However, we will argue that if the adversary can see only a single message, this scheme is indeed secure.
+This signature scheme has relatively large keys:
+the verification key, in particular consists of $2n$ values,
+where each is of length $\Omega(\lambda)$ bits.
+So the total length is roughly $2n\lambda$ bits---much
+longer than the $n$-bit message being signed.
 
-\textbf{Claim:} This scheme is one-time secure assuming $f$ is a one-way function.
+In addition, notice that an adversary who sees signatures
+on even two messages can forge signatures on messages of its choice.
+In particular:
+\begin{itemize}[noitemsep]
+  \item The adversary first asks for a signature on the message $m_0 = 0^n$.
+It receives $\sig_0 = (x_{10}, \ldots, x_{n0})$.
+  \item The adversary then then asks for a signature on the message $m_1 = 1^n$.
+    It receives $\sig_1 = (x_{11}, \ldots, x_{n1})$.
+  \item At this point, the adversary has the entire secret signing key! 
+\end{itemize}
+However, we will show that this scheme is indeed one-time secure.
 
-In cryptography, they way we generally do these proofs is by \emph{reduction}---we will show that \emph{if an adversary exists that breaks the security}, then we can construct an adversary to break one of our assumptions. If we do this, there is a contradiction, so the first adversary cannot exist.
+\begin{claim} 
+The Lamport signature scheme is one-time secure under the
+assumption that $f$ is a one-way function.
+\end{claim}
+\marginnote{Remember that if $\classP = \classNP$, 
+one-way functions, and also digital signature schemes, do not exist. 
+So any proof of security of a digital-signature scheme will require
+some sort of cryptographic assumption.}
 
-\textbf{Proof (sketch):} Suppose there exists an adversary $\A$ that wins the game in our security definition with non-negligible probability, meaning that the adversary can generate $(m^*, \sig^*)$ such that $\Ver(\vk, m^*, \sig^*) = 1$ and $m \neq m^*$ given only $\sig_1 = \Sign(\sk, m_1)$. We can then construct an adversary $\B$ that can use $\A$ to break the one-way function.
+In cryptography, we generally prove these security
+claims by \emph{reduction}: we will show that
+if there exists an efficient adversary $\calA$
+that breaks the security of our scheme,
+then we can construct an efficient adversary $\calB$ 
+that breaks one of our assumptions.
+If we do this, we have reached a contradiction to one
+of our assumptions, so the first adversary cannot exist.
 
-% TODO: Fix this. I didn't have time to write it well/finish it
-First, $\B$ should generate a key pair ($\B$ is the challenger in this case.
+\begin{proof}[Proof of Claim]
+Suppose there exists an adversary $\A$ that wins the 
+one-time-security game of \cref{def:sig-once} with non-negligible probability $\epsilon$.
+That is, the adversary can produces $(m^*, \sig^*)$ such that $\Ver(\vk, m^*, \sig^*) = 1$ and $m \neq m^*$ given only $\sig = \Sign(\sk, m)$.
+We can then construct an adversary $\B$ that can use $\A$ to 
+invert the one-way function.
 
-Since $m \neq m^*$ and $\sig$ in this scheme depends on the bits of $m$, it must be the case that $\sig^*$ varies from $\sig_1$ in at least one bit. Therefore, the adversary has some value of the secret key matrix that was not given to them as part of $\sig_1$ and the corresponding value of
+\marginnote{Lamport's construction shows that if one-way functions
+exist, then so do digital signatures.
+Can you show that if digital signatures exist, then so do one-way
+functions?}
 
+In particular, our adversary $\calB$ will use algorithm $\calA$
+as a subroutine to invert the one-way function.
+We will show that if $\calA$ wins in the one-time signature security
+game often, then algorithm $\calB$ will invert the one-way function
+often, which is a contradiction.
+
+Assume our one-way function is of the form $f \colon \calX \to \calY$
+and that the Lamport signature scheme is on $n$-bit messages.
+The one-way-function adversary $\calB$ operates as follows:
+\begin{itemize}[noitemsep]
+  \item The adversary $\calB$ is given a point $y \in \calY$
+    and its task is to produce a preimage of $y$ under $f$. 
+  \item The adversary $\calB$ generates a signing keypair as follows:
+    \begin{itemize}[noitemsep]
+      \item It runs the key-generation algorithm for the Lamport signature scheme $(\sk, \vk) \gets \Gen()$.
+      \item The adversary chooses a random value $i^* \getsr \{1, \dots, n\}$
+            and a random bit $\beta^* \getsr \zo$.
+          \item The adversary sets $\vk_{i^*,\beta^*} \gets y$.
+            That is, it inserts the one-way-function point it must invert
+            into a random location in the verification key.
+    \end{itemize}
+  \item The adversary then sends the verification key $\vk$ to the Lamport-signature adversary $\calA$.
+  \item The adversary $\calA$ asks for the signature on a message $m = m_1 m_2 \dots m_n \in \zon$.
+  \item If $m_{i^*} = \beta^*$, then algorithm $\calB$ cannot produce a valid signature on the message
+        $m$ and it outputs FAIL.
+  \item Otherwise, the algorithm $\calB$ returns the signature $\sigma = (\sk_{1,m_1}, \dots, \sk_{n,m_n}) \in \calX^n$
+        to algorithm $\calA$.
+  \item Algorithm $\calA$ then produces a forged message-signature pair $(m^*, \sigma^*)$,
+        where $m \neq m^*$.
+  \item Algorithm $\calB$ parses $m^* = m^*_1 \dots m^*_n \in \zon$
+        and $\sigma^* = \sigma^*_1 \dots \sigma^*_n \in \calX^n$. Then:
+        \begin{itemize}[noitemsep]
+          \item If $m_{i^*} = m_i$, algorithm $\calB$ outputs FAIL.
+          \item Otherwise, algorithm $\calB$ outputs $x \gets \sigma^*_{i^*} \in \calX$.
+        \end{itemize}
+\end{itemize}
+
+First, notice that whenever $(m^*, \sigma^*)$ is a valid message-signature
+pair and whenever algorithm $\calB$ does not output FAIL, algorithm $\calB$
+outputs a preimage $x \in \calX$ of point $y \in \calY$ under the one-way function $f$.
+That is because, by the verification relation (\ref{eq:lamport}) for Lamport signatures,
+\[f(x) = f(\sigma^*_{i^*}) = \vk_{i^*,m^*_{i^*}} = \vk_{i^*, 1 - m_i} = \vk_{i^*, \beta^*} = y.\]
+
+Now, we must show that algorithm $\calB$ does not output FAIL too often.
+Since algorithm $\calB$ chooses the values $i^*$ and $\beta^*$ at random,
+and since the adversary $\calA$ behavior is \emph{independent} of these values,
+we can say:
+  \begin{itemize}
+    \item the probability of the first failure event is $1/2$,
+          since there are two possible choices of $m_{i^*}$ and only 
+          one of these is bad, and 
+    \item the probability of the second failure event is at most $1/n$,
+          since $m$ and $m^*$ must differ in at least one of $n$ bits,
+          and there is a $1/n$ probability that this differing bit is
+          at index $i^*$.
+  \end{itemize}
+
+The events that $\calA$ breaks the signature scheme
+and that either of these failures occur are all \emph{independent}.
+Then if $\calA$ breaks the one-way function with probability $\epsilon$,
+our one-way-function adversary $\calB$
+inverts the one-way function with probability
+\[ \epsilon_\text{one-way} = \epsilon \cdot \frac{1}{2} \cdot \frac{1}{n}.\]
+
+The probability of either bad is at most $1/2 + 1/n$,
+by the union bound.
+Therefore if algorithm $\calA$ breaks one-time security of Lamport's
+scheme with probability $\epsilon$,
+If $\epsilon$ is non-negligible, then $\epsilon_\text{one-way} = \epsilon/2n$
+is also non-negligible, and we have a contradiction.
+\end{proof}

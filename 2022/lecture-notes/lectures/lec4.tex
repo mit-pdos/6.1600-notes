@@ -40,7 +40,7 @@ game with at most negligible probability:
     \item The challenger samples a MAC key $k \getsr \calK$.
     \item For $i = 1, 2, \dots$ (polynomially many times)
       \begin{itemize}
-        \item The adversary $\calA$ sends any message $m_i \in \calM$ 
+        \item The adversary sends any message $m_i \in \calM$ 
               to the challenger 
         \item The challenger responds with $\mathsf{MAC}(k, m_i)$. 
       \end{itemize}
@@ -157,7 +157,7 @@ For example, if you believe that factoring large numbers is difficult
 
 In particular the following definition captures the notion of a
 function that is hard to invert:
-\begin{definition}[One-Way Function]
+\begin{definition}[One-Way Function]\label{def:owf}
 A function $f \colon \calX \to \calY$ is a \emph{one-way function} if
 for all efficient adversaries $\calA$, 
 \[ \Pr[f(\calA(f(x))) = f(x) \colon x \getsr \calX ] \leq \text{``negligible''}.\]
@@ -175,10 +175,13 @@ Psueodorandom functions exist if and only if one-way functions exist.
 
 In practice, we assume that:
 \begin{itemize}
-  \item the SHA256 hash function is a one-way function, 
-  \item the function $AES(k, 0^128)$ 
+  \item the function $f(x) \deq \text{SHA256}(x)$ is a one-way function
+    where the domain is the set of 256-bit strings,
+  \item the function $f(x) \deq \text{AES}(x, 0^{128})$ is a one-way function,
+    where the domain is the set of 128-bit strings, and
+  \item the function $f(x) \deq 2^x \bmod p$ is a one-way function
+    on domain $\{1, \dots, p\}$, for a sufficiently large prime $p$.
 \end{itemize}
-  \item the SHA256 hash function is a one-way function, 
 
 \subsection{Pseudorandom functions in practice}
 
