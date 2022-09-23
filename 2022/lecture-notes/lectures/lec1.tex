@@ -51,7 +51,7 @@ an \emph{implementation}.
     The threat model (or ``adversary model'') specifies the class of 
     adversaries against which we want to defend.
     Or, put another way, the threat model specifies the adversary's power:
-    what can the adversary do to break our security goal?
+    what can the adversary do in trying to break our security goal?
     By defining a threat model, we can make it
     tractable to achieve a security goal. 
     For example, in analyzing the security of a password-based login system,
@@ -74,7 +74,8 @@ cannot be ``wrong''---the goal might turn out to
 not be exactly what we needed, 
 the threat model might not have captured all of
 the attacks that our system might actually face
-in the real world, 
+in the real world, and the system designer might
+be surprised when they discover this,
 but together the goal and threat model define 
 the security properties that we set out to achieve.
 The implementation, on the other hand, can definitely be wrong---if 
@@ -90,10 +91,14 @@ First, a secure system must defend against
 \emph{all possible attacks} within the scope of 
 the threat model.
 In contrast, when we are just concerned about functionality or
-correctness, we are typically satisfied with a system 
-that performs well 99.99999\% of the time.
-In other words, security is concerned with \emph{worst-case behavior},
-while correctness is usually about \emph{average-case behavior}
+correctness, we are often satisfied with a system 
+that performs well for the cases that users care about.
+\marginnote{Some developers do worry about correctness
+of their system for all possible inputs and corner cases; this is
+is indeed the mindset that is often necessary for security.}
+In other words, security is concerned with behavior in
+\emph{worst-case situations}, while correctness is often
+about behavior in \emph{expected situations}.
 
 For example, suppose that we have
 a student-information system that should achieve the security
@@ -114,6 +119,7 @@ access the grades by:
 \begin{itemize}
 	\item finding a bug in the server software,
 	\item breaking into a TA's office,
+        \item compromise the TA's laptop,
 	\item stealing the password to an administrator's account,
 	\item tricking a TA into disclosing grades,
 	\item breaking the server's cryptography,
@@ -194,8 +200,8 @@ This had big benefits for performance and for
 compatibility, but as we'll talk about later in
 the semester, researchers have recently exploited
 this timing variability to perform sophisticated
-attacks on wide ranges of processors. The
-processor implementation matched the
+attacks on wide ranges of processors.\cite{hill:spectre-meltdown}
+The processor implementation matched the
 specification, but the specification itself
 allowed for this attack.
 
@@ -258,7 +264,7 @@ system for CAPTCHAs in general, but attackers who want
 to bypass CAPTCHAs do not do this.
 Instead, they set up computer centers in countries where the cost of
 labor is cheap. Attackers then pay people working in these 
-centers to solve CAPTCHAs.
+centers to solve CAPTCHAs.\cite{motoyama:recaptchas}
 The result is that it costs some fraction of
 a cent to solve a CAPTCHA. 
 The cost of solving a CAPTCHA is still non-zero,
@@ -269,7 +275,9 @@ may have intended.
 There used to be an encryption standard called DES that had $2^{56}$ possible keys.
 At the time that it was designed, the U.S.~government standards agencies asserted that it was
 secure against even powerful attackers,
-but today a modern computer can try all $2^{56}$ keys at only modest cost.
+but today a modern computer can try all $2^{56}$ keys at only modest cost.\marginnote{For
+example, \url{https://crack.sh/} uses an array of FPGAs to provide a service that
+exhaustively checks all possible keys.}
 (Academic researchers even at the time of DES's
 design understood that 56-bit keys were not large
 enough to prevent exhaustive
@@ -283,15 +291,17 @@ to newer block ciphers with longer keys, such as AES.
 \subsubsection{Dependencies: Two-factor authentication (2FA) via SMS}
 Many 2FA systems use a text message for authentication, but an attacker then
 just needs to convince the clerk at the AT\&T store to give them a new SIM card for your phone number.
+\marginnote{These attacks are often called ``SIM swapping'' or ``SIM hijacking''.}
 
 \subsubsection{Software Versions: Xcode}\label{sec:intro:xcode}
-iPhone apps are normally created and compiled on a developer's machine, sent to Apple's App Store, and sent to iPhones from there. iPhone apps are created using a tool called Xcode that is normally downloaded from Apple servers. However, Xcode is a big piece of software and for developers behind China's firewall, it was very slow to download. Someone within China set up a much faster mirror of Xcode, and lots of developers in China used the version of Xcode from this mirror. However, this mirror was not serving exactly Apple's version of Xcode---instead, it was serving a slightly modified version of Xcode that would inject some malicious code into every app that was compiled with it. This took a long time to detect. 
+iPhone apps are normally created and compiled on a developer's machine, sent to Apple's App Store, and sent to iPhones from there. iPhone apps are created using a tool called Xcode that is normally downloaded from Apple servers. However, Xcode is a big piece of software and for developers behind China's firewall, it was very slow to download. Someone within China set up a much faster mirror of Xcode, and lots of developers in China used the version of Xcode from this mirror. However, this mirror was not serving exactly Apple's version of Xcode---instead, it was serving a slightly modified version of Xcode that would inject some malicious code into every app that was compiled with it. This took a long time to detect.
+\marginnote{The Wikipedia article on XcodeGhost, \url{https://en.wikipedia.org/wiki/XcodeGhost}, provides more details about this attack.}
 
 \subsection{Problematic Implementations}
 Bugs, misconfigurations, and other mistakes are the most common cause of security issues. A rule of thumb to keep in mind is that every 1000 lines of code will have around 1 bug. This is a very rough estimate, but the basic idea is that more code will have more bugs. An effective strategy to reduce security vulnerabilities is to reduce the amount of code in your system.
 
 \subsubsection{Missing Checks: iCloud}
-Apple's iCloud performs many functions---email, calendar, storage, and Find my iPhone. Each of these had their own way of logging in, but across all of them a common goal was to limit the attacker's ability to guess a user's password. To do this, they added rate limiting to all the login interfaces, allowing something like only 10 login attempts per hour---but they forgot the Find my iPhone login interface. Because this authentication code was duplicated all over the place, there were many places to remember to add this rate limiting, but the attacker only needed one weak login interface to brute-force a password. In general, avoiding this repition will make it much easier to build a secure system.
+Apple's iCloud performs many functions---email, calendar, storage, and Find my iPhone. Each of these had their own way of logging in, but across all of them a common goal was to limit the attacker's ability to guess a user's password. To do this, they added rate limiting to all the login interfaces, allowing something like only 10 login attempts per hour---but they forgot the Find my iPhone login interface.\cite{icloud} Because this authentication code was duplicated all over the place, there were many places to remember to add this rate limiting, but the attacker only needed one weak login interface to brute-force a password. In general, avoiding this repition will make it much easier to build a secure system.
 
 \subsubsection{Insecure Defaults}
 When you set up a new service, they almost always come with some defaults to make the setup simpler. Wi-Fi routers come with default passwords, AWS S3 buckets come with default permissions, and so on. These defaults can be convenient, but they are very important to security because many people will forget or neglect to change the default. Because of this, the default becomes the way that the system operates. In order to build a secure system, it is important that the default is secure.
@@ -300,7 +310,7 @@ When you set up a new service, they almost always come with some defaults to mak
 \subsection{Goals and Threat Models}
 \begin{itemize}
 	\item Create simple, general goals.
-	\item Avoid assumptions (such as ``no one else will be able to get a user's SIM card'').
+	\item Avoid assumptions (such as ``no one else will be able to get a user's SIM card'') through better designs.
 	\item Learn and iterate.
 	\item Practice Defense in Depth: don't rely on one single defense for all your security---it is useful to use backup defenses to guard against bugs that will inevitably come up in one defense.
 \end{itemize}
