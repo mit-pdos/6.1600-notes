@@ -9,22 +9,25 @@ someone we trust last viewed them.
 The key new tool we use to do so is a \textit{collision-resistant hash function}. 
 
 \section{Intuition: Collision resistance}
-\begin{definition}[Hash Function]
-	A hash function $H$ maps a bitstring of any length onto a fixed-size space of outputs. $H: \bin^* \rightarrow \bin^{\lambda}$.
-\end{definition}
+For our purposes, a hash function $H$ 
+maps a bitstring of any length onto a fixed-size space of outputs,
+so the type signature is $H: \bin^* \rightarrow \bin^{\lambda}$.
 
 In order for a hash function to be \textit{collision-resistant}, we want it to be the case that for any input, the generated output should be \textquote{unique.} Of course, it cannot really be unique---we are mapping infinitely many inputs onto finitely many outputs---but we want it to be \textit{computationally infeasible} to find a 
 pair of distinct inputs that have the same hash values (a ``collision'').
 
 \begin{framed}
 \noindent
-\textbf{Security goal:} A hash function $H$ is collision resistant if
-it is \textquote{computationally infeasible} to find two distinct inputs 
+\textbf{Security goal:} A hash function $H$ is \emph{collision resistant} if
+it is \textquote{computationally infeasible} to find two distinct strings
 $x$ and $x'$ such that $H(x) = H(x')$.
 \end{framed}
 
-Collision-resistant hash functions let you authenticate 
-a long message $m$ by authenticating a short fixed-length string $H(m)$.
+Given a long message $m$, it's hash $H(m)$ under a collision-resistant
+hash function is like a short ``fingerprint'' of the message---the
+hash essentially uniquely identifies the message $m$.
+For that reason, collision-resistant hash functions let you authenticate 
+a long message $m$ by authenticating the  short fixed-length string $H(m)$.
 We often call the hash value $H(m)$ a \emph{digest}.
 
 \subsection{Applications}
@@ -115,23 +118,26 @@ These seemingly magic constants come from empirical considerations:
 
 \begin{table}[htpb]
 	\centering
-	\caption{Big numbers in terms of hashes}
-	\label{tab:exp-work}
+	%\caption{Big numbers in terms of hashes}
+	%\label{tab:exp-work}
 
 	\begin{tabular}{rl}
 		$2^{30}$ & operations/second on a laptop \\
 		$2^{58}$ & ops/sec on Fugaku supercomputer \\
 		$2^{68}$ & hashes/second on the Bitcoin network (as of Fall 2022) \\
-    $2^{92}$ & hashes/yr on the Bitcoin network \todo{Cite}\\
+    $2^{92}$ & hashes/yr on the Bitcoin network\\
 		$2^{114}$ & hashes required to use enough energy to boil the ocean \\
 		$2^{140}$ & hashes required to use one year of the sun's energy \\
 	\end{tabular}
 \end{table}
 
+See Lenstra, Kleinjung, and Thom{\'e} for an entertaining
+discussion of these constants.\cite{lenstra:universal}
+
 \begin{table}[htpb]
 	\centering
-	\caption{Exponents as probabilities}
-	\label{tab:exp-probability}
+  %\caption[Exponents as probabilities][3em]{Exponents as probabilities}
+	%\label{tab:exp-probability}
 
 	\begin{tabular}{rl}
 		$2^{-1}$ & fair coin lands heads \\
@@ -141,6 +147,8 @@ These seemingly magic constants come from empirical considerations:
 		$2^{-128}$ & will essentially never happen \\
 	\end{tabular}
 \end{table}
+
+
 
 \marginnote{For most cryptosystems, there is a tradeoff between the
 attacker's running time and success probability.
