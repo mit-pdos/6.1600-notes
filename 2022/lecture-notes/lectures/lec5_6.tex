@@ -122,7 +122,7 @@ We will construct this scheme in three stages:
 \end{enumerate}
 
 
-\section{One-time-secure Signatures (Lamport Signatures)}
+\section{One-time-secure Signatures (Lamport Signatures)} \label{sec:lamport}
 
 In this section we give a very simple and elegant construction 
 of one-time-secure digital signatures, due to Lamport.\cite{L79}
@@ -302,3 +302,73 @@ scheme with probability $\epsilon$,
 If $\epsilon$ is non-negligible, then $\epsilon_\text{one-way} = \epsilon/2n$
 is also non-negligible, and we have a contradiction.
 \end{proof}
+
+% LECTURE 6
+
+\section{A one-time signature scheme for arbitrary-length messages}
+In the scheme above, the keys scale with the size of the input. To adapt our scheme from above into a scheme that works on arbitrary-length messages without the key growing arbitrarily large, we will use a strategy called hash-and-sign. In essence, we will pass our message through a hash function to generate a fixed-size digest before applying the scheme above. To do so, we will show a more general construction of a scheme for arbitrary-length messages from one for bounded-length messages.
+
+\begin{claim}
+Given a collision-resistant hash function $h: \bin^* \rightarrow \bin^{n=256}$ and a signature scheme $(\Gen, \Sign, \Ver)$ for message space $\calM = \bin^n$ (such as the one in \S\ref{sec:lamport}), there exists a signature scheme $(\Gen', \Sign', \Ver')$ for $\calM' = \bin^*$ as follows:
+
+\begin{itemize}
+	\item $\Gen'$: generate $(\sk, \vk)$ as $\Gen$ and output $\sk' = (\sk, h), \vk' = (\vk, h)$. Note that we include the hash function as part of the keys.
+	\item $\Sign'((\sk, h), m) = \Sign(sk, h(m))$. We hash the message using the given hash function before passing it to the original signing function.
+	\item $\Ver'((\vk, h), m, \sig) = \Ver(\vk, h(m), \sig)$. We use the original $\Ver$ to check that the tag matches \emph{hash} of the original message.
+\end{itemize}
+\end{claim}
+
+\subsubsection{Security Intuition}
+Suppose $\exists \A$ that breaks $(\Gen', \Sign', \Ver')$, meaning that given $((m_1, \sig_1, \ldots, (m_t, \sig_t))$, $\A$ is able to forge $(m^*, \sig^*)$ such that $m^* \notin \set{m_1, \ldots, m_t}$. There are then two cases for what the adversary could have found:
+
+\begin{enumerate}
+	\item $h(m^*) \notin \set{h(m_1), \ldots, h(m_t)}$. Since the message that we pass to the underlying signature scheme is $h(m)$, this means $\A$ has found a valid signature for $h(m)$ under the original scheme $(\Gen, \Sign, \Ver)$ after seeing only signatures of $h(m_1)\neq h(m), \ldots, h(m_t)\neq h(m_t)$. This breaks the security of the underlying scheme, which is a contradiction!
+	\item $h(m^*) \in \set{h(m_1), \ldots, h(m_t)}$. If this is the case, there is some $i \in [t]$ such that $h(m^*) = h(m_i)$. However, $h$ is collision-resistant as in the definition, so this is a contradiction!
+\end{enumerate}
+
+\subsubsection{Application to Lamport}
+We can apply the above to our Lamport scheme from above. We can fix our input to the Lamport scheme at, for example, 256 bits, and then run messages through a hash function that outputs 256 bits before passing them to the Lamport scheme. Note, however, that this does not affect the \emph{security} of our scheme---it is still only one-time secure.
+
+\subsubsection{Hash \& Sign}
+This paradigm is called hash \& sign, and is very common---practically, hashing is a very cheap operation while signing turns out to be very expensive. So it is common to hash a message before signing it in order to reduce the size of the message that must be signed. \marginnote{Recall that we faced a similar problem in our MAC construction. Why not use hash \& MAC there? The reason is that we used AES as our PRF, which takes input of $\bin^{128}$. As explained by the birthday paradox, it is possible to find a collision in an output space of size $2^{128}$ in only time $2^64$! This does not provide sufficient security for practical use, as it would be quite practical to find collisions. If we had a version of AES that outputted 256 bits, we could indeed apply hash \& sign.}
+
+In practice, this strategy can actually \emph{increase} the security of our hash function. As shown in case 2 above, it is absolutely crucial that the hash function used is collision-resisant: if not, an adversary can find messages that cause collisions, and then a signature for one message will also be a valid signature for the other. However, in practice we think of hash functions like AES as \emph{random oracles}. This is much stronger than collision resistance, and allows us to treat the output of the hash function as truly random.
+
+Recall that our security definition involves the attacker requesting signatures over messages of its choice. If we pass a message through a hash function before passing it to our signature scheme, however, we effectively randomize the message---the adversary can no longer control the input to the scheme. This allows us to define another meaningful definition of security:
+
+\begin{definition}[Digital signatures: security against random message attacks]
+	Any efficient adversary given $\vk$ and a list of random message-signature pairs $((m_1, \sig_1), \ldots, (m_t, \sig_t))$ cannot generate $(m^*, \sig^*)$ such that $\Ver(\vk, m^*, \sig^*) = 1$ and $m^* \notin \set{m_1, \ldots, m_t}$.
+\end{definition}
+
+Note that this definition is \emph{not} good enough on its own---an adversary often does have the ability to generate signatures for messages of his choice. However, paired with a hash function modeled as a random oracle, this definition becomes very useful---if the inputs are passed through the hash function before they are passed to the signature scheme, they become effectively random. We can even relax the definition further without losing practicality: by the same logic, with hash function in front of the signature scheme, what the adversary needs to sign is really not a message of their choise, but is the \emph{hash} of a message of their choice---effectively a random value.
+
+\begin{definition}[Digital signatures: random security against random message attacks] \label{def:signatures_random_security}
+	Any efficient adversary given $\vk$ and a list of random message-signature pairs $((m_1, \sig_1), \ldots, (m_t, \sig_t))$ and random $m^* \notin \set{m_1, \ldots, m_t}$ cannot generate $\sig^*$ such that $\Ver(\vk, m^*, \sig^*) = 1$.
+\end{definition}
+
+It is possible to formally argue that given a signature scheme satisfying definition \ref{def:signatures_random_security} and a random oracle, we can construct a scheme satisfying existential unforgeability under chosen message attacks.
+
+\section{From one-time security to many-time security}
+After applying the hash \& sign strategy above to our Lamport scheme, we have a signature scheme that is one-time secure for messages of arbitrary length. In order for the scheme to be useful and satisfy our security definition, we need to be able to sign polynomially many messages with a single key pair. To do this, we will use a construction very similar to he Merkle tree construction we have seen before.
+
+We will show how to do this for a message space of size $\bin^n$, but hash \& sign can be applied to make this work for arbitrarily-length messages. We will first show an inefficient construction, and then use a PRF to make it practical.
+
+We first generate a single key pair for every possible message in the message space: $2^n$ total $(\sk_i^n, \vk_i^n)$ pairs for $i \in \bin^n$. These will be the leaves of our tree. For every two adjacent keys, we will then generate a key pair ($2^{n-1}$ pairs total) Then continue for all $j \in [0, \ldots, n]$, where the keys for each $j$ form layer $n-j$ of the tree (with leaves at level $n$).
+
+% TODO: diagram of tree
+
+Importantly, every key in the tree will be used to sign only one message ever: the key at non-leaf nodes will only ever sign the pair of its children, and the key at leaf nodes will only ever be used to sign the corresponding message. 
+
+To sign a given message, we generate the signature as 
+
+% TODO: finish this explanation.
+
+\subsection{Improving Inefficiency}
+In the scheme above, we required $O(2^n)$ keys for our secret key. This is far too many keys to be pracical, but we still need to be able to use each of these keys to sign a given message. To bridge this gap, we will use a PRF to generate these secret keys \textquote{on the fly}.
+
+Given a one-time secure signature scheme $(\Gen, \Sign, \Ver)$:
+
+\begin{itemize}
+	\item $\Gen'$: generate $(\sk, \vk) \leftarrow \Gen()$ for one-time scheme and a random PRF key $k$. Output $\vk' = \vk$ and $\sk' = (\sk, k)$.
+	\item $\Sign'$: % finish
+\end{itemize}
