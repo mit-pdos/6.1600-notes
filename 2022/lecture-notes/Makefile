@@ -14,3 +14,4 @@ $(PAPER).pdf:
 .PHONY: clean
 clean:
 	latexmk -C $(PAPER).tex
+	rm -f lecture-notes.bbl
