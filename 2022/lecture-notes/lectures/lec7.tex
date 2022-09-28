@@ -1,0 +1,88 @@
+In the last section, we established the idea of digital signatures, which allow us to authenticate message integrity without a shared secret.
+
+\section{Choosing Signature Schemes}
+The scheme we presented in the last section was not particuarly efficient: it required very long verification keys in order to allow a verifying party to trace the path back to the root verification key. 
+
+\begin{table}[htpb]
+	\centering
+	\caption{Statistics about various signature schemes used in practice}
+	\label{tab:sig_schemes}
+
+	\begin{tabular}{rcccc}
+		\textbf{Algorithm} & $\vk$ size & $\sig$ size & signatures/sec & verifications/sec \\
+		\bf{SPHINCS-128} & 32 B & 8000 B & 5 & 750 \\
+		\bf{RSA 2048} & 256 B & 256 B & 2,000 & 50,000 \\
+		\bf{ECDSA256} & 32 B & 64 B & 42,000 & 14,000 \\
+	\end{tabular}
+\end{table}
+
+For most purposes, ECDSA256 is the standard scheme used. \marginnote{Hashing is much, much faster---the commonly used SHA256 hashing algorithm can compute around 10,000,000 hashes per second. When possible, it is very preferable to use hashing.}
+
+\section{Exchanging Keys}
+Public-key signatures are incredibly useful on paper---they can totally prevent, for example, the class of social engineering attacks where someone pretends to be a CEO or high-ranking dean to try to learn confidential information. If the message needed to be signed with a signature of the person the attacker was claiming to be, they would have zero chance of success. 
+
+However, then the recieving party needs to be able to verify the signature. To do that, they need to somehow know the $\vk$ of the sender. It is not clear how to do this and indeed there are no great solutions. However, there are solutions used in practice.
+
+% TODO: exmaples: chisel, meet in person, trusted source, blockchain
+
+\section{Option 1: Use $\vk$ as name}
+One option would be to just refer to everyone by their verification key. This way, there is no need to do a messy name-to-verification-key lookup. In real life, this would clearly not work. However, some digital services such as bitcoin do do things this way. However, it has a couple problems:
+\begin{itemize}
+	\item Verification keys are hard to remember. Things like email addresses, domain names, kerberos usernames, phone numbers, etc. are much easier to remember.
+	\item No great solution to losing a secret key
+\end{itemize}
+
+% TODO: this introduction does not flow very well
+% it might be good to have a section elaborating on the need to change keys a bit more.
+
+\section{Trust on first use (TOFU)}
+One strategy is to avoid having any global mapping from name to verification key altogether. Instead, many systems trust the first key that they see for a given name.
+
+The system will start with an empty mapping from username (or phone number, etc) to verification key. Whenever connecting to a new party, the party will report their own verification key. If we haven't seen that key before, we will just \emph{trust} that that key is the real key. From then on, we will always verify that the key matches the signature. 
+
+However, we need some strategy to handle a key changing. In most systems that use TOFU, this strategy is to warn the user. If the party on the other end reports that their verification key has changed, the system will tell the user and allow them to either accept or reject the new key.
+
+% todo: example of the ssh key change could be nice
+
+\section{Certificates}
+Another option is to trust a few parties to reliably report verification keys for everyone else. In practice, this is most commonly used in web browsers for SSL keys: when you download Google Chrome or another browser, it will come with a preset list of \emph{Certificate Authorities} that the manufacturer has deemed trustworthy. 
+
+When connecting to a new website, the server will provide a \emph{certificate} of the form $(\vk, \text{name}, \sig_{\text{CA}})$. The browser will accept that $\vk$ as corresponding to the given name if and only if the signature can be verified with one of the CA public keys that it has locally.
+
+Importantly, no communication needs to happen between the browser and the CA in order to verify a $\vk$ of a new server: all that needs to happen is a local signature verification, checking that the signature provided was indeed created by one of the trusted CAs.
+
+\marginnote{In order to use SSL on a website you own, you need to convince one of the certificate authorities to sign your $(\vk, \text{name})$ pair. To do so, the CA will have some protocol to follow---typically, you will send your $(\vk, \text{name})$ pair to the CA, who will then ask you to verify that you own the domain somehow. This verification may be uploading some secret file to your server, adding a new DNS record with a secret value, or something similar. Once this is done to the CA's satisfaction, the CA will reply with a signature over $(\vk, \text{name})$. This $(\vk, \text{name}, \sig_{\text{CA}})$ triplet then forms the \emph{certificate} that your website will advertise.}
+
+This scheme in practice works quite well:
+\begin{itemize}[noitemsep]
+	\item The client only needs to store $\approx 100$, so the system scales well.
+	\item A client can choose which CAs to trust (though in practice, this is totally up to manufacturers).
+	\item No online interaction with the CA is required.
+\end{itemize}
+
+However, it is still far from a perfect solution:
+\begin{itemize}[noitemsep]
+	\item All of the CAs are ultimately trusted: if an attacker compromises some CA, they can generate certificates for any domain.
+	\item Validation is weak
+	\item If a server's private key gets stolen, there is no great plan---an attacker can impersonate them until the certificate expires.
+\end{itemize}
+
+\subsection{Revocation}
+It may sometimes be the case that a verification key no longer belongs to the person that previously owned it. There are several possible reasons for this:
+\begin{itemize}[noitemsep]
+	\item The secret key corresponding to the verification key gets leaked
+	\item A company may want to rotate keys, for example to update to a new cryptographic algorithm
+	\item A website may go out of business and another entity buys their domain name
+	\item Software bugs may lead to an insecure $(\sk, \vk)$ pair being generated in the first place
+\end{itemize}
+
+In a scheme that uses certificates, this seems like a hard problem: since there is no interaction with the CA to verify a certificate, there is no way for a CA to \textquote{take back} a certificate. There are again no excellent solutions to this, but there are a few strategies used in practice.
+
+\paragraph{Expiration Dates}
+The most practical solution to this is to add an expiration date to the generated certificate---if this expiration date has passed, the client will reject the certificate. This way, a server will need to re-authenticate to the CA that they own the name that they claim to own periodically. Therefore, an attacker that steals a secret key will only be able to use it for a certain amount of time.
+
+\paragraph{Software Updates}
+Another solution is for a browser to contain a list of revoked certificates. On every connection, the browser will check whether the provided certificate is in this local revocation list and refuse it if so. Since browsers today check for updates very frequently, this strategy can respond to a stolen secret key quickly. However, there is a large storage cost since now every browser needs to store this (potentially large) list of revoked certificates.
+
+\paragraph{CA Revocation List}
+To avoid depending on browser manufacturers to update this revocation list, another strategy is to ask the CA for it directly. One way to do this is similar to the above: periodically query the CA to download its updated revocation list and check that each certificate is not in this list. Another way called OCSP involves asking the CA on every new connection. However, this adds another request to the CA on the critical path to rendering.

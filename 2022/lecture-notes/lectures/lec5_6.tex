@@ -379,14 +379,56 @@ We first generate a single key pair for every possible message in the message sp
 
 % TODO: diagram of tree
 
+As an example, to construct a hash function for 2-bit messages:
+
+\begin{figure}[htpb]
+	\centering
+	\begin{subfigure}{.5\textwidth}
+		\centering
+		\begin{forest}
+			[$\sk_\varepsilon$
+				[ $\sk_0 $ 
+					[ $\sk_{00}$ ]
+					[ $\sk_{01}$ ]
+				]
+				[ $ \sk_1 $ 
+					[ $\sk_{10}$ ]
+					[ $\sk_{11}$ ]
+				]
+			]
+		\end{forest}
+		\caption{A subfigure}
+		\label{fig:sub1}
+	\end{subfigure}%
+	\begin{subfigure}{.5\textwidth}
+		\centering
+		\begin{forest}
+			[$\sk_\varepsilon$
+				[ $\sk_0 $ 
+					[ $\sk_{00}$ ]
+					[ $\sk_{01}$ ]
+				]
+				[ $ \sk_1 $ 
+					[ $\sk_{10}$ ]
+					[ $\sk_{11}$ ]
+				]
+			]
+		\end{forest}
+		\caption{A subfigure}
+		\label{fig:sub2}
+	\end{subfigure}
+	\caption{A figure with two subfigures}
+	\label{fig:test}
+\end{figure}
+
 Importantly, every key in the tree will be used to sign only one message ever: the key at non-leaf nodes will only ever sign the pair of its children, and the key at leaf nodes will only ever be used to sign the corresponding message. 
 
-To sign a given message, we generate the signature as 
+To sign a given message, we generate the signature by providing the actual signature of $\vk_m$ over $m$ \emph{alongside} the remainder of the verification keys and signatures needed to trace all the way back up to the root verification key $\vk_\varepsilon$.
 
 % TODO: finish this explanation.
 
 \subsection{Improving Inefficiency}
-In the scheme above, we required $O(2^n)$ keys for our secret key. This is far too many keys to be pracical, but we still need to be able to use each of these keys to sign a given message. To bridge this gap, we will use a PRF to generate these secret keys \textquote{on the fly}.
+In the scheme above, we required $O(2^n)$ keys for our secret key. This is far too many keys to be pracical, but we still need to be able to use each of these keys to sign a given message. To bridge this gap, we will use a PRF to generate these secret keys \textquote{on the fly} and use those secret keys to generate the corresponding verification key.
 
 Given a one-time secure signature scheme $(\Gen, \Sign, \Ver)$:
 
