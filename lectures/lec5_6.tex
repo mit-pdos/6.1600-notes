@@ -354,12 +354,30 @@ sampled and uniformly random value from the co-domain of the hash function, $\zo
 is \emph{never actually} a random oracle. A random oracle from $h \colon \zo^* \to \zo^\lambda$
 would take infinitely many bits to describe, while real-world hash functions have finite size (and polynomial-size descriptions).}
 
---------------------------
-
-Recall that our security definition involves the attacker requesting signatures over messages of its choice. If we pass a message through a hash function before passing it to our signature scheme, however, we effectively randomize the message---the adversary can no longer control the input to the scheme. This allows us to define another meaningful definition of security:
+Recall that the standard security definition for
+digital signatures (\cref{def:sig-sec}) allows
+the attacker to request signatures on messages
+of its choice.
+If we pass a message through a hash function before signing
+it using an underlying signature scheme scheme, however, 
+we effectively randomize the message---the adversary can no longer control the
+input to the underlying signature scheme. This allows us to define
+another meaningful definition of security:
 
 \begin{definition}[Digital signatures: security against random message attacks]
-	Any efficient adversary given $\vk$ and a list of random message-signature pairs $((m_1, \sig_1), \ldots, (m_t, \sig_t))$ cannot generate $(m^*, \sig^*)$ such that $\Ver(\vk, m^*, \sig^*) = 1$ and $m^* \notin \set{m_1, \ldots, m_t}$.
+Any efficient adversary given the public verification key and a list of random message-signature pairs $((m_1, \sig_1), \ldots, (m_t, \sig_t))$ cannot generate a forged
+message-signature pair $(m^*, \sig^*)$ 
+such that $\Ver(\vk, m^*, \sig^*) = 1$ and $m^* \notin \set{m_1, \ldots, m_t}$.
+\iffalse
+For all efficient adversaries $\calA$:
+  \[\Pr\left[ \Ver(\vk, m^*, \sig^*) = 1 \colon 
+\begin{aligned}
+  (\sk, \vk) &\gets \Gen()\\
+  m_i &\getsr \calM \text{, for $i \in \{1, \dots, t\}$}\\
+  \sig_i &\gets \Sign(\sk, m_i) \text{, for $i \in \{1, \dots, t\}$}\\
+  (m^*, \sigma^*) &\gets \calA\big((m_1, \sig_1), \dots, (m_t, \sig_t) \big)
+\end{aligned} \right] \]
+\fi
 \end{definition}
 
 Note that this definition is \emph{not} good enough on its own---an adversary often does have the ability to generate signatures for messages of his choice. However, paired with a hash function modeled as a random oracle, this definition becomes very useful---if the inputs are passed through the hash function before they are passed to the signature scheme, they become effectively random. We can even relax the definition further without losing practicality: by the same logic, with hash function in front of the signature scheme, what the adversary needs to sign is really not a message of their choise, but is the \emph{hash} of a message of their choice---effectively a random value.
@@ -368,7 +386,7 @@ Note that this definition is \emph{not} good enough on its own---an adversary of
 	Any efficient adversary given $\vk$ and a list of random message-signature pairs $((m_1, \sig_1), \ldots, (m_t, \sig_t))$ and random $m^* \notin \set{m_1, \ldots, m_t}$ cannot generate $\sig^*$ such that $\Ver(\vk, m^*, \sig^*) = 1$.
 \end{definition}
 
-It is possible to formally argue that given a signature scheme satisfying definition \ref{def:signatures_random_security} and a random oracle, we can construct a scheme satisfying existential unforgeability under chosen message attacks.
+It is possible to formally argue that given a signature scheme satisfying \cref{def:signatures_random_security} and a random oracle, we can construct a scheme satisfying existential unforgeability under chosen message attacks.
 
 \section{From one-time security to many-time security}
 After applying the hash \& sign strategy above to our Lamport scheme, we have a signature scheme that is one-time secure for messages of arbitrary length. In order for the scheme to be useful and satisfy our security definition, we need to be able to sign polynomially many messages with a single key pair. To do this, we will use a construction very similar to he Merkle tree construction we have seen before.
