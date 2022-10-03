@@ -41,7 +41,7 @@ This definition, however, allows encryption schemes that leake a single bit of t
 
 	\begin{enumerate}
 		\item The challenger samples $b \rgets \bin$ and $b \rgets \calK$.
-		\item $\calA$ then chooses $m_i^0$ and $m_i^1 \in \calM$ and sends them to the challenger. The challenger responds with $c_i = \Enc(k, $m_i^b)$. This can be repeated for polynomially many $i$.
+		\item $\calA$ then chooses $m_i^0$ and $m_i^1 \in \calM$ and sends them to the challenger. The challenger responds with $c_i = \Enc(k, m_i^b)$. This can be repeated for polynomially many $i$.
 		\item $\calA$ outputs a value $b' \in \bin$, and wins if $b'=b$ with probability $\geq \tfrac{1}{2} + \mu(n)$, where $\mu$ is some negligible function.
 	\end{enumerate}
 \end{definition}
