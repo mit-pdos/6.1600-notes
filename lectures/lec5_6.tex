@@ -389,9 +389,96 @@ Note that this definition is \emph{not} good enough on its own---an adversary of
 It is possible to formally argue that given a signature scheme satisfying \cref{def:signatures_random_security} and a random oracle, we can construct a scheme satisfying existential unforgeability under chosen message attacks.
 
 \section{From one-time security to many-time security}
-After applying the hash \& sign strategy above to our Lamport scheme, we have a signature scheme that is one-time secure for messages of arbitrary length. In order for the scheme to be useful and satisfy our security definition, we need to be able to sign polynomially many messages with a single key pair. To do this, we will use a construction very similar to he Merkle tree construction we have seen before.
+After applying the hash-and-sign strategy above to our Lamport scheme, we have a signature scheme that is one-time secure for messages of arbitrary length. In order for the scheme to be useful and satisfy our security definition, we need to be able to sign polynomially many messages with a single key pair. To do this, we will use a construction very similar to he Merkle tree construction we have seen before.
 
-We will show how to do this for a message space of size $\bin^n$, but hash \& sign can be applied to make this work for arbitrarily-length messages. We will first show an inefficient construction, and then use a PRF to make it practical.
+We will show how to do this for a message space of
+size $\bin^n$, but hash and sign can be applied to
+make this work for arbitrary-length messages. 
+
+
+\begin{claim}
+Assume that we are given:
+\begin{compactitem}
+  \item a pseudorandom function, and 
+  \item a one-time secure signature scheme $(\Gen_0, \Sign_0, \Ver_0)$.
+\end{compactitem}
+Then, for any $t \geq 0$, we can construct a many-time secure 
+signature scheme $(\Gen_t, \Sign_t, \Ver_t)$ on message space $\zo^{t}$,
+where the running time of all algorithms on 
+security parameter $\lambda$ is $\poly(\lambda, t)$.
+\end{claim}
+
+By taking $t \approx 256$, and combining this signature
+scheme with the hash-and-sign paradigm, 
+we can get a many-time-secure signature scheme 
+for arbitrary-length messages.
+
+\begin{proof}[Proof (Informal)]
+By induction on $t$.
+
+\paragraph{Base case ($t=0$).}
+The signature scheme is just $(\Gen_0, \Sign_0, \Ver_0)$.
+
+\paragraph{Induction step.}
+Assume the claim for $t-1$.
+Then we construct the signature scheme for $t$.
+
+Let the PRF keyspace be $\calK$.
+For a PRF key $k \in \calK$ and string $s$, we write $\Gen_0^{F(k, s)}()$
+to indicate the process of running the key-generation algorithm
+$\Gen_0$ using randomness derived from the output of the PRF $F(k, s)$.
+
+We have:
+\begin{framed}
+\begin{itemize}
+  \item $\Gen_t() \to (\sk, \vk)$:
+    \begin{itemize}
+      \item Sample a fresh PRF key $k \getsr \calK$.
+      \item Set $(\sk_\epsilon, \vk_\epsilon) \gets \Gen_0^{F(k, \text{``''})}()$.
+      \item Output $(\sk, \vk) \gets ((\sk_\epsilon, k), \vk_\epsilon)$.
+    \end{itemize}
+
+  \item $\Sign_t((\sk_\epsilon, k), m) \to \sigma$: 
+    \begin{itemize}
+      \item Write the message $m$ as bits $(m_1, \dots, m_t) \in \zo^t$.
+      \item Compute $(\sk_0, \vk_0) \gets \Gen_0^{F(k, \text{``0''})}()$
+      and $(\sk_1, \vk_1) \gets \Gen_0^{F(k, \text{``1''})}()$.
+      \item Set $\sigma_\epsilon \gets \Sign_0(\sk_\epsilon, \vk_0 \| \vk_1)$.
+      \item Set $\sigma_m \gets \Sign_{t-1}(\sk_{m_1}, m_{2}m_3 \dots m_t)$.
+      \item Output $\sigma \gets (\vk_0, \vk_1, \sigma_\epsilon, \sigma_m)$.
+    \end{itemize}
+  \item $\Ver_t(\vk_\epsilon, m, \sigma) \to \zo$:
+    \begin{itemize}
+      \item Parse $(\vk_0, \vk_1, \sigma_\epsilon, \sigma_m) \gets \sigma$.
+      \item Output ``1'' if and only if 
+        \begin{itemize}
+          \item $\Ver_0(\vk_\epsilon, \vk_0 \| \vk_1, \sigma_\epsilon)$
+        and 
+      \item $\Ver_{t-1}(\vk_{m_1}, m_2m_3\dots m_n, \sigma_m)$.
+        \end{itemize}
+    \end{itemize}
+\end{itemize}
+\end{framed}
+
+The efficiency claim follows by inspection.
+To sketch the security proof: 
+In a forged message-signature pair, consider
+the pair $(\vk_0,\vk_1)$. Either 
+\begin{itemize}
+  \item These keys are different from those that the signer generated.
+        In this case, the adversary has broken the one-time signature scheme. Or:
+  \item These keys are the same as those that the signer generated.
+        In this case, the adversary has broken the signature 
+        scheme for $(t-1)$-bit messages. This violates the induction hypothesis.
+\end{itemize}
+Either way, we get a contradiction.
+So we have (informally) proved the claim.
+\end{proof}
+\iffalse
+
+We
+will first show an inefficient construction, and
+then use a pseudorandom to make it practical.
 
 We first generate a single key pair for every possible message in the message space: $2^n$ total $(\sk_i^n, \vk_i^n)$ pairs for $i \in \bin^n$. These will be the leaves of our tree. For every two adjacent keys, we will then generate a key pair ($2^{n-1}$ pairs total) Then continue for all $j \in [0, \ldots, n]$, where the keys for each $j$ form layer $n-j$ of the tree (with leaves at level $n$).
 
@@ -448,9 +535,4 @@ To sign a given message, we generate the signature by providing the actual signa
 \subsection{Improving Inefficiency}
 In the scheme above, we required $O(2^n)$ keys for our secret key. This is far too many keys to be pracical, but we still need to be able to use each of these keys to sign a given message. To bridge this gap, we will use a PRF to generate these secret keys \textquote{on the fly} and use those secret keys to generate the corresponding verification key.
 
-Given a one-time secure signature scheme $(\Gen, \Sign, \Ver)$:
-
-\begin{itemize}
-	\item $\Gen'$: generate $(\sk, \vk) \leftarrow \Gen()$ for one-time scheme and a random PRF key $k$. Output $\vk' = \vk$ and $\sk' = (\sk, k)$.
-	\item $\Sign'$: % finish
-\end{itemize}
+\fi
