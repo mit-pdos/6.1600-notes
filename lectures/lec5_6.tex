@@ -389,6 +389,7 @@ Note that this definition is \emph{not} good enough on its own---an adversary of
 It is possible to formally argue that given a signature scheme satisfying \cref{def:signatures_random_security} and a random oracle, we can construct a scheme satisfying existential unforgeability under chosen message attacks.
 
 \section{From one-time security to many-time security}
+\label{sec:sig:manytime}
 After applying the hash-and-sign strategy above to our Lamport scheme, we have a signature scheme that is one-time secure for messages of arbitrary length. In order for the scheme to be useful and satisfy our security definition, we need to be able to sign polynomially many messages with a single key pair. To do this, we will use a construction very similar to he Merkle tree construction we have seen before.
 
 We will show how to do this for a message space of
@@ -536,3 +537,28 @@ To sign a given message, we generate the signature by providing the actual signa
 In the scheme above, we required $O(2^n)$ keys for our secret key. This is far too many keys to be pracical, but we still need to be able to use each of these keys to sign a given message. To bridge this gap, we will use a PRF to generate these secret keys \textquote{on the fly} and use those secret keys to generate the corresponding verification key.
 
 \fi
+
+\section{Choosing Signature Schemes}
+The signature scheme we presented in \cref{sec:sig:manytime}
+is not particularly efficient in terms of signature size.
+
+\begin{table}[htpb]
+	\centering
+	\caption{Statistics about various signature schemes used in practice}
+	\label{tab:sig_schemes}
+
+	\begin{tabular}{rcccc}
+		\textbf{Algorithm} & $\vk$ size & $\sig$ size & signatures/sec & verifications/sec \\
+		\bf{SPHINCS+-128} & 32 B & 8000 B & 5 & 750 \\
+		\bf{RSA 2048} & 256 B & 256 B & 2,000 & 50,000 \\
+		\bf{ECDSA256} & 32 B & 64 B & 42,000 & 14,000 \\
+	\end{tabular}
+\end{table}
+
+Many deployed systems today use the ECDSA256 signature scheme.
+Legacy application still use RSA signatures, though because of their
+relatively large public-key and signature sizes, few new applications
+use these schemes.\marginnote{Hashing is much, much faster than signing---the commonly used SHA256 hashing algorithm can compute around 10,000,000 hashes per second. 
+This is one reason the hash-and-sign paradigm 
+is so useful.
+}

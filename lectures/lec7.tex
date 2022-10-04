@@ -1,48 +1,104 @@
-In the last section, we established the idea of digital signatures, which allow us to authenticate message integrity without a shared secret.
+In the last chapter, we discussed digital
+signatures, which allow us to authenticate messages
+without a shared secret.
+For example, if I have the public signature-verification key 
+of the university dean, I can verify that signed emails from 
+the dean really came from her and not from someone pretending to be her.
+But to verify the signature on the dean's message, I need to know her
+signature-verification key $\vk$.
+How can I (the recipient) obtain this verification key without
+a secure channel to the dean (the sender)?
 
-\section{Choosing Signature Schemes}
-The scheme we presented in the last section was not particuarly efficient: it required very long verification keys in order to allow a verifying party to trace the path back to the root verification key. 
+Unfortunately, there are no perfect solutions to this problem.
+In this section, we will discuss some of the approaches that
+we use in practice.
 
-\begin{table}[htpb]
-	\centering
-	\caption{Statistics about various signature schemes used in practice}
-	\label{tab:sig_schemes}
+\section{Public-key infrastructure}
 
-	\begin{tabular}{rcccc}
-		\textbf{Algorithm} & $\vk$ size & $\sig$ size & signatures/sec & verifications/sec \\
-		\bf{SPHINCS-128} & 32 B & 8000 B & 5 & 750 \\
-		\bf{RSA 2048} & 256 B & 256 B & 2,000 & 50,000 \\
-		\bf{ECDSA256} & 32 B & 64 B & 42,000 & 14,000 \\
-	\end{tabular}
-\end{table}
+The goal of a public-key infrastructure is to facilitate
+the mapping of \textbf{human-intelligible names} to
+\textbf{signature-verification keys}.
+Examples of human-intelligible names that we map to keys
+are: email addresses, domain names, legal entities, phone numbers, and
+usernames (e.g., within a company).
 
-For most purposes, ECDSA256 is the standard scheme used. \marginnote{Hashing is much, much faster---the commonly used SHA256 hashing algorithm can compute around 10,000,000 hashes per second. When possible, it is very preferable to use hashing.}
-
-\section{Exchanging Keys}
-Public-key signatures are incredibly useful on paper---they can totally prevent, for example, the class of social engineering attacks where someone pretends to be a CEO or high-ranking dean to try to learn confidential information. If the message needed to be signed with a signature of the person the attacker was claiming to be, they would have zero chance of success. 
-
-However, then the recieving party needs to be able to verify the signature. To do that, they need to somehow know the $\vk$ of the sender. It is not clear how to do this and indeed there are no great solutions. However, there are solutions used in practice.
+We can think of the public-key infrastructure as implementing
+the following (grossly simplified) API:
+\[ \mathsf{IsKeyFor}(\vk, \texttt{name}) \to \zo.\]
+That is, given a verification key $\vk$ and a name $\texttt{name}$, 
+the public-key infrastructure gives a way to check whether this mapping
+is valid.
 
 % TODO: exmaples: chisel, meet in person, trusted source, blockchain
 
-\section{Option 1: Use $\vk$ as name}
-One option would be to just refer to everyone by their verification key. This way, there is no need to do a messy name-to-verification-key lookup. In real life, this would clearly not work. However, some digital services such as bitcoin do do things this way. However, it has a couple problems:
+We now discuss some ways to implement this API.
+
+\section{Option 1: Use verification keys as names}
+One option is to just refer to everyone by the bytes of
+their signature-verification key.
+This way, there is no need to do a messy name-to-verification-key 
+translation at all.
+
+This is not practical for humans generally: it would be difficult
+to remember your friends' names if you had to call them by 
+random 32-byte strings!
+However, some digital services such as Bitcoin indeed use verification
+keys as identities: when you want to transfer Bitcoin to someone,
+you send the coins to an account identified by their public key.
+The public key \emph{is} name of that account.
+
+Using keys as names has a two major problems:
 \begin{itemize}
-	\item Verification keys are hard to remember. Things like email addresses, domain names, kerberos usernames, phone numbers, etc. are much easier to remember.
-	\item No great solution to losing a secret key
+	\item Verification keys are hard to remember. Things like email addresses, domain names, kerberos usernames, phone numbers, and so on, are much easier for humans to remember.
+	\item There is no way to update the name-to-key mapping. If you lose the secret key associated with your name/account, there is no way to ``update'' the key to a new value. In practice, people lose their secret keys all the time, so supporting key updates is critical in most systems.
 \end{itemize}
 
 % TODO: this introduction does not flow very well
 % it might be good to have a section elaborating on the need to change keys a bit more.
 
 \section{Trust on first use (TOFU)}
-One strategy is to avoid having any global mapping from name to verification key altogether. Instead, many systems trust the first key that they see for a given name.
+Another strategy is to avoid having any global mapping from names to verification keys.
+Instead, a client can just accept the first verification key 
+that it sees associated with a given name.
+The secure shell system (\ttt{SSH}) uses TOFU for key management by default.
 
-The system will start with an empty mapping from username (or phone number, etc) to verification key. Whenever connecting to a new party, the party will report their own verification key. If we haven't seen that key before, we will just \emph{trust} that that key is the real key. From then on, we will always verify that the key matches the signature. 
+In particular, the key-validation logic looks like this:
 
-However, we need some strategy to handle a key changing. In most systems that use TOFU, this strategy is to warn the user. If the party on the other end reports that their verification key has changed, the system will tell the user and allow them to either accept or reject the new key.
+\begin{framed}
+\noindent
+$\mathsf{keymap} \gets \{ \}$.
 
-% todo: example of the ssh key change could be nice
+\medskip
+\noindent
+$\mathsf{IsKeyFor}(\vk, \texttt{name}):$ 
+\begin{compactitem}
+\item If $\mathsf{keymap}[\texttt{name}]$ is undefined:
+      \begin{compactitem}
+      \item Set $\mathsf{keymap}[\texttt{name}] \gets \vk$.
+      \item Return true..
+      \end{compactitem}
+
+\item Else: Return $\mathsf{keymap}[\texttt{name}] == \vk$.
+\end{compactitem}
+\end{framed}
+
+That is, the client will accept the \emph{first} verification key 
+it sees associated with a particular name.
+Later on, the client will only accept the same verification key
+for that name.
+
+TOFU is very simple to implement and provides a meaningful security
+guarantees. 
+There are two drawbacks:
+\begin{itemize}
+  \item If the first key that client receives for a particular name 
+        is incorrect/attacker-generated, the attacker can forge signatures
+        under that name.
+  \item It is not clear with TOFU how to handle key updates. In most systems that use TOFU, whenever the sender's key changes, the system notifies the user and allows them to accept or reject the new key. The burden is then on the user to figure out whether the sender really did change their signing keypair, or whether there is an attack in progress.
+\end{itemize}
+
+
+----------------------------------
 
 \section{Certificates}
 Another option is to trust a few parties to reliably report verification keys for everyone else. In practice, this is most commonly used in web browsers for SSL keys: when you download Google Chrome or another browser, it will come with a preset list of \emph{Certificate Authorities} that the manufacturer has deemed trustworthy. 
