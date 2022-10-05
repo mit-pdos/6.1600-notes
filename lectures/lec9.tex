@@ -1,0 +1,63 @@
+We have just constructed an encryption scheme with \emph{weak} security: one that provided security given that the adversary could see encryptions of messages of his choice. This scheme also allowed encrypting only messages of length 128. In practice, neither of these assumptions are particularly useful: an attacker is often able to see the effects of a client decrypting \emph{ciphertexts} of his choice, and messages are very rarely exactly 128 bits long.
+
+\section{Encryption of Long Messages}
+First we will discuss methods for MACing messages or arbitrary length. As in the case of MAC, we can split our message into blocks of length 128 and encrypt each of them with our encryption scheme from the last question, outputting the concatenation of all of the resulting ciphertexts.
+
+Unlike the block-by-block MAC construction we explored, where the adversary's ability to rearrange the input and output together broke security, this simple strategy scheme is CPA secure! 
+
+However, recall that our scheme from the last section included 128 bits of randomness with each of our ciphertexts in order to seed the PRF. If we concatenate all of our ciphertexts, the ciphertext will grow twice as fast as the message! 
+
+However, the purpose of this randomness was to avoid ever using the same pad in the underlying one-time pad scheme. Since we are encrypting many blocks at once, it is not necessary to have fresh randomness for every single block: instead, we can use a \emph{counter}---we send some initial randomness called an \emph{initialization vector}, and for each block $i$, we use $r_i = \text{IV} || i$, where the IV is length 96 and $i$ is a 32-bit integer as the input to the PRF.\marginnote{You may notice that this scheme reveals the length of the message to the attacker! This indeed is a potential risk, but in some sense it is required: if we were to hide the length of the message, we would need to set some maximum message length and pad it up to this length. If we did this, encrypting a single word would necessarily result in a ciphertext equal in length to the ciphertext of encrypting a movie! This would greatly decrease the practicality of our encryption scheme. For applications where hiding the length is especially important, the messages can be padded to ensure they are all the same length before they are passed to the encryption scheme.}
+
+Also note that in the MAC construction, we needed each block to be exactly 128 bits long: we had no way of MACing a shorter message. In this case, we do not need to make this assumption. Because our underlying one-time pad works on messages of any length given a pad of the same length, to encrypt a message of length $m < 128$, we can simply use only the first $m$ bits of the output of the PRF to compute the ciphertext. Now the ciphertext is exactly as long as the message.
+
+As long as an initialization vector is not reused, this scheme satisfies our definition of CPA security. However, to have a truly useful encryption scheme, we need to also consider message integrity.
+
+\section{Authenticated Encryption}
+Without authentication that a ciphertext was created by someone trusted, an adversary is free to tamper with the message and we will have no way of knowing. For example, if a client is communicating with a server, an adversary can observe one ciphertext, view the server's reaction, and compare it to the server's reaction to ciphertexts of his choice. Because the adversary is able to see the server's reaction (such as the length of its response or where it sends secondary requests to), this can allow the adversary to deduce the contents of the original message! 
+
+In order to make our encryption scheme broadly applicable to all applications, we need to extend our definition of security to one called \emph{indistinguishability under chosen ciphertext attacks}.
+
+\begin{definition}[Encryption Scheme CCA security (strong)]\label{defn:cca}
+	An encryption scheme is CCA secure if every efficient adversary wins the following game with probability at most $\tfrac{1}{2} + \text{\textquote{negligible}}$:
+
+  \begin{itemize}[noitemsep]
+		\item The challenger samples $b \rgets \bin$ and $k \rgets \calK$.
+    \item Polynomially many times: \quad \emph{// Chosen-plaintext queries}
+          \begin{itemize}
+            \item The adversary sends the challenger a message $m_i \in \calM$
+						\item The challenger replies with $c_{m_i} \gets \Enc(k, m_i)$.
+          \end{itemize}
+    \item Polynomially many times: \quad \emph{// Chosen-ciphertext queries}
+          \begin{itemize}
+						\item The adversary sends the challenger a \emph{ciphertext} $c_j \notin \set{c_{m_0}, \ldots, c_{m_i}}$
+						\item The challenger replies with $m_{c_j} \gets \Dec(k, c_j)$.
+          \end{itemize}
+    \item The adversary then sends two messages $(m^*_0, m^*_1) \in \calM^2$ to the challenger.
+    \item The challenger replies with $c^* \gets \Enc(k, m^*_b)$.
+		\item The adversary outputs a value $b' \in \bin$.
+    \item The adversary wins if $b'=b$. 
+	\end{itemize}
+\end{definition}
+
+
+
+We typically achieve this by concatenating the ciphertext output of the above scheme with a MAC using a \emph{different key}. \marginnote{It is important to use a different key for the encryption and the MAC here. Each application leaks some information about the secret key, and these different applications guarantee only that this leaked information will not compromise that application---they make no guarantees that the information leaked by one application will not compromise the security of some other application. In general, we must never share keys across different applications. However, in practice, it is sufficient to share a single key and derive two new pseudorandom keys as $\prf_k(0), \prf_k(1)$.} Importantly, we compute the MAC over the ciphertext---we encrypt \emph{then} MAC, rather than MAC the plaintext and then encrypt the concatenation of the two. Our final ciphertext to be sent then becomes $(ct = \Enc(k_\Enc, m), \MAC(k_\MAC, ct))$. This strategy is called Encrypt-then-MAC.
+
+\begin{theorem}
+	If an encryption scheme $(\Enc, \Dec)$ is CPA secure and MAC is secure (existentially unforgeable against adaptive chosen message attacks), then Encrypt-then-MAC is CCA secure.	
+\end{theorem}
+
+\section{AES-GCM (Galois Counter Mode)}
+In practice, authenticated encryption is most commonly done using a scheme that combines the encryption and the MAC, called AES-GCM. However, they are able to improve performance by doing this using a one-time MAC that is not secure! Importantly, the MAC they use is not secure if the attacker ever sees a tag. To do this, the scheme \emph{masks} the final output of the MAC with yet another one-time pad: the \textquote{tag} that is revealed is actually $\text{tag} \xor \AES(k, iv || 0)$.
+
+% TODO: clarify this
+The scheme makes use of a finite-field multiplication to implement this insecure MAC. In particular, it uses a function $M_H: \bin^{128} \rightarrow \bin^{128}$ which is a multiplication by $H = \AES(k, 0)$ in a finite field of size $2^{128}$.
+\begin{itemize}
+	\item Computes $[ct_1, ct_2, \ldots, ct_n]$ for each block $i$ by computing $m_1 \xor \AES(k, iv || i)$.
+	\item Computes $t = M_H(M_H(\ldots), M_H(ct_2)), M_H(ct_1))$
+	\item Computes $t' = t \xor \AES(k, m_0)$
+
+\end{itemize}
+% TODO: finish
+% TODO: diagram is pretty important here
