@@ -53,7 +53,9 @@ Encryption shows up in a large number of deployed systems. A few examples are:
 \section{Encryption Scheme Syntax}
 Encryption schemes are defined with respect to a key space $\calK$, a message space $\calM$, and a ciphertext space $\calC$.
 For now, think of $\calK = \calM = \zo^n$ and $\calC = \zo^{2n}$,
-for a security parameter $n$. 
+for a security parameter $n$.\marginnote{Remember that in practice,
+we will often take the size of the keyspace $\abs{\calK}$ to be at least
+$2^{128}$ to prevent brute-force key-guessing attacks.} 
 An encryption scheme then consists of two algorithms:
 
 \begin{itemize}
@@ -103,10 +105,16 @@ the following game with probability at most $\tfrac{1}{2}$ + ``negligible:''
             \item The adversary sends the challenger a message $m_i \in \calM$
             \item The challenger replies with $c_i \gets \Enc(k, m_i)$.
           \end{itemize}
-    \item The adversary then sends two messages $(m^*_0, m^*_1) \in \calM^2$ to the challenger.
+    \item The adversary then sends two messages $m^*_0, m^*_1 \in \calM$ to the challenger.
+          (We require $\abs{m^*_0} = \abs{m^*_1}$.)
+          \marginnote{Standard encryption systems do not hide the
+          length of the message being encrypted.
+          So, if the message space $\calM$ contains messages of different
+          lengths, our security definition requires the adversary to distinguish
+          the encryption of two messages of the \emph{same} length.}
+
     \item The challenger replies with $c^* \gets \Enc(k, m^*_b)$.
-		\item The adversary outputs a value $b' \in \bin$.
-    \item The adversary wins if $b'=b$. 
+		\item The adversary outputs a value $b' \in \bin$. The adversary wins if $b=b'$. 
 	\end{itemize}
 \end{definition}
 
@@ -199,7 +207,7 @@ and then use these keys to communicate securely over long distances.
 In practice, it is much more convenient to be able to exchange a \emph{short}
 key and then use it to encrypt many \emph{long} messages.
 
-\section{A Weak Encryption Scheme}
+\section{A Weak Encryption Scheme}\label{sec:lec8:weakenc}
 What we effectively need is a way to generate many bits of random-looking keys 
 (i.e., keys for the one-time pad encryption scheme)
 from a single short random string.
@@ -208,6 +216,8 @@ To generate this, we can use a pseudorandom function!
 \marginnote{If you forget what a pseudorandom function is, refer back to \cref{defn:prf}.}
 In particular, we would like a pseudorandom 
 function of the form $F \colon \bin^n \times \bin^n \rightarrow \bin^n$. 
+\marginnote{In practice, we will use AES or another block cipher
+as a pseudorandom function, so we will have $n = 128$ or so.}
 
 Using such a pseudorandom function, we can construct a new 
 encryption scheme that replaces the truly random keys 
@@ -269,4 +279,77 @@ By the Birthday Paradox, if we sample the nonce from a space of size $2^{128}$, 
 Cryptographic standards typically limit the number of bytes that users can
 encrypt with the same key to prevent these sorts of problems.
 
+
+\section{Encrypting longer messages: Counter mode}
+
+The CPA-secure encryption scheme of \cref{sec:lec8:weakenc} only
+allowed encrypting messages of a fixed length.
+We now show how to use \emph{counter-mode encryption} to extend
+this scheme to support messages of arbitrary length.
+That is, we will construct an encryption scheme 
+$\Enc \colon \calK \times \zo^* \to \zo^*$
+for messages of any length.
+\marginnote{In practice, encryption schemes place some
+(large) bound on the length of encrypted messages.
+For example, the AES-GCM cipher has a maximum message
+limit of just under 64 GiB.
+}
+
+Counter-mode encryption works much as the CPA-secure encryption
+scheme we have already seen in \cref{sec:lec8:weakenc}, except 
+that we split the message into blocks and encrypt each block separately.
+
+\newcommand{\ToString}{\mathsf{ToString}}
+We will use the function $\ToString \colon \{0, \dots, 2^n-1\} \to \zon$,
+which converts an integer in $\{0, \dots, 2^n -1\}$ to an $n$-bit string in the natural way.
+
+The encryption scheme uses a pseudorandom function $F \colon \calK \times \zon \to \zon$.
+The secret encryption key is a key $k \in \calK$ for the pseudorandom function.
+To encrypt a message, we choose a fresh random value $r \getsr \{0, \dots, 2^n-1\}$ and 
+XOR the $i$th block of the message with the value $F(k, \ToString(r+i \bmod 2^n))$.
+
+\begin{itemize}
+  \item $\Enc(k, m):$
+    \begin{itemize}
+      \item Split the message $m$ into blocks of $n$ bits: $(m_1, m_2, m_3, \dots, m_\ell)$.
+            The last message block $m_\ell$ may be shorter than $n$ bits.
+      \item Sample a random nonce 
+            $r \getsr \{0, \dots, 2^n-1\}$.
+        \marginnote{The nonce is sometimes called an ``initialization vector'' or ``IV.''} 
+      \item For $i = 1, \dots, \ell$: Compute $c_i \gets m_i \oplus F(k, \mathsf{ToString}(r+i \bmod 2^n))$.\\
+            (If the last message block $m_\ell$ is less than $n$ bits long, 
+            truncate the last ciphertext block $c_\ell$ to the length of $m_\ell$.)
+      \item Output the ciphertext $c = \big(r, c_1, \dots, c_\ell)$.
+    \end{itemize}
+
+  \item $\Dec(k, c):$
+    \begin{itemize}
+      \item Parse the ciphertext $c$ as $(r, c_1, \dots, c_\ell)$,
+            where all values but the last are exactly $n$ bits long.
+          \item For $i = 1, \dots, \ell$: Compute $m_i \gets c_i \oplus F(k, \ToString(r+i \bmod 2^n))$.
+            (Truncate $m_\ell$ to the length of $c_\ell$.)
+      \item Output the message $m = (m_1 \| \dots \| m_\ell)$.
+    \end{itemize}
+
+\end{itemize}
+
+As long as the space of random values $r$ is large enough to ensure that
+the encryption routine never evaluates the pseudorandom function $F(k, \cdot)$
+on the same input twice, this scheme will be CPA secure.
+
+You may notice that this encryption scheme reveals
+the length of the encrypted message to the attacker! This
+indeed is a potential risk, but in some sense it
+is required: if we were to hide the length of the
+message, we would need to set some maximum message
+length and pad it up to this length. If we did
+this, encrypting a single word would necessarily
+result in a ciphertext equal in length to the
+ciphertext of encrypting a movie! This would
+greatly decrease the practicality of our
+encryption scheme. For applications where hiding
+the length is especially important, the messages
+can be padded to ensure they are all the same
+length before they are passed to the encryption
+scheme.
 
