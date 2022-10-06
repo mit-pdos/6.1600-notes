@@ -196,7 +196,7 @@ don't have any mathematical proof that AES is
 a pseudorandom function. However, 
 it has undergone a tremendous amount of cryptanalysis and the best attacks on AES are only marginally better than the obvious brute-force attacks.}
 
-\subsection{From pseudorandom functions to MACs}
+\section{From pseudorandom functions to MACs}
 
 \paragraph{MACs for short messages.}
 Using AES as a pseudorandom function on a 128-bit domain,
@@ -360,7 +360,8 @@ The security argument here goes in two steps:
   \item First, we appeal to the PRF security property to argue
         that we can replace the values $F(k_F, R)$ used to generate
         the tags with truly random values.
-        Now, the 
+        Now, the adversary gets no information 
+
   \item Now, as long as the adversary does not find two messages
         $m,m' \in \calM$ with $m \neq m'$, the tags that the 
         adversary sees are just uniform random values, so the
