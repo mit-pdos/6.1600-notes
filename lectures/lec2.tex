@@ -308,7 +308,7 @@ Then the client sends the pair $(t_{\mathsf{req}}, \mathsf{req})$ to the server.
 In this way, the server can simultaneously authenticate the client
 and be sure that the request $\mathsf{req}$ came from the client.
 
-\subsection{Two-Factor Authentication}
+\section{Two-Factor Authentication}
 As we have already seen, passwords are a weak authentication
 mechanism: humans are bad at choosing strong passwords and 
 attackers have become good at stealing password databases
@@ -325,7 +325,7 @@ Common authentication schemes are:
 	\item Something you are: biometrics (fingerprint, face ID)...
 \end{itemize}
 
-\subsubsection{Time-based One-Time Passwords (TOTP)}
+\subsection{Time-based One-Time Passwords (TOTP)}
 In this scenario, the server requests a code along
 with the password. The user has a device, such as 
 a phone, that shares a secret key $k$ (e.g., a random 128-bit string) 
@@ -351,7 +351,7 @@ One benefit of TOTP codes (unlike passwords) is that the attacker
 must use a stolen TOTP code within $\approx$30 seconds of stealing
 it, which requires a much more sophisticated attack.
 
-\subsubsection{Avoiding phishing: U2F (simplified)}
+\subsection{Avoiding phishing: U2F (simplified)}
 To prevent phishing attacks entirely, we can use a more complex authentication protocol.
 If we include the name of the server that the user is trying to log in to in the request that we sent to the device,
 the code will be bound to a particular website.
@@ -361,14 +361,16 @@ If the attacker sets up \ttt{amason.com} and gets the user to visit it,
 the U2F device will only generate a code that is good for \ttt{amason.com}
 and not the real \ttt{amazon.com}. 
 	
-\subsection{Biometrics}
+\section{Biometrics}
 Biometrics are physical features like your fingerprints, your face, etc.
 They are very convenient to use for authentication, since you will not forget them and cannot easily lose them.
 Biometrics most useful when authenticating in person to a device, such as for phone unlock, or
 to grant a person access to a secure vault.
 In these settings, the device performing the authentication has a ``trusted input path''
-that can more or less guarantee that a real human who owns that biometric is on the other end.
-Biometrics are not so useful for authenticating over a network because they are not particularly secret.
+that can provide some assurance that a real human who owns that biometric is on the other end.
+Biometrics are not so useful for authenticating over a network because the network typically
+does not provide a trusted input path (i.e., does not provide any assurance that the biometric
+readings are coming from a real human), and the biometric data itself is not particularly secret.
 In particular, if we used biometrics for network authentication,
 an adversary who knows what your fingerprints looks like could log in to your account.
 (Since biometrics are essentially impossible to change, this is a major drawback.)
