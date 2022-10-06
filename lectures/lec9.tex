@@ -49,7 +49,7 @@ We typically achieve this by concatenating the ciphertext output of the above sc
 	If an encryption scheme $(\Enc, \Dec)$ is CPA secure and MAC is secure (existentially unforgeable against adaptive chosen message attacks), then Encrypt-then-MAC is CCA secure.	
 \end{theorem}
 
-\section{AES-GCM (Galois Counter Mode)}
+\section{AES-GCM (Galois Counter Mode)}\label{sec:enc:gcm}
 In practice, authenticated encryption is most commonly done using a scheme that combines the encryption and the MAC, called AES-GCM. However, they are able to improve performance by doing this using a one-time MAC that is not secure! Importantly, the MAC they use is not secure if the attacker ever sees a tag. To do this, the scheme \emph{masks} the final output of the MAC with yet another one-time pad: the \textquote{tag} that is revealed is actually $\text{tag} \xor \AES(k, iv || 0)$.
 
 % TODO: clarify this

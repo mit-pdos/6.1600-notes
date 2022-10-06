@@ -238,8 +238,7 @@ In practice, we typically do not construct MACs in this way because
 collision-resistant hash functions are typically more expensive to
 compute (per bit of input) than pseudorandom functions, such as AES.
 
-\paragraph{MACs for long messages: The hard way.}
-
+\subsection{MACs for long messages: Cipher-Block Chaining MAC}
 
 \marginnote{
 Applying the PRF to the last block using an independent random key is important.
@@ -285,6 +284,78 @@ This construction is called CBC-MAC or CMAC. % TOOD: explanation of why we need 
 	\label{fig:}
 \end{figure}
 
+CBC-MAC is going out of favor for two reasons:
+\begin{enumerate}
+  \item It is impossible to parallelize the MAC computation:
+        the chaining procedure is inherently sequential so you 
+        cannot speed it up, even if you have a computer with many 
+        CPU cores.
+  \item Computing the MAC requires one PRF invocation \emph{per block} of the message.
+        There are even faster MACs that require only one PRF invocation
+        \emph{per message} total, 
+        plus a number of fast ``non-cryptographic'' operations
+        per message block.
+        These MACs can be faster than CBC-MAC on some processors.
+        The GMAC construction we will see next is one example.
+\end{enumerate}
+
 % TODO: diagram
 
-\todo{Describe GMAC}
+\subsection{A parallelizable MAC: Carter-Wegman MAC}
+
+We now describe a different way to authenticate long messages.
+This MAC scheme is parallelizable and also requires only one 
+single PRF invocation per message authenticated (independent of
+the message length).
+The construction is named the Carter-Wegman MAC, after its
+inventors.\cite{CW81}
+Modern encryption schemes, including AES-GCM (\cref{sec:enc:gcm})
+use a Carter-Wegman-style MAC as a key ingredient.
+
+For this construction, we will use the notation
+$\Z_p$ to indicate the set of integers modulo $p$
+with addition and multiplication modulo $p$.
+So $x + y \in \Z_p$ means that we add $x$ and $y$
+as integers and reduce the result modulo~$p$.
+Typically, we will think of $p$ as a prime---of
+64 bits, for example.
+
+The MAC uses a fixed a prime number $p$ as a parameter,
+where $p \approx 2^n$ on security parameter $n$.\marginnote{So
+in practice, we take $p \approx 2^{128}$
+for 128-bit security.}
+The MAC uses a pseudorandom function 
+$F \colon \calK \times \Z_p \to \zon$.
+\marginnote{Here, the input space of the pseudorandom 
+function $F$ is the set of integers in $\{0, \dots, p-1\}$.
+Given a pseudorandom function on bitstrings, it is indeed
+possible to construct one that operates on numbers in 
+$\Z_p$ like this by interpreting each number as a bitstring.}
+
+The keyspace for the MAC is $\calK_\mathsf{MAC} = \Z_p \times \calK$;
+so the MAC key consists of a $\Z_p$ element and a key for 
+the pseudorandom function.
+The message space for the MAC is $\calM = \Z_p^{\leq L}$,
+the set of vectors of integers of $\Z_p$ elements of length
+at most $L$.
+Here, assume that the message vector has length at least $1$.
+
+The MAC construction is then:
+
+\medskip
+\noindent
+$\MAC(k, m \in \Z^{\leq L}_p) \to t$.
+\begin{itemize}
+  \item Parse the key $(r, k_F) \gets k \in \calK \times \Z_p$.
+  \item Parse the message into chunks as $(m_0, \dots, m_{\ell-1}) \gets m \in \Z_p^\ell$.
+  \item Compute $R \gets m_0 + m_1 r + m_2 r^2 + \cdots + m_{\ell-1} r^{\ell-1} \in \Z_p$. \\
+        (Essentially we are viewing the blocks of the message $m$ as coefficients of a degree-$(t-1)$
+        polynomial. We then evaluate this polynomial at the secret point $r$ determined by the MAC key.)
+  \item Output $t \gets F(k_F, R) \in \Z_p$ as the MAC tag.
+\end{itemize}
+
+\paragraph{Security intuition.}
+The security argument here goes in two steps:
+\begin{itemize}
+  \item \hcg{Finish this}
+\end{itemize}
