@@ -10,55 +10,163 @@ Our security notion then says that
 even an attacker with this power should not be
 able to distinguish which of two chosen plaintext
 message a given ciphertexts encrypts.
+This new and strong notion of security for encryption
+schemes is called 
+\emph{security against adaoptive chosen-ciphertext attacks}.
 
-\section{Authenticated Encryption}
+\paragraph{Motivation: Chosen-ciphertext security}
+It is not clear why chosen-ciphertext security is the right 
+security notion to consider. 
+In real-life applications, why would we ever allow an attacker
+to obtain \emph{decryptions} of ciphertexts of its choosing?
+It turns out that, in many settings, attackers can indeed
+trick honest parties into decrypting adversarially ciphertexts
+and revealing their contents.
 
---------------------
+As a simple example, imagine a server that receives encrypted
+requests from the network, decrypts them, and either:
+\begin{itemize}
+  \item returns an error if the decrypted request is malformed, or
+  \item silently processes the request otherwise.
+\end{itemize}
+In this case, an attacker can send ciphertexts to the server and
+learn information about their decryptions by noticing whether or not
+the server returned an error message.
+\marginnote{If the server returns an error when the decrypted message
+is illformed, we often call it a \emph{padding oracle}.
+Many many real-world protocols using non-chosen-ciphertext-secure encryption
+schemes fall victim to this sort of attack.}
 
-Without authentication that a ciphertext was created by someone trusted, an adversary is free to tamper with the message and we will have no way of knowing. For example, if a client is communicating with a server, an adversary can observe one ciphertext, view the server's reaction, and compare it to the server's reaction to ciphertexts of his choice. Because the adversary is able to see the server's reaction (such as the length of its response or where it sends secondary requests to), this can allow the adversary to deduce the contents of the original message! 
+CPA-secure encryption schemes provide \emph{no} security guarantees
+in this setting. Even if the server leaks a single bit to the attacker 
+about the
+decrypted value (such as whether the decrypted ciphertext is a
+well-formed request or not), the attacker could potentially learn 
+the entire secret key!
 
-In order to make our encryption scheme broadly applicable to all applications, we need to extend our definition of security to one called \emph{indistinguishability under chosen ciphertext attacks}.
+Chosen-ciphertext security guarantees that such attacks are ineffective.
 
-\begin{definition}[Encryption Scheme CCA security (strong)]\label{defn:cca}
-	An encryption scheme is CCA secure if every efficient adversary wins the following game with probability at most $\tfrac{1}{2} + \text{\textquote{negligible}}$:
+
+\section{Defining Authenticated Encryption}
+
+Authenticated-encryption schemes simultaneously provide message 
+integrity (as a MAC does) and confidentiality (as CPA-secure encryption does).
+Additionally, authenticated-encryption schemes remain secure even when 
+an attacker can see encryptions and decrypts of ciphertexts of her choice.
+Perhaps unsurprisingly, the standard way to construct an authenticated-encryption
+scheme is to combine a CPA-secure encryption scheme with a MAC in a careful way.
+
+We now formally define our strong security notion:
+\emph{indistinguishability under chosen ciphertext attacks}, 
+also known as IND-CCA2 security or CCA security.
+
+\begin{definition}[CCA security for encryption (strong)]\label{defn:cca}
+An encryption scheme is \emph{secure against 
+adaptive chosen-ciphertext attacks}
+if every efficient adversary wins the following 
+game with probability at most $\tfrac{1}{2} + \text{\textquote{negligible}}$:
 
   \begin{itemize}[noitemsep]
 		\item The challenger samples $b \rgets \bin$ and $k \rgets \calK$.
-    \item Polynomially many times: \quad \emph{// Chosen-plaintext queries}
+    \item The adversary can make either of the following queries to the challenger
+      repeatedly:
+      \begin{itemize}
+    \item \emph{Chosen-plaintext queries}
           \begin{itemize}
             \item The adversary sends the challenger a message $m_i \in \calM$
 						\item The challenger replies with $c_{m_i} \gets \Enc(k, m_i)$.
           \end{itemize}
-    \item Polynomially many times: \quad \emph{// Chosen-ciphertext queries}
+    \item \emph{Chosen-ciphertext queries}
           \begin{itemize}
 						\item The adversary sends the challenger a \emph{ciphertext} $c_j \notin \set{c_{m_0}, \ldots, c_{m_i}}$
 						\item The challenger replies with $m_{c_j} \gets \Dec(k, c_j)$.
           \end{itemize}
-    \item The adversary then sends two messages $(m^*_0, m^*_1) \in \calM^2$ to the challenger.
+      \end{itemize}
+    \item The adversary then sends two messages $(m^*_0, m^*_1) \in \calM^2$ to the challenger,
+          where $\abs{m^*_0} = \abs{m^*_1}$.
     \item The challenger replies with $c^* \gets \Enc(k, m^*_b)$.
+    \item The adversary can make more chosen-plaintext queries
+      and more chosen-ciphertext queries. (The adversary may not
+      make a chosen-ciphertext query on the challenge ciphertext $c^*$.)
 		\item The adversary outputs a value $b' \in \bin$.
-    \item The adversary wins if $b'=b$. 
+    \item The adversary wins if $b=b'$. 
 	\end{itemize}
 \end{definition}
 
 
+\subsection{Encrypt then MAC}
+We typically achieve CCA security using the ``encrypt-then-MAC'' construction:
+\begin{itemize}
+  \item First, encrypt the message using a CPA-secure encryption scheme on key $k_\mathsf{Enc}$.
+  \item Next, MAC the \emph{ciphertext} using a secure MAC scheme and an independent key 
+    $k_\mathsf{MAC}$.\marginnote{As we discuss below,
+    it is possible to derive both keys $k_\mathsf{Enc}$
+    and $k_\mathsf{MAC}$ from a single key $k$ using a pseudorandom function.}
+  \item Output the ciphertext and the MAC tag.
+\end{itemize}
+The decryption routine first checks the MAC tag, then decrypts the ciphertext.
 
-We typically achieve this by concatenating the ciphertext output of the above scheme with a MAC using a \emph{different key}. \marginnote{It is important to use a different key for the encryption and the MAC here. Each application leaks some information about the secret key, and these different applications guarantee only that this leaked information will not compromise that application---they make no guarantees that the information leaked by one application will not compromise the security of some other application. In general, we must never share keys across different applications. However, in practice, it is sufficient to share a single key and derive two new pseudorandom keys as $\prf_k(0), \prf_k(1)$.} Importantly, we compute the MAC over the ciphertext---we encrypt \emph{then} MAC, rather than MAC the plaintext and then encrypt the concatenation of the two. Our final ciphertext to be sent then becomes $(ct = \Enc(k_\Enc, m), \MAC(k_\MAC, ct))$. This strategy is called Encrypt-then-MAC.
+Using independent keys $(k_\mathsf{Enc}, k_\mathsf{MAC})$ is important 
+in encrypt-then-MAC, as in many other cryptographic constructions.
+For example, a CPA-secure encryption scheme using $n$-bit keys can reveal
+the low order $n/2$ bits of its secret key in the ciphertext.
+And a secure MAC scheme using $n$-bit keys can reveal the high-order
+$n/2$ bits of its secret key in each MAC tag.
+Used independently, the encryption scheme and the MAC scheme are both
+secure.
+Used together with the same key $k$, the attacker learns all $n$ bits
+of the key $n$ and can break both primitives!
 
-\begin{theorem}
-	If an encryption scheme $(\Enc, \Dec)$ is CPA secure and MAC is secure (existentially unforgeable against adaptive chosen message attacks), then Encrypt-then-MAC is CCA secure.	
+So, in general, you should always use independent keys for different primitives.
+To reduce the amount of keying material parties need to store, it is actually 
+sufficient to store a single secret key $k$ for a pseudorandom function $F$
+and derive all subsequent keys from the pseudorandom strings $F(k, 0), F(k, 1), \dots$.
+
+\begin{theorem}[Informal]
+The Encrypt-then-MAC construction yields a CCA-secure encryption scheme,
+provided that: the underlying encryption scheme is CPA-secure and the
+underlying MAC scheme is secure (existentially unforgeable against adaptive chosen message attacks).
 \end{theorem}
 
+\paragraph{Warning! \textbf{Only} use encrypt-then-MAC}\marginnote{Reminder:
+You should never need to implement authenticated-encryption schemes yourself.
+Instead use an off-the-shelf implementation that does the hard work for you.
+AES-GCM is one popular and widely implemented authenticated encryption scheme
+}
+There are a number of bad ways to combine encryption and MACs to attempt to
+build authenticated-encryption schemes.
+MAC-then-encrypt is one way. Encrypt-and-MAC (i.e., MAC the message
+instead of the ciphertext) is another.
+Neither of these constructions is necessarily CCA-secure when used with a
+CPA-secure encryption scheme and a secure MAC scheme.
+So the \emph{\textbf{only}} flavor of authenticated encryption you should use
+is encrypt-then-MAC.
+
 \section{AES-GCM (Galois Counter Mode)}\label{sec:enc:gcm}
-In practice, authenticated encryption is most commonly done using a scheme that combines the encryption and the MAC, called AES-GCM. However, they are able to improve performance by doing this using a one-time MAC that is not secure! Importantly, the MAC they use is not secure if the attacker ever sees a tag. To do this, the scheme \emph{masks} the final output of the MAC with yet another one-time pad: the \textquote{tag} that is revealed is actually $\text{tag} \xor \AES(k, iv || 0)$.
+One of the most widely used authenticated-encryption constructions is AES-GCM.
+It follows the encrypt-then-MAC paradigm.
+It uses AES as a pseudorandom function for counter-mode encryption (\cref{sec:enc:ctr}).
+It uses a Carter-Wegman-style MAC (\cref{sec:mac:cw}) as the MAC scheme.
 
-% TODO: clarify this
-The scheme makes use of a finite-field multiplication to implement this insecure MAC. In particular, it uses a function $M_H: \bin^{128} \rightarrow \bin^{128}$ which is a multiplication by $H = \AES(k, 0)$ in a finite field of size $2^{128}$.
+There are a few optimizations that AES-GCM uses beyond what we have described:
 \begin{itemize}
-	\item Computes $[ct_1, ct_2, \ldots, ct_n]$ for each block $i$ by computing $m_1 \xor \AES(k, iv || i)$.
-	\item Computes $t = M_H(M_H(\ldots), M_H(ct_2)), M_H(ct_1))$
-	\item Computes $t' = t \xor \AES(k, m_0)$
-
+  \item AES-GCM derives both the encryption and MAC keys from a single short key
+        using a pseudorandom function.
+  \item AES-GCM implements a fast form of the Carter-Wegman MAC that does not 
+        need arithmetic modulo a big prime $p$, as the scheme described in \cref{sec:mac:cw} does.
+        Instead, of defining the MAC using $\Z_p$ (integers mod a 128-bit prime $p$),
+        GCM works with 128-bit strings.
+        The GCM mode of operation replaces addition modulo $p$ with XOR of 128-bit strings
+        and it replaces multiplication modulo $p$ with a somewhat complicated operation
+        on 128-bit strings.\marginnote{If you are interested, to implement the
+        multiplication operation: think of both 128-bit strings as polynomials with 128
+        coefficients in $\Z_2 = \{0,1\}$. Multiply the polynomials, reducing the 
+        coefficients modulo $2$. Then reduce the resulting polynomial modulo some 
+        fixed polynomial of degree-$128$. Then interpret the result as a $128$-bit string.} 
+        (Formally, the scheme works over the field $\F_{2^{128}}$ of order $2^{128}$.)
+        This gives a big performance boost with no loss in security.
 \end{itemize}
+
+
 % TODO: finish
 % TODO: diagram is pretty important here

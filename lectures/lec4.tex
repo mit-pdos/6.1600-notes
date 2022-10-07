@@ -301,7 +301,7 @@ CBC-MAC is going out of favor for two reasons:
 
 % TODO: diagram
 
-\subsection{A parallelizable MAC: Carter-Wegman MAC}
+\subsection{A parallelizable MAC: Carter-Wegman MAC}\label{sec:mac:cw}
 
 We now describe a different way to authenticate long messages.
 This MAC scheme is parallelizable and also requires only one 
@@ -325,53 +325,107 @@ where $p \approx 2^n$ on security parameter $n$.\marginnote{So
 in practice, we take $p \approx 2^{128}$
 for 128-bit security.}
 The MAC uses a pseudorandom function 
-$F \colon \calK \times \Z_p \to \zon$.
+$F \colon \calK \times \Z_p \to \Z_p$.
 \marginnote{Here, the input space of the pseudorandom 
 function $F$ is the set of integers in $\{0, \dots, p-1\}$.
 Given a pseudorandom function on bitstrings, it is indeed
 possible to construct one that operates on numbers in 
 $\Z_p$ like this by interpreting each number as a bitstring.}
 
-The keyspace for the MAC is $\calK_\mathsf{MAC} = \Z_p \times \calK$;
-so the MAC key consists of a $\Z_p$ element and a key for 
+The keyspace for the MAC is $\calK$, so the MAC key consists of a key for 
 the pseudorandom function.
 The message space for the MAC is $\calM = \Z_p^{\leq L}$,
 the set of vectors of integers of $\Z_p$ elements of length
-at most $L$.
+at most $L$ where $L \ll p$.
 Here, assume that the message vector has length at least $1$.
 
-The MAC construction is then:
+One other difference is that this MAC construction is 
+\emph{randomized}. So there are now two algorithms:
+\begin{itemize}
+  \item $\MACSign(k, m) \to t$, which takes as input a key $k$ and message $m$
+        and outputs a MAC tag $t$, and 
+  \item $\MACVerify(k, m, t) \to \zo$, which takes as input a key $k$,
+    message $m$, tag $t$, and outputs an accept/reject bit.
+\end{itemize}
+The security definition here is essentially the same as for deterministic MACs,
+except that we use different algorithms to generate and verify the MAC tags.
+
+The Carter-Wegman MAC construction is then:
 
 \medskip
 \noindent
-$\MAC(k, m \in \Z^{\leq L}_p) \to t$.
-\begin{itemize}
-  \item Parse the key $(r, k_F) \gets k \in \Z_p \times \calK$. 
-  \item Parse the message into chunks as $(m_0, \dots, m_{\ell-1}) \gets m \in \Z_p^\ell$.
-  \item Compute $R \gets m_0 + m_1 r + m_2 r^2 + \cdots + m_{\ell-1} r^{\ell-1} \in \Z_p$. \\
-        (Essentially we are viewing the blocks of the message $m$ as coefficients of a degree-$(t-1)$
-        polynomial. We then evaluate this polynomial at the secret point $r$ determined by the MAC key.)
-  \item Output $t \gets F(k_F, R) \in \Z_p$ as the MAC tag.
+$\MACSign(k, m \in \Z^{\leq L}_p) \to t$.
+\begin{itemize}[noitemsep]
+  \item Compute $v \gets F(k, 0) \in \Z_p$.
+  \item Parse the message into chunks as $(m_1, \dots, m_{\ell}) \gets m \in \Z_p^\ell$.
+  \item Compute $M(v) \gets m_1 v + m_2 v^2 + m_3 v^3 \cdots + m_{\ell} v^{\ell} \in \Z_p$. \\
+        \marginnote{Essentially we are viewing the blocks of the message 
+        $m$ as coefficients of a degree-$t$
+        polynomial $M(\cdot)$. We then evaluate this polynomial 
+        at the secret point $v$ determined by the MAC key.}
+        \hcg{Check the definition of the message polynomial $M$. Should 
+        there be an additional $v^{t+1}$ monomial?}
+  \item Sample a nonce $r \getsr \Z_p$.
+  \item Output $t \gets \big(r, F(k, r) + M(v)\big) \in \Z^2_p$ as the MAC tag.
 \end{itemize}
+
+\medskip
+\noindent
+$\MACVerify(k, m, t) \to \zo$.
+\begin{itemize}[noitemsep]
+  \item Compute $v \gets F(k, 0) \in \Z_p$.
+  \item Parse the message into chunks as $(m_1, \dots, m_{\ell}) \gets m \in \Z_p^\ell$.
+  \item Compute $M(v) \gets m_1 v + m_2 v^2 + m_3 v^3 + \cdots + m_{\ell} v^{\ell}\in \Z_p$. \\
+  \item Parse the tag $(r, z) \gets t \in \Z^2_p$.
+  \item Output ``1'' if and only if $z - F(k, r) = M(v)$. 
+\end{itemize}
+
 
 \paragraph{Security intuition.}
-The security argument here goes in two steps:
+\marginnote{For a detailed treatment of Carter-Wegman security 
+see Boneh and Shoup's textbook, \emph{A Graduate Course in Applied Cryptography},
+Section 7.4.}
+The security argument here goes as follows:
 \begin{itemize}
   \item First, we appeal to the PRF security property to argue
-        that we can replace the values $F(k_F, R)$ used to generate
+        that we can replace the values $F(k_F, r)$ used to generate
         the tags with truly random values.
-        Now, the adversary gets no information 
 
-  \item Now, as long as the adversary does not find two messages
-        $m,m' \in \calM$ with $m \neq m'$, the tags that the 
-        adversary sees are just uniform random values, so the
-        tags give the adversary no information on the secret point $r$.
+  \item Next, we show that as long as the $\MACSign$ algorithm never
+        samples the same nonce $r$ twice, the masking values $F(k,r)$
+        are independent random values that complete hide the values $M(v)$.
+        So, the adversary learns no information on the secret point $v$
+        by making MAC queries.
 
-        Finally, we use a fact about polynomials about $\Z_p$ to show
-        that the probability that the adversary ever finds a pair of
-        unequal messages $m$ and $m'$ is small.
-        In particular, if we evaluate two distinct non-zero polynomials
-        of degree $(t-1)$ at a random point in $\Z_p$, the probability
-        that they are equal is 
-        
+  \item Now, say that the adversary finds a forged message-tag pair $(m^*, t^*)$.
+    There are two cases:
+        \begin{itemize}
+          \item Either the forgery uses a fresh random nonce $r^*$ that did 
+            not appear as the response to any of the adversary's MAC queries.
+            In this case, the forgery is only valid with probability $1/p$. 
+          \item Alternatively, the forger could use a random nonce $r^*$
+            that is equal to the nonce $r$ returned from one of the adversary's
+            MAC queries.
+            In this case, we have the following relations, where message
+            $m$ polynomial $M$ was the message the adversary queried of
+            the challenger:
+            \begin{align*}
+              F(k, r) &= M(v) - z\\
+              F(k, r) &= M^*(v) - z^*\\
+              0 &= \big(M(v) - M^*(v)\big) + (z - z^*).
+            \end{align*}
+            Since $m \neq m^*$, we know $z \neq z^*$.
+            So $(M(\cdot) - M^*(\cdot)) + (z^* - z)$ is a non-zero polynomial
+            of degree at most $t$. 
+            Since such a polynomial can have at most $\ell \leq L$ zeros in $\Z_p$,
+            and since the adversaries view is independent of the evaluation
+            point $v \in \Z_p$, the probability that the adversary's 
+            forgery is valid is at most $\ell/p$.
+        \end{itemize}
+
+     In either case, the adversary's probability of forging is
+     $O(L)/p = \poly(\lambda) \cdot \negl(\lambda) = \negl(\lambda)$
+     on security parameter $\lambda$.
 \end{itemize}
+
+
