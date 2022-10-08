@@ -1,4 +1,3 @@
-\todo{Rewrite in terms of one-bit Lamport signatures}
 
 In the last section, our strategy for
 authentication depended on two parties sharing a
@@ -82,21 +81,19 @@ Notice that this   security definition does not guarantee that an attacker canno
 Namely, given a valid
 message-signature pair $(m, \sigma)$ an adversary may be able to produce additional valid message-signature
 pairs on the same message: $(m, \sigma'), (m, \sigma''), \dots$.
-Standard digital-signature schemes, such as the elliptic-curve digital signature
-algorithm (EC-DSA) have this property.
 
 In some applications, we want to prohibit an attacker from finding \emph{any}
-new message-signature pair. We call this security notion ``\emph{strong} existential unforgeability under chosen message attack.'' 
-
+new message-signature pair. We call this security notion ``\emph{strong} existential unforgeability under chosen message attack.''  
 The definition is the same as in \cref{def:sig-sec} except that we require
 the adversary to find a valid-message signature pair $(m^*, \sigma^*)$
-such that $(m^*, \sigma^*) \not \in \{ (m_1, \sigma_1), (m_2, \sigma_2), \dots \}$.
+such that $(m^*, \sigma^*) \not \in \{ (m_1, \sigma_1), (m_2, \sigma_2), \dots \}$.  Standard digital-signature schemes, such as the elliptic-curve digital signature
+algorithm (EC-DSA) is believed to have this strong security property.
 
 \section{Constructing a Signature Scheme}
 In the following sections, we will show how to construct a digital-signature
 scheme from any one-way function (\cref{def:owf}).
 
-We will generate a signature scheme that is secure, but that has a relatively large
+We will generate a signature scheme that is secure, but that has relatively large
 signatures and public keys: to achieve security against attackers running
 in time $2^\lambda$, this signature scheme has signatures of $O(\lambda^2)$ bits.
 Widely used modern digital signature schemes (e.g., EC-DSA) have signatures
@@ -109,7 +106,9 @@ adversaries.\todo{Cite NIST PQ signature schemes and compare}
 We will construct this scheme in three stages:
 
 \begin{enumerate}
-	\item Construct a \emph{one-time secure} signature scheme for \emph{fixed-length messages}.
+	\item Construct a signature scheme for signing a \emph{single bit}.  
+
+        \item Construct a \emph{one-time secure} signature scheme for signing a \emph{fixed length} messages.
         With this scheme, an attacker who sees two signatures under the same signing key can forge signatures.
         In addition, the secret signing key for this scheme will be larger than the size of the message 
         being signed.
@@ -122,11 +121,33 @@ We will construct this scheme in three stages:
         This last scheme is a fully secure and fully functional digital-signature scheme.
 \end{enumerate}
 
+\section{Constructing a Signature Scheme for Signing a Single Bit}
+
+This signature scheme is not useful on its own, and is given only as a step towards the final construction.  It uses as a building block a one-way function $f:\calX\rightarrow\calY$.  Recall that $f$ a one-way function if it is easy to compute but hard to invert; namely there is an efficient algorithm that given $x\in\calX$ outputs $f(x)$, and at the same time any efficient algorithm given $y=f(x)$ for a random $x\leftarrow \cal X$, finds an inverse $x'\in\calX$ such that $f(x')=f(x)$ with only negligible probability.  
+
+\begin{itemize}
+  \item $\Gen() \to (\sk, \vk)$. 
+    \marginnote{In this construction, we leave the security parameter $\lambda$
+    implicit.
+    To be fully formal, $\Gen$ would take $\lambda$ an input.
+    The one-way function $f$ and its domain $\calX$ would both
+    depend on $\lambda$. So we would write $f_\lambda$ and $\calX_\lambda$.
+    }
+    Choose two random elements $x_0, x_1$ from $\calX$ and let $(y_0,y_1)=(f(x_0),f(x_1))$.  Output $\sk=(x_0,x_1)$ and $\vk=(y_0,y_1)$.
+    
+	\item $\Sign(\sk, b) \to \sigma$.  Parse $\sk=(x_0,x_1)$ and output $\sigma=x_b$, 
+	\item $\Ver(\vk, b, \sig) \to \zo$. Parse $\vk=(y_0,y_1)$ and output~$1$ if and only if $f(\sig)=y_b$. 
+    (Otherwise, the signing routine rejects.)
+\end{itemize}
+
 
 \section{One-time-secure Signatures (Lamport Signatures)} \label{sec:lamport}
 
 In this section we give a very simple and elegant construction 
-of one-time-secure digital signatures, due to Lamport.\cite{L79}
+of a one-time-secure digital signature scheme, due to Lamport.\cite{L79}
+The construction is a straightforward generalization of  the signature scheme constructed above:  Each message is signed bit-by-bit, where each bit is signed using a fresh and independently generated secret key. 
+
+
 Before giving the construction, we define one-time security for 
 digital-signature schemes.
 This signature scheme is not generally useful on its own, but is
@@ -151,12 +172,7 @@ To do this, we will define the following algorithms, which make use of a
 one-way function $f \colon \calX \to \calY$:
 \begin{itemize}
   \item $\Gen() \to (\sk, \vk)$. 
-    \marginnote{In this construction, we leave the security parameter $\lambda$
-    implicit.
-    To be fully formal, $\Gen$ would take $\lambda$ an input.
-    The one-way function $f$ and its domain $\calX$ would both
-    depend on $\lambda$. So we would write $f_\lambda$ and $\calX_\lambda$.
-    }
+    %\marginnote{In this construction, we leave the security parameter $\lambda$ implicit. To be fully formal, $\Gen$ would take $\lambda$ an input. The one-way function $f$ and its domain $\calX$ would both     depend on $\lambda$. So we would write $f_\lambda$ and \calX_\lambda$.    }
     Choose $2n$ random elements from $\calX$,
     the domain of the one-way function $f$.
     Arrange these values in to a $2 \times n$
