@@ -78,8 +78,9 @@ Otherwise the definition is essentially identical.
   \end{itemize}
 \end{definition}
 
-Notice that the security definition here allows an attacker, given a valid
-message-signature pair $(m, \sigma)$ to produce additional valid message-signature
+Notice that this   security definition does not guarantee that an attacker cannot forge a new signature on a message that it has already seen a signature of. 
+Namely, given a valid
+message-signature pair $(m, \sigma)$ an adversary may be able to produce additional valid message-signature
 pairs on the same message: $(m, \sigma'), (m, \sigma''), \dots$.
 Standard digital-signature schemes, such as the elliptic-curve digital signature
 algorithm (EC-DSA) have this property.
