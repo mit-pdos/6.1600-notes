@@ -1,0 +1,74 @@
+So far, we have talked about authenticating and encrypting with a shared secret key. We also talked about authenticating \emph{without} a secret key using public-key signatures. However, we don't yet have a way to secretly share a message without a shared secret key. Eventually, we will see that public-key encryption exists just as public-key signatures do. However, before we get there, let's see if there is a way to avoid the need to meet up to share a secret altogether.
+
+\begin{definition}[Key Agreement Protocol]
+	A key agreement protocol is a two-message protocol defined by efficient functions $F_1, F_2, G_1, G_2$. It works between two parties Alice and Bon as follows:
+
+	\begin{enumerate}[noitemsep]
+		\item Alice chooses a random value $r_1$ and sends $F_1(r_1)$ to Bob.
+		\item Bob chooses $r_2$ randomly and sends $F_2(r_2)$ to Alice.
+		\item Alice and Bob each compute a key based on the information they each have.
+			\begin{itemize}[noitemsep, topsep=0pt]
+				\item Alice computes $K_1 = G_1(r_1, F_2(r_2))$
+				\item Bob computes $K_2 = G_2(r_2, F_1(r_1))$
+			\end{itemize}
+	\end{enumerate}
+
+	\paragraph{Correctness.} In order for this protocol to be correct, it must be the case that the computed keys are identical: $K_1 = K_2$.
+
+	\paragraph{Security.} When constructing a security definition for a key agreement protocol, we will consider only passive attacks---the adversary can view our traffic but cannot modify it. In practice, this scheme would be combined with a scheme to verify the authenticity of the received messages to detect when a real-life active adversary tampers with messages. In particular, we would like the computed key to look indistinguishable from randomness given the messages sent on the network.
+
+	For a random $r_1$, $r_2$, and $U$, the probability that an adversary given $F_1(r_1))$ and $F_2(r_2)$ can determine which of $(K, U)$ is the computed key is at most $\tfrac{1}{2} + \text{\textquote{negligible.}}$
+\end{definition}
+
+\section{Constructing a key agreement protocol}
+
+\marginnote{So far, we have been able to construct our cryptographic entities from constructs like a PRF, which meant that we could use \textquote{unstructured} algorithms like AES to compute them. For key exchange, we know only how to construct a protocol using number-theoretic concepts.}
+
+This scheme first requires the two parties to decide on some large (2048 bits) prime number $p$ and a random element $g \in \Z_p^*$, where $\Z_p^* = \set{1, 2, \ldots, p-1}$. \marginnote{In practice, $p$ and $g$ are predetermined as part of the standard and used for all instances of the key exchange.}
+
+\begin{enumerate}[noitemsep]
+	\item Alice chooses a random value $x \in \Z_p^*$ and sends $g^x \mod p$ to Bob.
+	\item Bob chooses a random $y \in \Z_p^*$ and sends $g^y \mod p$ to Alice.
+	\item Alice and Bob both then compute $K = g^{xy} \mod p$.
+		\begin{itemize}
+			\item Alice computes $K = G_1(x, g^y) = (g^y)^x = g^{xy}$
+			\item Bob computes $K = G_2(y, g^x) = (g^x)^y = g^{xy}$
+		\end{itemize}
+\end{enumerate}
+
+\paragraph{Correctness.} In order for the algorithm to be useful, Alice and Bob must be able to compute $K$ efficiently. However, trying to compute $g^x$ where $x$ is 2048 bits long naively would certainly not be efficient---it would require $x$ multiplications (at most $2^{2048}$!). However, we can compute this exponentiation much more efficiently if we first construct many powers of 2 of $g$ then combine them:
+\[ g^x = g^{\sum_{i \in [2048]} x_i 2^i} = \prod_{i=0}^{n = 2047} x_i(g^2^i) \] 
+
+Therefore, we can compute $g^x$ efficiently if we can efficiently compute $g^2^i \forall \set{0, \ldots, n}$. To do this, we can compute progressive squares: 
+
+% TODO: align
+\[ g^2 = g\cdot g \] \[ g^4 = g^2 \cdot g^2 \]  \[ \vdots \] \[ g^2^i = g^2^{i-1} \cdot g^2^{i-1} \]
+
+\paragraph{Basic Group Theory}
+Each element $g \in \Z_p^*$ has order $\text{Order}(g) = \abs{\set{g^1, g^2, \ldots }}$. For any of these elements, a theorem states that $\text{Order}(g)$ divides $\abs{\Z_p^*} = p-1$. Importantly, this guarantees that $g^{p-1} = 1$.
+
+\section{Diffie-Helman Security}
+To prove the security of the scheme, we will first prove \emph{weak security}---that it is hard to learn the entire key from the messages of the key agreement protocol.\marginnote{When we say that it is \emph{hard} to guess the key, we mean that the probablity that any adversary can find $K$ is at most \textquote{negligible}.} We settle here because it is possible to convert a weak key (where some bits may be known but the whole key is hard to learn) into a strong key---to do so, compute $k_\text{strong} = H(k_\text{weak})$. Importantly, if $H$ is modeled as a random oracle, because it is (computationally) hard to learn the key $k_\text{weak}$, the value $H(k_\text{weak})$ is computationally distinguishable from random.
+
+To prove this weak security, we will need an assumption called the \emph{Computational DH Assumption} (CDH). This assumption states that given $g^x$ and $g^y$, it is hard to compute $g^{xy}$.
+
+In particular, this relies on the \emph{Discrete Log Assumption}: given $p, g$, and $g^x$, it is hard to compute $x$. However, there are some attacks on this problem:
+
+\begin{enumerate}
+	\item The most basic attack is to enumerate all $p$ possible values of $x$ and check whether the corresponding $g^x$ matches. This will take time $p \approx 2^{2048}$.
+	\item A much better attack is the Number Field Sieve, which is able to compute $x$ in time $2^{O(\log p)^{\frac{1}{3}}}$---sub-exponential time! The existence of this attack is the reason we require so many bits for $p$---otherwise, this problem would be feasibly solveable.
+	\item For more generic (non-$\Z_p^*$) groups, there is an algorithm called Giant Step Baby Step that is able to compute $x$ in time $\sqrt{p}$.
+\end{enumerate}
+
+However, the discrete log assumption does not imply the computational DH assumption. However, the only methods we know of to try to compute $g^{xy}$ from $g^x$ and $g^y$ rely on solving the discrete log problem. Therefore, we assume that the computational DH assumption holds. 
+
+\subsection{Without Random Oracle Model}
+In order to achieve strong security for our generated key with the above assumption, we relied on a hash function that we modeled as a random oracle. However, this random oracle model is obviously not accurate. If we want to achieve strong security from Diffie-Helman \emph{without} modeling a hash function as a random oracle, we need to assume the \emph{Decisional DH Assumption} (DDH).
+
+For Diffie-Helman to be secure, we would like that $(g^x, g^y, g^{xy}) \cong (g^x, g^y, g^z)$ where $x, y, z \rgets \set{1, \ldots, p-1}$. And indeed, the DDH assumption is exactly this. Unfortunately, in general (for random $g$ and $p$) DDH is false. Since our $\abs{\Z_p^*} = \abs{\set{1, \ldots, p-1}}$, and $p$ is prime, $p-1$ must not be prime. This means that the \emph{order} of $\Z_p^*$ is even---certainly not prime. We know that groups of prime order do not have \emph{subgroups}, but groups that are not of prime order do not carry this guarantee.
+
+To distinguish $g^{xy}$ from $g^z$ for random $z$, we will check if $xy$ is even. This may seem like it relies on breaking the discrete log assumption, but in fact we can much more efficiently check if an element is in the \emph{quadratic residue} of a group. Crucially, the probability that $xy$ is even is $\tfrac{3}{4}$, while the probability that $z$ is even is $\tfrac{1}{2}$. Given $(g^x, g^y, g^z)$, our attack will output 0 if $g^z \in QR$ and 1 otherwise, where 0 indicates that $z = xy$ and 1 indicates that $z$ is random.
+
+To determine if a value $g^z$ is in the set of quadratic residues of $g$, we will check whether $(g^z)^{2^{i-1}}$ is equal to 1.
+
+However, there are certain selections of $g$ and $p$ for which we believe that DDH does hold. In particular, if we choose $p$ to be a \emph{safe prime} where $\frac{p-1}{2}$ is prime and we choose $g$ to itself be a quadratic residue (so that $g^z$ is always a quadratic residue), we believe that DDH holds.
