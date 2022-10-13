@@ -37,12 +37,12 @@ This scheme first requires the two parties to decide on some large (2048 bits) p
 \end{enumerate}
 
 \paragraph{Correctness.} In order for the algorithm to be useful, Alice and Bob must be able to compute $K$ efficiently. However, trying to compute $g^x$ where $x$ is 2048 bits long naively would certainly not be efficient---it would require $x$ multiplications (at most $2^{2048}$!). However, we can compute this exponentiation much more efficiently if we first construct many powers of 2 of $g$ then combine them:
-\[ g^x = g^{\sum_{i \in [2048]} x_i 2^i} = \prod_{i=0}^{n = 2047} x_i(g^2^i) \] 
+\[ g^x = g^{\sum_{i \in [2048]} x_i 2^i} = \prod_{i=0}^{n = 2047} x_i(g^{2^i}) \] 
 
-Therefore, we can compute $g^x$ efficiently if we can efficiently compute $g^2^i \forall \set{0, \ldots, n}$. To do this, we can compute progressive squares: 
+Therefore, we can compute $g^x$ efficiently if we can efficiently compute $g^{2^i} \forall \set{0, \ldots, n}$. To do this, we can compute progressive squares: 
 
 % TODO: align
-\[ g^2 = g\cdot g \] \[ g^4 = g^2 \cdot g^2 \]  \[ \vdots \] \[ g^2^i = g^2^{i-1} \cdot g^2^{i-1} \]
+\[ g^2 = g\cdot g \] \[ g^4 = g^2 \cdot g^2 \]  \[ \vdots \] \[ g^{2^i} = g^{2^{i-1}} \cdot g^{2^{i-1}} \]
 
 \paragraph{Basic Group Theory}
 Each element $g \in \Z_p^*$ has order $\text{Order}(g) = \abs{\set{g^1, g^2, \ldots }}$. For any of these elements, a theorem states that $\text{Order}(g)$ divides $\abs{\Z_p^*} = p-1$. Importantly, this guarantees that $g^{p-1} = 1$.
