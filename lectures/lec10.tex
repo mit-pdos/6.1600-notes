@@ -96,12 +96,8 @@ and the algorithms are as follows:
     \end{itemize}
 \end{itemize}
 
-\paragraph{Correctness.}
-Correctness holds since $g^{xy}=g^{yx} \in \Z^*_p$ for all $x,y \in \Z$:
-\begin{align*}
-  \Derive(\sk_A, \pk_B) = (\pk_B)^{\sk_A} = (\pk_A)^{\sk_B} = \Derive(\sk_B, \pk_A).
-\end{align*}
-
+Before we argue correctness and security, let us consider
+the computational efficiency of the scheme:
 
 \paragraph{Efficiency.} In order for the algorithm to be useful,
 Alice and Bob must be able to compute $g^x \in \Z^*_p$ efficiently,
@@ -128,6 +124,27 @@ the following strategy:
         This step again takes only $\ell$ multiplications.
 \end{itemize}
 
+
+\paragraph{Correctness.}
+Correctness holds since $g^{xy}=g^{yx} \in \Z^*_p$ for all $x,y \in \Z$:
+\begin{align*}
+  \Derive(\sk_A, \pk_B) = (\pk_B)^{\sk_A} = (\pk_A)^{\sk_B} = \Derive(\sk_B, \pk_A).
+\end{align*}
+
+
+\paragraph{Security.}
+To argue security, we must rely on a new computational assumption:
+essentially we just assume that the key-agreement scheme is secure.
+
+\begin{definition}[Decision Diffie-Hellman assumption]
+For $p$, $q$, and $g$, the following distributions are 
+computationally indistinguishable:
+  \[ 
+  \{ (g, g^x, g^y, g^{xy}) \in (\Z^*_p)^4\colon x, y \getsr \{1, \dots, q\}\}
+  \approx_c
+  \{ (g, g^x, g^y, g^z) \in (\Z^*_p)^4 \colon x, y, z \getsr \{1, \dots, q\}\}
+  \]
+\end{definition}
 
 \section{Background: Group theory}
 The simplest and most commonly used key-exchange protocol uses
