@@ -1,0 +1,112 @@
+\section{Finite Groups}
+In the last section, we defined Diffie-Helman in terms of the \emph{finite group} $\Z_p^*$. However, this scheme can work more generally over any finite group as follows:
+
+\begin{compactenum}
+	\item Choose some $g \in G$ that is a \emph{generator} of $G$.
+	\item Alice samples $a \gets \abs{G}$ and sends $g^a$ to Bob.
+	\item Bob samples $b \gets \abs{G}$ and sends $g^b$ to Alice.
+	\item The key is then $g^{ab}$.
+\end{compactenum}
+
+The CDH assumption is that it is hard to compute $g^{ab}$ given $g^a$ and $g^b$.
+
+\begin{definition}[Finite Group - Generator]
+	A \emph{generator} of a finite group $G$ is an element $g$ such that $G = \set{g, g^2, \ldots, g^q}$ for $q = \abs{G}$. Note that generators are not necessarily easy to find. However, for groups of prime order, every element except 1 is guaranteed to be a generator of the group.
+\end{definition}
+
+\begin{definition}[Safe Prime]
+	A prime $p$ is a \emph{safe prime} iff $\tfrac{p-1}{2}$ is prime.
+\end{definition}
+
+\begin{definition}[Finite Group]
+	A finite group consists of a finite set $G$ and binary operation $\cdot$ with the following properties:
+	\begin{compactenum}
+		\item \textbf{Closure}: $\forall a, b \in G, a \cdot b \in G$
+		\item \textbf{Identity}: $\exists 1 \in G$  s.t. $\forall a \in G, a\cdot 1 = 1\cdot a = a$.
+		\item \textbf{Associativity}: $\forall a, b, c \in G, a\cdot (b \cdot c) = (a \cdot b) \cdot c$
+		\item \textbf{Inverse}: $\forall a \in G, \exists a^{-1} \in G$ s.t. $a\cdot a^{-1} = a^{-1}\cdot a = 1$.
+	\end{compactenum}
+\end{definition}
+
+The group that we discussed last section, $\Z_p^*$ uses the set of elements $\set{1, \ldots, p-1}$ and defines $\cdot$ as multiplication modulo $p$. The size of $\Z_p^*$ is $\abs{\Z_p^*} = p-1$---even since if $p$ is prime then it is odd. We also discussed the quadratic residual, which is defined with $\set{a^2: a \in \Z_p^*}$ and again uses multiplication modulo $p$. This groups is of size $\abs{QR} = \tfrac{p-1}{2}$. Importantly, $\tfrac{p-1}{2}$ may be prime if $p$ is a \emph{safe prime}.
+
+There are many other groups besides these!
+\begin{compactitem}
+\item $\Z_p$: $\set{0, 1, \ldots, p-1}$, with the operator as addition modulo $p$.
+\item $n \times n$ full rank matrix defined modulo $p$.
+\item Elliptic Curve groups are some of the most useful groups in modern cryptography.
+\end{compactitem}
+
+The first public-key encryption scheme did not use this idea. However, Diffie-Helman naturally leads to a public-key encryption scheme.
+
+\section{Defining Public-Key Encryption}
+The definition for a public-key encryption scheme will be a combination of our public-key signature and symmetric-key encryption definitions.
+
+\begin{definition}[Public-Key Encryption Scheme]
+	A public-key encryption scheme consists of three efficient algorithms $(\Gen, \Enc, \Dec)$:
+	\begin{compactitem}
+		\item $\Gen$: generates a pair $(\pk, \sk)$.
+		\item $\Enc$: takes input $\pk$ and message $m \in \calM$, where $\calM$ is the message space and generates ciphertext $\ct$.
+		\item $\Dec$: takes as input $\ct$ and $\sk$ and outputs $m$.
+	\end{compactitem}
+\end{definition}
+
+\begin{definition}[Public-Key Encryption - Correctness]
+	In order for the scheme to be useful, we desire that:
+	\[ \forall m \in \calM, \, (\pk, \sk) \gets \Gen \quad \Prbig{\Dec(\sk, \Enc(\pk, m)) = m} = 1 - \negl \]
+\end{definition}
+
+\begin{definition}[Public-Key Encryption - CPA (Semantic) Security]
+	Any PPT adversary $\A$ wins the following game with probability $\leq \tfrac{1}{2} + \negl$:
+
+	\begin{compactitem}
+		\item The challenger generates $(\sk, \pk) \gets \Gen$ and $b \gets \bin$ and sends $\pk$ to $\A$.
+		\item Polynomially many times:
+			\begin{compactitem}
+			\item $\A$ sends $m_0, m_1 \in \calM$ to the challenger
+			\item The challenger responds with $\Enc(m_b)$		
+			\end{compactitem}
+		\item The adversary outputs $b'$ and wins if $b' = b$.
+	\end{compactitem}
+\end{definition}
+	Note that since this is a public-key encryption scheme, the adversary can generate encryptions of any message of their choice since they know the public key. However, they must still not be able to distinguish between challenger-generated encryptions of those same messages! In other words, the attacker is able to sample from two distributions: the distribution of encrytions of $m_0$ and that of the encryptions of $m_1$. Despite this, they must not be able to tell which distribution a given ciphertext belongs to. Therefore, it is crucial that the algorithms are randomized.
+
+For symmetric-key encryption, we also defined a stronger notion of security that we called CCA security, for security against chosen ciphertext attacks. We can extend this definition to the public-key setting:
+
+\begin{definition}[Public-Key Encryption - CCA Security]
+\begin{compactitem}
+	\item The challenger generates $(\sk, \pk) \gets \Gen$ and $b \gets \bin$ and sends $\pk$ to $\A$.
+	\item Polynomially many times:
+		\begin{compactitem}
+		\item $\A$ sends $m_0, m_1 \in \calM$ to the challenger
+		\item The challenger responds with $\ct^* = \Enc(m_b)$		
+		\item $A$ sends a ciphertext $\ct \neq \ct^*$ to the challenger.
+		\item The challenger responds with $\Dec(\sk, \ct)$.
+		\end{compactitem}
+	\item The adversary outputs $b'$ and wins if $b' = b$.
+\end{compactitem}
+\end{definition}
+
+\section{El-Gamal Encryption Scheme}
+In essence, the goal of public-key encryption is to perform encryption without a shared secret key. Diffie-Helman provided us a way to generate a shared secret between two parties. To construct a public-key encryption scheme, we can define our previous symmetric-key scheme to perform the actual encryption with Diffie-Helman to generate a key for the symmetric encryption scheme. \marginnote{This was actually not the first public-key encryption scheme. The first scheme, RSA, was much more complicated despite Diffie-Helman already having been published.}
+
+
+\begin{definition}[El-Gamal]
+	Let $G$ be a finite cyclic group of order $n$. Let $g$ be a generator of $G$. Let $H: G \rightarrow \bin^*$ be a hash function (modelled as a random oracle). Let $(\Enc', \Dec')$ be a symmetric authenticated encryption scheme. Then define:
+
+	\begin{compactitem}
+		\item $\Gen$: choose $a \gets \abs{G}$, output $(\pk, \sk) = (g^a, a)$.	
+		\item $\Enc(\pk, m)$: choose $b \gets \abs{G}$, output $(g^b, \Enc'(H(g^{ab}), m)$. \marginnote{If we wanted only CPA security, we don't even need a real symmetric-key encryption scheme here! Since a fresh $g^b$ is generated for each message, we can just use a one-time pad, i.e. $\Enc(\pk, m)$: choose $b \gets \abs{G}$, output $(g^b, H(g^{ab}) \xor m$}.
+		\item $\Dec(\sk=a, (u, v))$: output $\Dec'(H(u^{\sk=a}), v)$ \marginnote{For the one-time pad version, output $\Dec(\sk, (u, v)) = H(u^{\sk=a}) \xor v$.}
+	\end{compactitem}
+\end{definition}
+
+\subsection{Performance}
+The performance of this scheme is limited by the exponentiations---the symmetric encryption scheme is incredibly fast, but exponentiation takes a few milliseconds on modern processors. For encryption, this scheme requires 2 exponentiations ($g^b$ and $\pk^b$). Decryption requires one exponentiation $(u^\sk)$. It seems that decryption is twice as fast, but we can efficiently precompute $g^b$ by computing $g^{2^i}$ for $i$ from 1 to $\log n$. If we encrypt often to the same $\pk$, we can also precompute powers of two for $\pk$ to perform the same optimizaiton.
+
+\subsection{Security}
+For CPA security, all we require is that $(g^a, g^b, H(g^{ab}) \ind (g^a, g^b, U)$ where $U$ is truly random. This is called the Hash Diffie-Hellman assumption (HDH) and is stronger thatn CDH. However, if we assume that the hash function is a random oracle, the assumptions are equivalent. For CPA security, the underlying symmetric encryption can be a one-time pad---and indeed this was the proposal in the original scheme.
+
+For CCA security, a one-time secure symmetric encryption scheme is not sufficient. Instead, we need to use an authenticated symmetric encryption scheme. With authenticated encryption, the decryption oracle aspect of the CCA game becomes basically useless since the adversary cannot generate ciphertexts that appear to be authentic. This seems to imply that the definitions of CPA and CCA security are equivalent given a symmetric encryption scheme. However, there is a bit of subtlety---the decryption oracle can function as a \textquote{checker} for $g^{ab}$---it will reject the ciphertext if the attacker uses an incorrect key. If the adversary does not know if they have sufficient information to compute $g^{ab}$, this gives the adversary some extra power, and we do not know how to prove that the scheme is CCA secure under only CDH. \marginnote{We do, however, know how to prove that other, more complicated, schemes are CCA secure under only CDH}.
+
+We need something stronger---the interactive DH assumption---to prove the CCA-security of El-Gamal.
