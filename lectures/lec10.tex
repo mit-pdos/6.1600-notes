@@ -1,28 +1,149 @@
-So far, we have talked about authenticating and encrypting with a shared secret key. We also talked about authenticating \emph{without} a secret key using public-key signatures. However, we don't yet have a way to secretly share a message without a shared secret key. Eventually, we will see that public-key encryption exists just as public-key signatures do. However, before we get there, let's see if there is a way to avoid the need to meet up to share a secret altogether.
+So far, we have talked about encryption systems that require
+the sender and recipient to \emph{share a secret key}.
+In this chapter, we discuss how the sender and recipient
+can agree on a shared secret even if they only ever communicate
+over an open (insecure) network.
 
-\begin{definition}[Key Agreement Protocol]
-	A key agreement protocol is a two-message protocol defined by efficient functions $F_1, F_2, G_1, G_2$. It works between two parties Alice and Bon as follows:
+A key-agreement scheme over keyspace $\calK$ is defined by efficient functions $(\Gen, \Derive)$:
+\begin{itemize}[noitemsep]
+  \item $\Gen() \to (\sk, \pk)$. The $\Gen$ algorithm 
+    generates a secret key and a public key for one party.
+  \item $\Derive(\sk_A, \pk_B) \to k$. The $\Derive$ algorithm
+    takes as input one party's secret key $\sk_A$ and the
+    other party's public key $\pk_B$ and outputs a shared
+    key $k \in \calK$.
+\end{itemize}
 
-	\begin{enumerate}[noitemsep]
-		\item Alice chooses a random value $r_1$ and sends $F_1(r_1)$ to Bob.
-		\item Bob chooses $r_2$ randomly and sends $F_2(r_2)$ to Alice.
-		\item Alice and Bob each compute a key based on the information they each have.
-			\begin{itemize}[noitemsep, topsep=0pt]
-				\item Alice computes $K_1 = G_1(r_1, F_2(r_2))$
-				\item Bob computes $K_2 = G_2(r_2, F_1(r_1))$
-			\end{itemize}
-	\end{enumerate}
 
-	\paragraph{Correctness.} In order for this protocol to be correct, it must be the case that the computed keys are identical: $K_1 = K_2$.
+\paragraph{Correctness.} 
+Correctness for a key-agreement scheme just says that the two parties
+should always agree on the same shared secret:
 
-	\paragraph{Security.} When constructing a security definition for a key agreement protocol, we will consider only passive attacks---the adversary can view our traffic but cannot modify it. In practice, this scheme would be combined with a scheme to verify the authenticity of the received messages to detect when a real-life active adversary tampers with messages. In particular, we would like the computed key to look indistinguishable from randomness given the messages sent on the network.
-
-	For a random $r_1$, $r_2$, and $U$, the probability that an adversary given $F_1(r_1))$ and $F_2(r_2)$ can determine which of $(K, U)$ is the computed key is at most $\tfrac{1}{2} + \text{\textquote{negligible.}}$
+\begin{definition}[Key Agreement Correctness]
+We say that a key-agreement scheme is \emph{correct} if
+for all 
+$(\sk_A, \pk_A) \gets \Gen()$ and
+$(\sk_B, \pk_B) \gets \Gen()$, it holds that: 
+\[ \Derive(\sk_A, \pk_B) = \Derive(\sk_B, \pk_A). \]
 \end{definition}
 
-\section{Constructing a key agreement protocol}
+\paragraph{Security.}
+The standard notion of security for a key-agreement scheme
+only considers \emph{passive attacks}:
+we consider adversaries that can view the
+network traffic but cannot modify it.
+In practice, we can combine key-agreement
+schemes with authentication schemes (e.g., digital signatures)
+to prevent active attacks by in-network adversaries.
 
-\marginnote{So far, we have been able to construct our cryptographic entities from constructs like a PRF, which meant that we could use \textquote{unstructured} algorithms like AES to compute them. For key exchange, we know only how to construct a protocol using number-theoretic concepts.}
+Our security definition for key agreement says that even
+if an adversary sees both parties' public keys, it should
+not be able to distinguish the shared secret from random.
+That is, the following probability distributions
+$D_\text{real}$ and $D_\text{random}$ should be 
+computationally indistinguishable:\marginnote{When we
+say that two distributions are \emph{computationally indistinguishable},
+we mean that if we give the adversary a sample from one or the other,
+it can guess which sample it got with probability at most $1/2 + \text{``negligible''}$.}
+\begin{align*}
+  D_\text{real} &\deq \left\{ 
+(\pk_A, \pk_B, k) \colon  \begin{aligned}
+  (\sk_A, \pk_A) &\getsr \Gen()\\
+  (\sk_B, \pk_B) &\getsr \Gen()\\
+  k &\getsr \Derive(\sk_A, \pk_B)
+\end{aligned}
+\right\} \\
+  D_\text{random} &\deq \left\{ (\pk_A, \pk_B, k) \colon  \begin{aligned}
+  (\_, \pk_A) &\getsr \Gen()\\
+  (\_, \pk_B) &\getsr \Gen()\\
+  k &\getsr \calK 
+\end{aligned}
+  \right\}
+\end{align*}
+
+
+\section{Diffie-Hellman key exchange}
+We now give a simple and beautiful key-exchange protocol, 
+due to Diffie and Hellman.
+
+The version we will see uses large primes $p$ 
+and $q$ a public parameters, along with a number $g \in \Z^*_p$,
+called the ``generator.''
+(\textbf{Warning:} The parameters $p$, $q$, and $g$ must have
+some particular relation. So do not attempt to pick these parameters
+yourself.)
+Typically, we will have $p \approx q \approx 2^{2048}$.
+\marginnote{For a prime $p$, the 
+notation $\Z^*_p$ just denotes 
+the non-zero integers modulo $p$.
+So when we write $ab \in \Z^*_p$,
+we mean $a \cdot b \bmod p$.}
+
+The keyspace of the Diffie-Hellman scheme is $\calK = \Z^*_p$
+and the algorithms are as follows:
+\begin{itemize}[noitemsep]
+  \item $\Gen() \to (\sk, \pk)$.
+    \begin{itemize}[noitemsep]
+      \item Sample $\sk \getsr \{1, \dots, q\}$.
+      \item Set $\pk \gets g^{\sk} \in \Z^*_p$.
+      \item Output $(\sk, \pk)$.
+    \end{itemize}
+
+  \item $\Derive(\sk_A, \pk_B) \to k$.
+    \begin{itemize}[noitemsep]
+      \item We have $\sk_A \in \{1, \dots, q\}$ and $\pk_B \in \Z^*_p$.
+      \item Output $k \gets (\pk_B)^{\sk_A} \in \Z^*_p$.
+    \end{itemize}
+\end{itemize}
+
+\paragraph{Correctness.}
+Correctness holds since $g^{xy}=g^{yx} \in \Z^*_p$ for all $x,y \in \Z$:
+\begin{align*}
+  \Derive(\sk_A, \pk_B) = (\pk_B)^{\sk_A} = (\pk_A)^{\sk_B} = \Derive(\sk_B, \pk_A).
+\end{align*}
+
+
+\paragraph{Efficiency.} In order for the algorithm to be useful,
+Alice and Bob must be able to compute $g^x \in \Z^*_p$ efficiently,
+for $x \in \{1, \dots, q \approx 2^{2048}\}$.
+However, trying to compute $g^x$ where $x$ is 2048
+bits long naively would certainly not be
+efficient: it would require $x \approx 2^{2048}$ multiplications!
+However, we can compute this exponentiation much more efficiently using
+the following strategy:
+\begin{itemize}[noitemsep]
+  \item \textbf{Compute powers of $g$.}
+        Write $\ell \gets \lceil \log_2 p \rceil$.
+        Then compute $(g, g^2, g^4, g^{8}, g^{16}, \dots, g^{2^\ell})$,
+        where all of these are in $\Z^*_p$.
+        It is possible to compute $g^{2^{i}}$ with a single multiplication
+        modulo $p$ as $g^{2^i} = (g^{2^{(i-1)}})^2 \in \Z^*_p$.
+        So this step takes only $\ell = 2048$ multiplications.
+        \marginnote{In many applications, the generator $g$ is fixed in advance.
+        In this case, the implementation can precompute and store these powers of $g$.}
+  \item \textbf{Compute exponentiation.}
+        Write the bits of the exponent as $x = x_0 \cdots x_{\ell-1}$.
+        Then compute:
+        \[ g^x = g^{\sum_{i = 0}^{\ell-1} x_i 2^i} = \prod_{i=0}^{\ell-1} x_i(g^{2^i}) \in \Z^*_p\] 
+        This step again takes only $\ell$ multiplications.
+\end{itemize}
+
+
+\section{Background: Group theory}
+The simplest and most commonly used key-exchange protocol uses
+a mathematical concept called a \emph{group}.
+A group $\G$ is a set of elements along with an operator
+``$\cdot$'' that takes two group elements $g, h \in \G$
+and returns a third group element $g \cdot h \in \G$.
+A group 
+
+
+
+
+\marginnote{So far, we have been able to construct our cryptographic entities from constructs like a PRF, which meant that we could use \textquote{unstructured} algorithms like AES to compute them. We so far only know how to construct key-exchange schemes from 
+more structured problems (e.g., based on number theory).}
+
+\section{Constructing a key agreement protocol}
 
 This scheme first requires the two parties to decide on some large (2048 bits) prime number $p$ and a random element $g \in \Z_p^*$, where $\Z_p^* = \set{1, 2, \ldots, p-1}$. \marginnote{In practice, $p$ and $g$ are predetermined as part of the standard and used for all instances of the key exchange.}
 
@@ -36,13 +157,6 @@ This scheme first requires the two parties to decide on some large (2048 bits) p
 		\end{itemize}
 \end{enumerate}
 
-\paragraph{Correctness.} In order for the algorithm to be useful, Alice and Bob must be able to compute $K$ efficiently. However, trying to compute $g^x$ where $x$ is 2048 bits long naively would certainly not be efficient---it would require $x$ multiplications (at most $2^{2048}$!). However, we can compute this exponentiation much more efficiently if we first construct many powers of 2 of $g$ then combine them:
-\[ g^x = g^{\sum_{i \in [2048]} x_i 2^i} = \prod_{i=0}^{n = 2047} x_i(g^{2^i}) \] 
-
-Therefore, we can compute $g^x$ efficiently if we can efficiently compute $g^{2^i} \forall \set{0, \ldots, n}$. To do this, we can compute progressive squares: 
-
-% TODO: align
-\[ g^2 = g\cdot g \] \[ g^4 = g^2 \cdot g^2 \]  \[ \vdots \] \[ g^{2^i} = g^{2^{i-1}} \cdot g^{2^{i-1}} \]
 
 \paragraph{Basic Group Theory}
 Each element $g \in \Z_p^*$ has order $\text{Order}(g) = \abs{\set{g^1, g^2, \ldots }}$. For any of these elements, a theorem states that $\text{Order}(g)$ divides $\abs{\Z_p^*} = p-1$. Importantly, this guarantees that $g^{p-1} = 1$.
