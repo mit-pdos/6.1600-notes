@@ -1,74 +1,156 @@
 
-The first public-key encryption scheme did not use this idea. However, Diffie-Helman naturally leads to a public-key encryption scheme.
+So far, all of the encryption schemes we have seen
+require the sender and recipient to 
+\emph{share a secret encryption key}.
+In this section, we show that it is possible for
+a sender to encrypt a message to a recipient even
+if the two parties do not share a secret key.
+
+In particular, in ``symmetric-key'' or ``secret-key'' encryption
+schemes we have seen so far, the sender and recipient use the \emph{same key}
+to encrypt and decrypt messages.
+In the ``asymmetric-key'' or ``public-key'' encryption schemes
+we consider now, the sender and recipient use \emph{different keys}
+to encrypt and decrypt messages.
 
 \section{Defining Public-Key Encryption}
-The definition for a public-key encryption scheme will be a combination of our public-key signature and symmetric-key encryption definitions.
+The definition for a public-key encryption scheme will be similar to the 
+definitions we saw for symmetric-key encryption:
 
 \begin{definition}[Public-Key Encryption Scheme]
-	A public-key encryption scheme consists of three efficient algorithms $(\Gen, \Enc, \Dec)$:
+	A public-key encryption scheme over message space $\calM$ 
+  consists of three efficient algorithms $(\Gen, \Enc, \Dec)$:
 	\begin{compactitem}
-		\item $\Gen$: generates a pair $(\pk, \sk)$.
-		\item $\Enc$: takes input $\pk$ and message $m \in \calM$, where $\calM$ is the message space and generates ciphertext $\ct$.
-		\item $\Dec$: takes as input $\ct$ and $\sk$ and outputs $m$.
+    \item $\Gen() \to (\sk, \pk)$: Generates a keypair with secret key $\sk$ and public key $\pk$.
+    \item $\Enc(\pk, m) \to c$: Uses public key $\pk$ to encrypts a message $m \in \calM$ 
+            to a ciphertext $c$.
+    \item $\Dec(\sk, c) \to m$: Uses secret key $\sk$ to decrypt ciphertext $c$ into message $m \in \calM$.
 	\end{compactitem}
 \end{definition}
 
 \begin{definition}[Public-Key Encryption - Correctness]
-	In order for the scheme to be useful, we desire that:
-	\[ \forall m \in \calM, \, (\pk, \sk) \gets \Gen \quad \Prbig{\Dec(\sk, \Enc(\pk, m)) = m} = 1 - \negl \]
+For all keypairs $(\sk, \pk) \gets \Gen()$ and for all messages $m \in \calM$,
+it holds that $$\Dec(\sk, \Enc(\pk, m)) = m.$$
 \end{definition}
 
-\begin{definition}[Public-Key Encryption - CPA (Semantic) Security]
-	Any PPT adversary $\A$ wins the following game with probability $\leq \tfrac{1}{2} + \negl$:
+\begin{definition}[Public-Key Encryption - Security against chosen-plaintext attacks (Weak)]
+  \marginnote{The literature sometimes calls security against chosen-plaintext attacks (``CPA security'')
+  \emph{semantic security}.}
+  A public-key encryption scheme $(\Gen, \Enc, \Dec)$ is \emph{secure against chosen-plaintext attacks}
+  if all efficient adversaries $\calA$ 
+  win the following game with probability $\leq \tfrac{1}{2} + \negl$:
 
 	\begin{compactitem}
-		\item The challenger generates $(\sk, \pk) \gets \Gen$ and $b \gets \bin$ and sends $\pk$ to $\A$.
-		\item Polynomially many times:
-			\begin{compactitem}
-			\item $\A$ sends $m_0, m_1 \in \calM$ to the challenger
-			\item The challenger responds with $\Enc(m_b)$		
-			\end{compactitem}
-		\item The adversary outputs $b'$ and wins if $b' = b$.
+  \item The challenger generates $(\sk, \pk) \gets \Gen()$ and $b \getsr \bin$ and sends 
+        the public key $\pk$ to $\A$.
+  \item The adversary $\A$ sends $m_0, m_1 \in \calM$ to the challenger,
+        where $\abs{m_0} = \abs{m_1}$.
+  \item The challenger responds with $\Enc(\pk, m_b)$		
+  \item The adversary outputs $b'$ and wins if $b' = b$.
 	\end{compactitem}
 \end{definition}
-	Note that since this is a public-key encryption scheme, the adversary can generate encryptions of any message of their choice since they know the public key. However, they must still not be able to distinguish between challenger-generated encryptions of those same messages! In other words, the attacker is able to sample from two distributions: the distribution of encrytions of $m_0$ and that of the encryptions of $m_1$. Despite this, they must not be able to tell which distribution a given ciphertext belongs to. Therefore, it is crucial that the algorithms are randomized.
+Note that since this is a public-key encryption
+scheme, the adversary can use the public key to
+generate encryptions of any message of their choice. 
+As in the secret-key setting, here it is crucial that
+the encryption algorithm be randomized---otherwise
+two encryptions of the same message are identical
+and the attacker can break CPA security.
 
-For symmetric-key encryption, we also defined a stronger notion of security that we called CCA security, for security against chosen ciphertext attacks. We can extend this definition to the public-key setting:
+For symmetric-key encryption, we also defined
+a stronger notion of security that we called
+security against chosen-ciphertext attacks (CCA security).
+We can extend this definition of CCA security
+to the public-key setting.
 
-\begin{definition}[Public-Key Encryption - CCA Security]
+This security definition asserts that the attacker should not be
+able to distinguish the encryption $c^*$ of two messages of its choice,
+even if the attacker can obtain decryptions of any ciphertext except
+$c^*$.
+This is a very strong notion of security (since the security definition
+gives the attacker a lot of power) and it is the notion of security
+that we typically demand in practice.
+
+\begin{definition}[Public-Key Encryption - Security against chosen-ciphertext attacks (Strong)]
+  A public-key encryption scheme $(\Gen, \Enc, \Dec)$ is \emph{secure against chosen-ciphertext attacks}
+  if all efficient adversaries $\calA$ 
+  win the following game with probability $\leq \tfrac{1}{2} + \negl$:
 \begin{compactitem}
-	\item The challenger generates $(\sk, \pk) \gets \Gen$ and $b \gets \bin$ and sends $\pk$ to $\A$.
-	\item Polynomially many times:
-		\begin{compactitem}
-		\item $\A$ sends $m_0, m_1 \in \calM$ to the challenger
-		\item The challenger responds with $\ct^* = \Enc(m_b)$		
-		\item $A$ sends a ciphertext $\ct \neq \ct^*$ to the challenger.
-		\item The challenger responds with $\Dec(\sk, \ct)$.
-		\end{compactitem}
-	\item The adversary outputs $b'$ and wins if $b' = b$.
+\item The challenger generates $(\sk, \pk) \gets \Gen()$ and $b \getsr \bin$ and sends 
+  the public key $\pk$ to the adversary $\A$.
+\item The adversary may make polynomially many \emph{decryption queries}:
+    \begin{compactitem}
+    \item The adversary $\A$ sends ciphertext $c$ to the challenger.
+    \item The challenger responds with $m \gets \Dec(\sk, c)$		
+    \end{compactitem}
+\item At some point, the adversary sends a pair of messages $m_0, m_1 \in \calM$
+  to the challenger, where $\abs{m_0}=\abs{m_1}$.
+\item The challenger returns $c^* \gets \Enc(\pk, m_b)$.
+\item The adversary can continue to make decryption queries, provided that
+      it never asks the challenger to decrypt the ciphertext $c^*$.
+\item The adversary outputs $b'$ and wins if $b' = b$.
 \end{compactitem}
 \end{definition}
 
-\section{El-Gamal Encryption Scheme}
-In essence, the goal of public-key encryption is to perform encryption without a shared secret key. Diffie-Helman provided us a way to generate a shared secret between two parties. To construct a public-key encryption scheme, we can define our previous symmetric-key scheme to perform the actual encryption with Diffie-Helman to generate a key for the symmetric encryption scheme. \marginnote{This was actually not the first public-key encryption scheme. The first scheme, RSA, was much more complicated despite Diffie-Helman already having been published.}
+\section{ElGamal Encryption Scheme}
+In public-key encryption, we want a sender to be able to encrypt a message
+to a recipient 
+The goal of public-key encryption is to perform encryption without a shared secret key.
 
+ElGamal's encryption scheme essentially uses Diffie-Hellman key exchange to allow
+the sender and recipient to agree on a shared secret key $k$, and then has
+the sender encrypt her message with a symmetric-key cryptosystem under key $k$.
+\marginnote{ElGamal's scheme was not the first
+public-key encryption scheme. The first scheme,
+RSA, was much more complicated despite
+Diffie-Hellman already having been published.}
 
-\begin{definition}[El-Gamal]
-	Let $G$ be a finite cyclic group of order $n$. Let $g$ be a generator of $G$. Let $H: G \rightarrow \bin^*$ be a hash function (modelled as a random oracle). Let $(\Enc', \Dec')$ be a symmetric authenticated encryption scheme. Then define:
+\begin{definition}[Hashed ElGamal Encryption]
+Let $p$, $q$, and $g$ be integers of the sort we use for Diffie-Hellman
+key exchange (\cref{sec:dh}).
+In particular, $p \approx q \approx 2^{2048}$
+and $g \in \Z^*_p$.
+  \marginnote{In practice, we typically use elliptic-curve groups to 
+  instantiate ElGamal encryption, instead of $\Z^*_p$.
+  But the general principle is exactly the same.}
 
-	\begin{compactitem}
-		\item $\Gen$: choose $a \gets \abs{G}$, output $(\pk, \sk) = (g^a, a)$.	
-		\item $\Enc(\pk, m)$: choose $b \gets \abs{G}$, output $(g^b, \Enc'(H(g^{ab}), m)$. \marginnote{If we wanted only CPA security, we don't even need a real symmetric-key encryption scheme here! Since a fresh $g^b$ is generated for each message, we can just use a one-time pad, i.e. $\Enc(\pk, m)$: choose $b \gets \abs{G}$, output $(g^b, H(g^{ab}) \xor m$}.
-		\item $\Dec(\sk=a, (u, v))$: output $\Dec'(H(u^{\sk=a}), v)$ \marginnote{For the one-time pad version, output $\Dec(\sk, (u, v)) = H(u^{\sk=a}) \xor v$.}
-	\end{compactitem}
+Let $H: \Z^*_p \rightarrow \bin^*$ be a hash function (modelled as a random oracle). Let $(\Enc', \Dec')$ 
+be a symmetric-key authenticated-encryption scheme. Then define:
+
+\begin{compactitem}
+\item $\Gen() \to (\sk, \pk)$:
+    \begin{itemize}[noitemsep]
+          \item Choose $a \gets \{1, \dots, q\}$.
+          \item Compute $A \gets g^a \in \Z^*_p$.
+          \item Output $(\sk, \pk) \gets (a, A)$.	
+    \end{itemize}
+  \item $\Enc(\pk, m) \to c$:
+    \begin{itemize}[noitemsep]
+      \item Choose $r \gets \{1, \dots, q\}$.
+      \item Compute $R \gets g^r \in \Z^*_p$.
+      \item Compute $k \gets H(\pk^r \in \Z^*_p)$.
+      \item Output $c \gets (R, \Enc'(k, m)$.
+    \end{itemize}
+
+  \item $\Dec(\sk, c) \to m$:
+    \begin{itemize}[noitemsep]
+      \item Parse $(R, c') \gets c$.
+      \item Compute $k \gets H(R^a \in \Z^*_p)$.
+      \item Output $m \gets \Dec'(k, c')$.
+    \end{itemize}
+\end{compactitem}
 \end{definition}
 
 \subsection{Performance}
-The performance of this scheme is limited by the exponentiations---the symmetric encryption scheme is incredibly fast, but exponentiation takes a few milliseconds on modern processors. For encryption, this scheme requires 2 exponentiations ($g^b$ and $\pk^b$). Decryption requires one exponentiation $(u^\sk)$. It seems that decryption is twice as fast, but we can efficiently precompute $g^b$ by computing $g^{2^i}$ for $i$ from 1 to $\log n$. If we encrypt often to the same $\pk$, we can also precompute powers of two for $\pk$ to perform the same optimizaiton.
+The performance of this scheme is limited by the exponentiations---the symmetric encryption scheme is quite fast (gigabytes per second), but a single exponentiation can take a millisecond on modern processors. For encryption, this scheme requires two exponentiations ($g^r$ and $\pk^r$). Decryption requires one exponentiation $(R^\sk)$.
+To speed up the encryption routine, we can precompute powers of $g$: $g^2, g^4, g^8, g^{16}, \dots$, which saves a factor of two in exponentiations.
+\marginnote{Hashed ElGamal encryption is one of the most common public-key encryption
+schemes used today.}
 
 \subsection{Security}
-For CPA security, all we require is that $(g^a, g^b, H(g^{ab}) \ind (g^a, g^b, U)$ where $U$ is truly random. This is called the Hash Diffie-Hellman assumption (HDH) and is stronger thatn CDH. However, if we assume that the hash function is a random oracle, the assumptions are equivalent. For CPA security, the underlying symmetric encryption can be a one-time pad---and indeed this was the proposal in the original scheme.
+If we model the hash function $H$ as a random oracle, 
+we can prove security of ElGamal encryption from 
+(a) the computational Diffie-Hellman assumption (\cref{defn:cdh}) and
+(b) the CCA security of the underlying authenticated-encryption
+scheme $(\Enc', \Dec')$.
 
-For CCA security, a one-time secure symmetric encryption scheme is not sufficient. Instead, we need to use an authenticated symmetric encryption scheme. With authenticated encryption, the decryption oracle aspect of the CCA game becomes basically useless since the adversary cannot generate ciphertexts that appear to be authentic. This seems to imply that the definitions of CPA and CCA security are equivalent given a symmetric encryption scheme. However, there is a bit of subtlety---the decryption oracle can function as a \textquote{checker} for $g^{ab}$---it will reject the ciphertext if the attacker uses an incorrect key. If the adversary does not know if they have sufficient information to compute $g^{ab}$, this gives the adversary some extra power, and we do not know how to prove that the scheme is CCA secure under only CDH. \marginnote{We do, however, know how to prove that other, more complicated, schemes are CCA secure under only CDH}.
-
-We need something stronger---the interactive DH assumption---to prove the CCA-security of El-Gamal.

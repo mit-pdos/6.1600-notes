@@ -76,7 +76,7 @@ it can guess which sample it got with probability at most $1/2 + \text{``negligi
 \end{align*}
 
 
-\section{Diffie-Hellman key exchange}
+\section{Diffie-Hellman key exchange}\label{sec:dh}
 We now give a simple and beautiful key-exchange protocol, 
 due to Diffie and Hellman.
 \marginnote{So far, we have been able to construct our cryptographic entities from constructs like a PRF, which meant that we could use \textquote{unstructured} algorithms like AES to compute them. We so far only know how to construct key-exchange schemes from 
@@ -154,7 +154,7 @@ essentially we just assume that the key-agreement scheme is secure.
 
 \begin{definition}[Decision Diffie-Hellman (DDH) assumption]\label{defn:ddh}
 The \emph{decision Diffie-Hellman assumption} states that,
-for $p$, $q$, and $g$, the following distributions are 
+for a suitable choice of $p$, $q$, and $g$, the following distributions are 
 computationally indistinguishable:\marginnote{To make the
 statement fully formal, we need to let $p$, $q$, and $g$ grow
 with the security parameter.}
@@ -172,7 +172,13 @@ If we model the hash function as a random oracle, security can rely
 on a slightly weaker assumption---the ``computational'' Diffie-Hellman
 (CDH) assumption.
 The CDH assumption asserts, informally, that given $(g, g^x, g^y)$, it is
-infeasible to compute $g^{xy}$.
+infeasible to compute $g^{xy}$. More formally, we have:
+
+\begin{definition}[Computational Diffie-Hellman (CDH) assumption]\label{defn:cdh}
+The \emph{computational Diffie-Hellman assumption} states that,
+for a suitable choice of $p$, $q$, and $g$, and for all adversaries $\calA$:
+\[ \Pr[\calA(g, g^x, g^y) = g^{xy} \colon x, y, \getsr\{1, \dots, q\} ] \leq \text{``negligible.''}\]
+\end{definition}
 
 
 \section{The discrete-log problem}
