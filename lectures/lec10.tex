@@ -79,6 +79,8 @@ it can guess which sample it got with probability at most $1/2 + \text{``negligi
 \section{Diffie-Hellman key exchange}
 We now give a simple and beautiful key-exchange protocol, 
 due to Diffie and Hellman.
+\marginnote{So far, we have been able to construct our cryptographic entities from constructs like a PRF, which meant that we could use \textquote{unstructured} algorithms like AES to compute them. We so far only know how to construct key-exchange schemes from 
+more structured problems (e.g., based on number theory).}
 
 The version we will see uses large primes $p$ 
 and $q$ a public parameters, along with a number $g \in \Z^*_p$,
@@ -181,7 +183,7 @@ is computationally infeasible:
 The \emph{discrete-log assumption} states that,
 for $p$, $q$, and $g$, and for all efficient 
 adversaries $\calA$:
-  \[ \Pr[\calA(g, g^x) \colon x \getsr \{1, \dots, q\} ] \leq \text{``negligible''}.\]
+  \[ \Pr[\calA(g, g^x) = x \colon x \getsr \{1, \dots, q\} ] \leq \text{``negligible''}.\]
 \end{definition}
 Given an algorithm for the discrete-log problem, we can use it to solve the DDH problem.
 Given a DDH challenge $(g, g^x, g^y, g^{z})$, compute the discrete log of $g^x$ and
@@ -192,10 +194,12 @@ is to first solve the discrete-log problem in $\Z^*_p$.
 How hard it to solve the discrete-log problem then?
 \begin{enumerate}
 	\item The most basic attack is to enumerate all $p$ possible values of $x$ and check whether the corresponding $g^x$ matches. This will take time $p \approx 2^{2048}$.
-	\item For more generic (non-$\Z_p^*$) groups, there is an algorithm called Baby Step Giant Step that is able to compute $x$ in time $\sqrt{p}$.
-  \item A much better attack is the Number Field Sieve, which is able to compute $x$ in (roughly) time $\exp((\log p)^{1/3} (\log \log p)^{2/3})$---sub-exponential time!
-    \marginnote{An attack that runs in time $\sqrt p$ runs in time $\exp(\frac 12 \log p)$. 
-    In contrast, the Number Field Sieve runs in time roughly $\exp(\log^{1/3} p)$. This is much much much faster than the $\sqrt p$-time algorithms,
+	\item There is a slightly more clever algorithm, called ``Baby Step Giant Step,'' that is able to compute $x$ in time $\sqrt{p}$.
+  \item In $\Z^*_p$,
+    a much better attack is the Number Field Sieve.
+    This algorithm is able to compute $x$ in (roughly) time $\exp((\log p)^{1/3} (\log \log p)^{2/3})$---sub-exponential time!
+    \marginnote{An attack that runs in time $\sqrt p$ runs in time $2^{\frac 12 \log p}$. 
+    In contrast, the Number Field Sieve runs in time roughly $2^{\sqrt[3]{\log p}}$. This is much much much faster than the $\sqrt p$-time algorithms,
     since the exponent grows much more slowly.}
     The existence of this attack is the reason we require $p$ to be $2048$ bits long to 
     get $128$-bit security.
@@ -205,8 +209,6 @@ How hard it to solve the discrete-log problem then?
 
 
 
-\marginnote{So far, we have been able to construct our cryptographic entities from constructs like a PRF, which meant that we could use \textquote{unstructured} algorithms like AES to compute them. We so far only know how to construct key-exchange schemes from 
-more structured problems (e.g., based on number theory).}
 
 \section{Generalizations of Diffie-Hellman}
 
@@ -217,19 +219,42 @@ and a \emph{binary operation on elements} (here, multiplication modulo $p$).
 There is a natural generalization of the Diffie-Hellman
 protocol that works with other sets of elements and
 binary operations that operate on them.
+\marginnote{More precisely, we can define Diffie-Hellman
+key exchange with respect to any \emph{finite cyclic group}---a
+concept from abstract algebra.
+A cyclic group just consists of a \emph{set} of elements
+and a \emph{binary operation on elements}.
+The set and operation need to satisfy certain mathematical
+properties---associativity, etc.
+
+Given a group $\G$, we can then 
+define a discrete-log assumption on $\G$ and whenever
+discrete-log is hard on $\G$, we can use $\G$ to construct
+cryptosystems.
+}
 
 The most widely used version of the Diffie-Hellman protocol today
 uses \emph{elliptic-curve groups}.
-The set of elements in an elliptic-curve group is a set of $(x,y)$
-points, where $0 \leq x, y \leq p$ for some prime $p \approx 2^{256}$.
+The set of elements in an elliptic-curve group is a set of points $(x,y) \in \Z^2$
+in two-dimensional space, 
+where $0 \leq x, y \leq p$ for some prime $p \approx 2^{256}$.
 The binary operation on elements is some geometric operation
 on two points that yields a third point.
 Even though the underlying objects are now points instead of integers
 modulo $p$, the Diffie-Hellman protocol looks exactly the same in this setting.
 
-The appeal of elliptic-curve 
+The appeal of elliptic-curve cryptosystems is that the best known discrete-log
+algorithm on certain elliptic-curve groups is Baby Step Giant Step, which runs
+in $\sqrt p$ time.
+So, we can use elliptic-curve groups of size $2^{256}$ and the Diffie-Hellman
+public keys take only $\approx 256$ bits to represent.
+In contrast, when working in $\Z^*_p$, we need to work modulo a prime $p \approx 2^{2048}$
+to defeat the Number Field Sieve attack, so Diffie-Hellman public keys in
+this setting take $\approx 2048$ bits to represent.
 
 
+
+\iffalse
 \section{Background: Group theory}
 The simplest and most commonly used key-exchange protocol uses
 a mathematical concept called a \emph{group}.
@@ -239,7 +264,6 @@ and returns a third group element $g \cdot h \in \G$.
 A group 
 
 
-\iffalse
 \section{Finite Groups}
 In the last section, we defined Diffie-Helman in terms of the \emph{finite group} $\Z_p^*$. However, this scheme can work more generally over any finite group as follows:
 
