@@ -1,0 +1,102 @@
+So far, we have established several constructions that allow us to hide the contents of transmissions: we created CPA- and CCA-secure encryption schemes that worked with and without a shared key. 
+
+\begin{compactitem}
+	\item File Encryption
+	\item Stream Encryption: TLS
+	\item Encrypted Messaging
+\end{compactitem}
+
+\section{File Encryption}
+Perhaps the most straightforward use of encryption is file encryption.
+
+\paragraph{Example: WhatsApp Encrypted Backup.} WhatsApp provides a backup utility to allow recovering messages in case of a lost or broken phone. They provide a server that stores these backup, but WhatsApp aims to provide message confidentiality---the WhatsApp server should not learn about the contents of messages in a backup. To achieve this, the device will generate a 128-bit AES key $k$ and encrypt the message data (photos, messages, etc.) using AES-GCM$(k, \cdot)$ before sending the \emph{ciphertext} to the server. In order to allow you to restore your backup on a new phone, the app allows you to export 64 decimal digits that encode the AES key used. When restoring your backup, you will enter these digits and your phone will fetch the ciphertext from the server and use these digits to reconstruct the key and decrypt your messages.
+
+This is a fairly simple application of file security. However, file encryption can be much more tricky: many applications require or desire features beyond simple encryption and decryption.
+
+\subsection{Case Study: PDF v1.5 Encryption}
+One instance of this desire for extra features that ended up going wrong was a previous version of the PDF standard, PDF v1.5. This standard provided several features:
+\begin{compactenum}
+	\item PDF allows password-encrypting some or all of the document: for example, the title page could be unencrypted and the remainder encrypted.
+	\item PDF supports form submissions via HTTP.
+	\item PDF forms can reference document contents
+	\item PDF can submit a form on an event (open, close, decrypt, etc.)
+\end{compactenum}
+
+Each of these features on their own may have been perfectly secure. However, when put together, there was a clever attack that allowed an attacker to learn the contents of an encrypted PDF. Consider a PDF document with an unencrypted title page and a confidential remainder. 
+
+The attacker intercepts the PDF on the way to the victim and replaces the title page with an \textquote{evil} title page. An attacker can set up this title page to include a PDF form that reads the contents of the rest of the document and sends it to the attacker server as soon as the user enters the password to decrypt the document.
+
+The core issue here was that the unencrypted contents of the document was not authenticated---it was possible to change the unencrypted parts without the user noticing. A better design would have been to either use a MAC over all pages of the document or to use something called Authenticated Encryption with Associated Data to authenticate the encrypted data together with the unencrypted data. A form of Merkle tree could also be used to allow authenticating a single page without needing to authenticate the whole (potentially large) document. A simpler, but incomplete, approach would be to simply compute a MAC of each (page \#, page contents) pair and store them in the document.\marginnote{See if you can find a hole in this scheme!}
+
+\section{Stream Encryption: TLS (previously SSL)}
+As we have discussed, TCP on the internet provides no integrity or secrecy whatsoever. In order to protect the data that we send over the network, a stream encryption standard called TLS is used with the goal of creating an encrypted \textquote{tunnel} between the client and the server.\marginnote{HTTPS is simply HTTP run over TLS.}
+
+As in the PDF case, this may seem like a straightforward goal. However, as is often the case in security, features and practical requirements make the situation much more complex.
+
+\paragraph{Downgrade Attack} The current version of TLS is TLS 1.3. An old version called SSLv3 is so broken today that communication happening over SSSLv3 allows an attacker to view the plaintext communication. However, it is not practical for a server (and the corresponding business owner) to expect all clients to have the most recent version of TLS included in their browser. As a result, implementations are designed to use the latest version of TLS that both client and server support.
+
+In order to decide on a mutually supported version of TLS, the client and server communicate back and forth---the client asks the server if they support their best version, and the server will respond back with either a confirmation or with garbage. If garbage, the client will \emph{downgrade} their version of TLS and try again. However, if none of this back-and-forth is authenticated, an attacker can simply replace all of the server responses with garbage until the client proposes SSLv3. Once the client and server agree to use SSLv3, believing that this is the best available option, the attacker can then monitor and decrypt their traffic.
+
+\subsection{TLS Structure}
+TLS consists of two main phases:
+\begin{compactenum}
+\item Handshake: in this phase, the client and server use a key-exchange protocol to agree on a shared key to use to encrypt later traffic. This uses public-key cryptography, since the client and server initially have no shared secret.
+\item Record Protocol: This phase is where the actual communication happens. For performance, this uses the key agreed upon in the handshake phase for symmetric authenticated encryption.
+\end{compactenum}
+
+\subsection{TLS Handshake Properties}
+In our definitions of cryptography primitives, we had simple properties defining our correctness and security. The TLS handshake, however, is much more complicated:
+
+\begin{compactitem}
+	\item Correctness
+	\item Security: adversary \textquote{learns nothing} about $k$.
+	\item Peer authentication: at the end of the handshake, each party believes that they are talking to the other party.
+	\item Downgrade protection
+	\item Forward secrecy with respect to key compromise: if an attacker compromises the client or the server, it cannot encrypt past traffic. \marginnote{Vanilla Diffie-Hellman key exchange does not provide this! If the parties are using a shared secret for encryption, an attacker who learns that secret can decrypt all past messages. To combat this, the agreed-upon key is used only to authenticate messages---encryption keys are negotiated separately and thrown away periodically.}
+	\item Protection against key-compromise impersonation: if an attacker steals a client's secret key, they should not be able to impersonate other servers to the client.
+	\item Protection of endpoint identities: the public keys of the two parties should never be transmitted in the clear: for example, if a client is connecting to a website that uses a CDN like Akamai or Cloudflare an attacker should not be able to tell which website the client is connecting to---only that it is hosted on Akamai or Cloudflare.
+\end{compactitem}
+
+\subsection{TLS Handshake}
+The TLS handshake is very carefully designed to achieve these properties. A grossly simplified version looks something like the following:
+
+\begin{compactenum}
+\item At the start of the handshake, the client knows $\pk_{\text{CA}}$ and the server (for example, MIT) knows $\sk_\text{MIT}$ and $\text{cert}_{MIT}$.
+\item \textquote{Client Hello}: The client sends several values to the server. The client assumes that the server supports a cipher suite and initiates the corresponding key exchange):
+	\begin{compactitem}
+		\item random values
+		\item list of supported ciphers
+		\item $R_c = g^{r_c} \mod p$
+	\end{compactitem}
+\item \textquote{Server Hello}: The server sends several values to the client, choosing a cipher suite to use and completing the Diffie-Hellman key exchange. 
+	\begin{compactitem}
+		\item random values
+		\item cipher to use
+		\item $R_s = g^{r_s} \mod p$
+	\end{compactitem}
+\item Both partices compute a shared key $k = H(g^{r_c r_s})$.
+\item Under encryption using $k$, the server sends the certificate for \ttt{mit.edu} as well as a signature over all messages sent so far, using $\sk_\text{MIT}$. The client then checks several things:
+	\begin{compactitem}
+	\item That the certificate has been signed by one of the client's trusted CAs.
+	\item That the signature from the server matches their own record of the messages.
+	\end{compactitem}
+\item Finally, the Record Protocol begins to exchange application data.
+\end{compactenum}
+
+\subsubsection{Properties}
+This is very simplified and does not provide many of the features that real TLS provides. However, we can see that it satisfies the properties we desire. 
+
+\paragraph{Protection against Replay Attacks.} Since the random values included in the client and server hello change with every run of the protocol, an attacker cannot reuse handshake messages to pretend to be one party.
+
+% TODO: protection of endpoint identities
+
+\section{What TLS does not Provide}
+
+\paragraph{Authenticated End-of-File}
+A popular tool to install the toolchain for the trendy systems programming language Rust is \ttt{rustup}. To use the tool and install the Rust toolchain, the recommanded method is to run \ttt{curl https://sh.rustup.rs | sh}. This downloads a bash script from the internet over HTTPS and immediately runs it using \ttt{sh}.
+
+Imagine that the contents of the downloaded script create a temporary directory, copy things into it, install some things, and finally delete the temporary directory with something like \ttt{rm -r /tmp/install}. If the attacker cuts of the stream after \ttt{rm -r /}, TLS provides no protection against this and this truncated command will cause the entire system to be deleted. To protect against this, script writers try to design their scripts such that if the stream is cut off, nothing happens---for example, everything can be wrapped in a function that is called at the very end of the script.
+
+\paragraph{Plaintext Length Obfuscation}
+As we have discussed, encryption reveals exactly the length of the plaintext. If there is data that is not encrypted that is then included inside the encrypted data as well, this can cause a vulnerability---see the CRIME attack.
+% TODO: Finish this up. It's a clever attack.
