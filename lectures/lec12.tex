@@ -1,20 +1,48 @@
-So far, we have established several constructions that allow us to hide the contents of transmissions: we created CPA- and CCA-secure encryption schemes that worked with and without a shared key. 
+So far, we have established several constructions
+that allow us to hide the contents of
+transmissions: we created chosen-plaintext- 
+and chosen-ciphertext-secure
+encryption schemes that worked with and without
+a shared key.
+We will now discuss a few practical applications
+of transport encryption, and why it is often difficult
+to get right.
 
-\begin{compactitem}
-	\item File Encryption
-	\item Stream Encryption: TLS
-	\item Encrypted Messaging
-\end{compactitem}
 
 \section{File Encryption}
 Perhaps the most straightforward use of encryption is file encryption.
 
-\paragraph{Example: WhatsApp Encrypted Backup.} WhatsApp provides a backup utility to allow recovering messages in case of a lost or broken phone. They provide a server that stores these backup, but WhatsApp aims to provide message confidentiality---the WhatsApp server should not learn about the contents of messages in a backup. To achieve this, the device will generate a 128-bit AES key $k$ and encrypt the message data (photos, messages, etc.) using AES-GCM$(k, \cdot)$ before sending the \emph{ciphertext} to the server. In order to allow you to restore your backup on a new phone, the app allows you to export 64 decimal digits that encode the AES key used. When restoring your backup, you will enter these digits and your phone will fetch the ciphertext from the server and use these digits to reconstruct the key and decrypt your messages.
+\paragraph{Example: WhatsApp Encrypted Backup.}
+WhatsApp allows the app's users to back up their 
+messages and contacts to the cloud.
+This way, a user can recover her messages 
+if she loses or breaks her phone.
+To hide the user's data from WhatsApp's cloud servers, WhatsApp
+uses encrypted backup.
+To achieve this, the user's device generates
+a 128-bit AES key $k$ at the time of backup
+and encrypt the message data
+(photos, messages, etc.) using AES-GCM$(k, \cdot)$
+before sending the \emph{ciphertext} to the
+server. In order to allow you to restore your
+backup on a new phone, the app allows you to
+export 64 decimal digits that encode the AES key
+used. When restoring your backup, you will enter
+these digits and your phone will fetch the
+ciphertext from the server and use these digits to
+reconstruct the key and decrypt your messages.
+\marginnote{See \href{https://scontent.fphl1-1.fna.fbcdn.net/v/t39.8562-6/241394876_546674233234181_8907137889500301879_n.pdf?_nc_cat=108&ccb=1-7&_nc_sid=ad8a9d&_nc_ohc=ANW9FNYPigIAX93N8Oj&_nc_ht=scontent.fphl1-1.fna&oh=00_AT9IVosU4uWqddd5woEO4eUWw3mbd76IgvwjcqDApb3p9A&oe=63565D66}{\textbf{this document}}
+for details on how WhatsApp encrypts backups.
+(The document also describes a more complicated
+backup scheme that uses passwords for encryption.)}
 
 This is a fairly simple application of file security. However, file encryption can be much more tricky: many applications require or desire features beyond simple encryption and decryption.
 
 \subsection{Case Study: PDF v1.5 Encryption}
-One instance of this desire for extra features that ended up going wrong was a previous version of the PDF standard, PDF v1.5. This standard provided several features:
+One instance of this desire for extra features
+that ended up going wrong was a previous version
+of the PDF standard, PDF v1.5.\cite{muller2019practical} This standard
+provided several features:
 \begin{compactenum}
 	\item PDF allows password-encrypting some or all of the document: for example, the title page could be unencrypted and the remainder encrypted.
 	\item PDF supports form submissions via HTTP.
