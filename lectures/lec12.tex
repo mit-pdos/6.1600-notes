@@ -41,20 +41,58 @@ This is a fairly simple application of file security. However, file encryption c
 \subsection{Case Study: PDF v1.5 Encryption}
 One instance of this desire for extra features
 that ended up going wrong was a previous version
-of the PDF standard, PDF v1.5.\cite{muller2019practical} This standard
-provided several features:
+of the PDF standard, PDF v1.5.\cite{muller2019practical}
+This standard provided several features:
 \begin{compactenum}
-	\item PDF allows password-encrypting some or all of the document: for example, the title page could be unencrypted and the remainder encrypted.
-	\item PDF supports form submissions via HTTP.
-	\item PDF forms can reference document contents
-	\item PDF can submit a form on an event (open, close, decrypt, etc.)
+	\item It is possible to password-encrypt some or all of the document.
+        (The encryption scheme does not matter, but think of it as
+        a secure authenticated-encryption scheme.)
+        For example, a PDF could have an unencrypted title page 
+        and have the rest of the pages be encrypted.
+	\item A PDF document can contain a form that the PDF reader
+        submits to a server via HTTP.
+	\item A form in a PDF document can reference other parts of a document.
+	\item The PDF reader may submit a form when an event happens:
+        when the PDF is opened, closed, decrypted, etc.
 \end{compactenum}
 
-Each of these features on their own may have been perfectly secure. However, when put together, there was a clever attack that allowed an attacker to learn the contents of an encrypted PDF. Consider a PDF document with an unencrypted title page and a confidential remainder. 
+Each of these features individually seems innocuous.
+However, when combined, there is a clever attack that allows an attacker to 
+learn the contents of the encrypted portion of a PDF.
 
-The attacker intercepts the PDF on the way to the victim and replaces the title page with an \textquote{evil} title page. An attacker can set up this title page to include a PDF form that reads the contents of the rest of the document and sends it to the attacker server as soon as the user enters the password to decrypt the document.
+The attack works against a PDf document with an unecrypted title page
+and an encrypted body.
+We assume that the attacker can modify the PDF on its way to the victim.
 
-The core issue here was that the unencrypted contents of the document was not authenticated---it was possible to change the unencrypted parts without the user noticing. A better design would have been to either use a MAC over all pages of the document or to use something called Authenticated Encryption with Associated Data to authenticate the encrypted data together with the unencrypted data. A form of Merkle tree could also be used to allow authenticating a single page without needing to authenticate the whole (potentially large) document. A simpler, but incomplete, approach would be to simply compute a MAC of each (page \#, page contents) pair and store them in the document.\marginnote{See if you can find a hole in this scheme!}
+To mount the attacker, the attacker intercepts the
+PDF on the way to the victim and replaces the
+title page with an \textquote{evil} title page.
+The evil title page:
+\begin{itemize}[noitemsep]
+    \item reads the contents of the decrypted pages into a PDF form element,
+          on the event that decryption of the PDF body succeeds, 
+          and then
+    \item submits the form via HTTP to \texttt{evil.com}
+\end{itemize}
+
+The core issue here was that the unencrypted
+contents of the document were not authenticated.
+That is, an attacker could modify the
+unencrypted pages of the document without detection.
+A better design would have been to either use
+a MAC over all pages of the document or to use
+a primitive called ``Authenticated Encryption with
+Associated Data'' to authenticate the encrypted data
+together with the unencrypted data.
+
+A form of Merkle tree could also be used to allow
+authenticating a single page without needing to
+authenticate the whole (potentially large)
+document. A simpler, but incomplete, approach
+would be to simply compute a MAC of each (page \#,
+page contents) pair and store them in the
+document.\marginnote{See if you can find a hole in
+this scheme!}
 
 \section{Stream Encryption: TLS (previously SSL)}
 As we have discussed, TCP on the internet provides no integrity or secrecy whatsoever. In order to protect the data that we send over the network, a stream encryption standard called TLS is used with the goal of creating an encrypted \textquote{tunnel} between the client and the server.\marginnote{HTTPS is simply HTTP run over TLS.}

@@ -313,3 +313,5 @@ TSWLatexianTemp*
 
 # End of https://www.toptal.com/developers/gitignore/api/latex
 lecture-notes.pdf
+build
+.DS_Store
