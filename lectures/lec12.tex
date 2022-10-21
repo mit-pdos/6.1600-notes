@@ -62,21 +62,28 @@ Each of these features individually seems innocuous.
 However, when combined, there is a clever attack that allows an attacker to 
 learn the contents of the encrypted portion of a PDF.
 
-The attack works against a PDf document with an unecrypted title page
-and an encrypted body.
-We assume that the attacker can modify the PDF on its way to the victim.
+The attack works against a PDF document with an \emph{unecrypted (public)
+title page}
+and an \emph{encrypted (secret) body}.
+We assume that the attacker can modify the PDF 
+file on its way to the victim.
 
 To mount the attacker, the attacker intercepts the
 PDF on the way to the victim and replaces the
 title page with an \textquote{evil} title page.
 The evil title page:
 \begin{itemize}[noitemsep]
+    \item contains an invisible PDF form,
     \item reads the contents of the decrypted pages into a PDF form element,
           on the event that decryption of the PDF body succeeds, 
           and then
     \item submits the form via HTTP to \texttt{evil.com}
 \end{itemize}
+So when the victim recipient enters her password into the PDF
+reader to decrypt the document, the evil title page is exfiltrates
+the decrypted content to \texttt{evil.com} via a PDF form.
 
+\paragraph{What went wrong?}
 The core issue here was that the unencrypted
 contents of the document were not authenticated.
 That is, an attacker could modify the
@@ -87,84 +94,214 @@ a primitive called ``Authenticated Encryption with
 Associated Data'' to authenticate the encrypted data
 together with the unencrypted data.
 
-A form of Merkle tree could also be used to allow
-authenticating a single page without needing to
-authenticate the whole (potentially large)
-document. A simpler, but incomplete, approach
-would be to simply compute a MAC of each (page \#,
-page contents) pair and store them in the
-document.\marginnote{See if you can find a hole in
-this scheme!}
+One downside of MACing the entire document is that,
+before rendering even a single page of the PDF,
+the reader would have to compute a MAC over the
+entire PDF.
+If the PDF consists of many thousands of pages, 
+this could be expensive.
+Using a more sophisticated cryptographic construction:
+per-page MACs, plus MACs on the document metadata, etc.,
+we might be able to construct a scheme that protects
+document integrity while allowing partial document
+rendering.
+But the design of such a scheme would have to carefully
+defend document integrity against the sort of attacks
+we describe here.
 
-\section{Stream Encryption: TLS (previously SSL)}
-As we have discussed, TCP on the internet provides no integrity or secrecy whatsoever. In order to protect the data that we send over the network, a stream encryption standard called TLS is used with the goal of creating an encrypted \textquote{tunnel} between the client and the server.\marginnote{HTTPS is simply HTTP run over TLS.}
+\section{Stream Encryption: Transport Layer Security (TLS)}
+The standard Internet data transfer protocols---TCP and UDP---%
+provide no integrity or confidentiality whatsoever.
+To protect the data that we send over the network, 
+we use the \emph{transport-layer security} (TLS) protocol.
+The TLS protocol runs on top of TCP and aims to 
+provide an encrypted \textquote{tunnel} between a
+client and server.\marginnote{HTTPS is simply HTTP run over
+TLS.}
 
-As in the PDF case, this may seem like a straightforward goal. However, as is often the case in security, features and practical requirements make the situation much more complex.
+While designing a stream-encryption protocol may seem straightforward
+at first glance, the task is much more subtle than it would seem.
+However, as is often the case in security, 
+features and practical requirements make the situation much more complex.
 
-\paragraph{Downgrade Attack} The current version of TLS is TLS 1.3. An old version called SSLv3 is so broken today that communication happening over SSSLv3 allows an attacker to view the plaintext communication. However, it is not practical for a server (and the corresponding business owner) to expect all clients to have the most recent version of TLS included in their browser. As a result, implementations are designed to use the latest version of TLS that both client and server support.
+\subsection{Downgrade Attack}
+We now give one example of a \emph{downgrade attack}---the
+sort of subtle security issue that can arise in protocol design.
 
-In order to decide on a mutually supported version of TLS, the client and server communicate back and forth---the client asks the server if they support their best version, and the server will respond back with either a confirmation or with garbage. If garbage, the client will \emph{downgrade} their version of TLS and try again. However, if none of this back-and-forth is authenticated, an attacker can simply replace all of the server responses with garbage until the client proposes SSLv3. Once the client and server agree to use SSLv3, believing that this is the best available option, the attacker can then monitor and decrypt their traffic.
+The current version of TLS is TLS 1.3. An older
+version of the TLS standard, called SSLv3,
+is vulnerable to devastating
+attacks that allow an attacker to recover the plaintext traffic.
+However, for backwards compatibility, many TLS clients
+and servers still supported SSLv3 until quite recently.
+
+When a TLS client connects to a TLS server, the two parties
+first exchange some messages to decide which version of the TLS
+protocol to use.
+In particular, the client will try to connect to the server using
+the latest version of TLS it supports.
+The server will respond back with either a confirmation 
+(if the server supports the client's proposed TLS version) or with garbage
+(if not).
+If garbage, the client will try to connect to the server
+with an older version of TLS.
+
+An important point is that \emph{none} of these negotiation messages
+are authenticated---the client and server cannot start
+using authentication (MACs, signatures, etc.) until they agree on 
+which version of TLS to use!
+So, an active in-network attacker
+can simply replace all of the server responses in
+this protocol-negotiation phase
+with garbage until the client downgrades all the way to SSLv3.
+Once the client and server agree to use SSLv3,
+believing that this is their best available option,
+the attacker can then monitor and decrypt their
+traffic using known attacks on SSLv3.
+
+The best defense against this attack is for both parties to
+disable support for SSLv3 completely.
 
 \subsection{TLS Structure}
 TLS consists of two main phases:
 \begin{compactenum}
-\item Handshake: in this phase, the client and server use a key-exchange protocol to agree on a shared key to use to encrypt later traffic. This uses public-key cryptography, since the client and server initially have no shared secret.
-\item Record Protocol: This phase is where the actual communication happens. For performance, this uses the key agreed upon in the handshake phase for symmetric authenticated encryption.
+\item \textbf{Handshake:}
+  In this phase, the client and server use a key-exchange protocol to agree on a shared key to use to encrypt their application-layer traffic. This step uses public-key cryptography, since the client and server initially have no shared secret.
+\item \textbf{Record protocol:} This phase is where the actual application-layer communication happens. This phases uses the secret key that the client and server agreed  upon in the handshake phase for authentication and encryption. 
 \end{compactenum}
 
 \subsection{TLS Handshake Properties}
-In our definitions of cryptography primitives, we had simple properties defining our correctness and security. The TLS handshake, however, is much more complicated:
+In our definitions of public-key encryption, we
+had only two (relatively simple) properties: 
+correctness and security. 
+The TLS handshake, however, has a much more complicated
+set of goals:
 
 \begin{compactitem}
-	\item Correctness
-	\item Security: adversary \textquote{learns nothing} about $k$.
-	\item Peer authentication: at the end of the handshake, each party believes that they are talking to the other party.
-	\item Downgrade protection
-	\item Forward secrecy with respect to key compromise: if an attacker compromises the client or the server, it cannot encrypt past traffic. \marginnote{Vanilla Diffie-Hellman key exchange does not provide this! If the parties are using a shared secret for encryption, an attacker who learns that secret can decrypt all past messages. To combat this, the agreed-upon key is used only to authenticate messages---encryption keys are negotiated separately and thrown away periodically.}
-	\item Protection against key-compromise impersonation: if an attacker steals a client's secret key, they should not be able to impersonate other servers to the client.
-	\item Protection of endpoint identities: the public keys of the two parties should never be transmitted in the clear: for example, if a client is connecting to a website that uses a CDN like Akamai or Cloudflare an attacker should not be able to tell which website the client is connecting to---only that it is hosted on Akamai or Cloudflare.
+\item \textbf{Correctness:} Both parties agree on the same session key 
+        at the conclusion of the handshake.
+      \item \textbf{Security:} adversary \textquote{learns nothing} about the secret
+        key that the parties agree upon at the conclusion of the handshake.
+      \item \textbf{Peer authentication:} At the end of the handshake, each party believes that they are talking to the other party.
+      \item \textbf{Downgrade protection:} The parties agree on the same version of TLS that they would agree on absent an in-network attacker.
+      \item \textbf{Forward secrecy with respect
+        to key compromise:} if an attacker
+        steals the secrets stored on the client or the server, 
+        the attacker cannot encrypt past traffic.
+        \marginnote{To provide forward secrecy, modern cryptographic
+        protocols use long-term secrets only for signing---not for
+        encryption.
+        These protocols use \emph{ephemeral} (one-time-use) 
+        cryptographic keys for key exchange and encryption.
+        Protocol participants delete these ephemeral keys on
+        connection teardown and/or they rotate these keys often.
+
+        This way, if an attacker compromises a party's secret key,
+        the attacker can only sign messages on behalf of that party;
+        the attacker cannot use the secret to decrypt past messages.}
+      \item \textbf{Protection against key-compromise impersonation:} If an attacker steals a client's secret key, the attacker should not be able to impersonate other servers to the client.
+      \item \textbf{Protection of endpoint
+        identities:} The public keys of the two
+        parties should never flow over the wire in
+        the clear. For example, if a client is
+        connecting to a website that uses
+        a content-distribution network, such as
+        Akamai or Cloudflare, an attacker should
+        not be able to tell which website the
+        client is connecting to---only that it is
+        hosted on Akamai or Cloudflare.
 \end{compactitem}
 
 \subsection{TLS Handshake}
 The TLS handshake is very carefully designed to achieve these properties. A grossly simplified version looks something like the following:
 
 \begin{compactenum}
-\item At the start of the handshake, the client knows $\pk_{\text{CA}}$ and the server (for example, MIT) knows $\sk_\text{MIT}$ and $\text{cert}_{MIT}$.
-\item \textquote{Client Hello}: The client sends several values to the server. The client assumes that the server supports a cipher suite and initiates the corresponding key exchange):
+\item At the start of the handshake, the TLS client
+  holds the public $\pk_{\text{CA}}$ of a certificate authority.
+  The TLS server (for example, MIT) holds its secret signing key
+  $\sk_\text{MIT}$ and a public-key certificate $\text{cert}_{MIT}$
+  binding its public key $\pk_\text{MIT}$ to its domain \texttt{mit.edu}.
+\item \textbf{Client Hello}: The client sends the following values to
+  the server:
 	\begin{compactitem}
-		\item random values
-		\item list of supported ciphers
-		\item $R_c = g^{r_c} \mod p$
+		\item a random nonce,
+		\item list of supported ciphersuites, and
+      \marginnote{A \emph{ciphersuite} contains all of the
+          cryptographic parameters needed to perform key exchange,
+          hashing, authentication, and encryption.
+          For example, one possible ciphersuite for TLS 1.2 is
+          \texttt{ECDHE-RSA-AES256-GCM-SHA384}.
+          This indicates use of ephemeral elliptic-curve
+          Diffie-Hellman key exchange (\texttt{DHE}) with
+          RSA signatures (\texttt{RSA}), 256-bit AES
+          encryption in GCM mode (\texttt{AES256-GCM}),
+          and SHA2-384 as the hash function (\texttt{SHA384}).}
+		\item an ephemeral Diffie-Hellman public key.
+          (The client constructs this Diffie-Hellman public key
+          using its preferred ciphersuite. If the server does not
+          support the ciphersuite the client picked, the client
+          will have to re-run this step using a different
+          ciphersuite.)
 	\end{compactitem}
-\item \textquote{Server Hello}: The server sends several values to the client, choosing a cipher suite to use and completing the Diffie-Hellman key exchange. 
+\item \textbf{Server Hello}: The server sends several values to the client, choosing a ciphersuite to use and completing the Diffie-Hellman key exchange. 
+  That is, the server sends:
 	\begin{compactitem}
-		\item random values
-		\item cipher to use
-		\item $R_s = g^{r_s} \mod p$
+		\item a random nonce,
+		\item a ciphersuite to use,
+		\item and an ephemeral Diffie-Hellman public key
 	\end{compactitem}
-\item Both partices compute a shared key $k = H(g^{r_c r_s})$.
-\item Under encryption using $k$, the server sends the certificate for \ttt{mit.edu} as well as a signature over all messages sent so far, using $\sk_\text{MIT}$. The client then checks several things:
+\item Both partices compute a shared session key $k$
+  using Diffie-Hellman key agreement on the ephemeral keys 
+  they exchanged.
+\item Under encryption using the keys derived from the session key $k$, the server sends the certificate for \ttt{mit.edu} as well as a signature over all messages sent so far, using its long-term secret key $\sk_\text{MIT}$. The client then checks that:
 	\begin{compactitem}
-	\item That the certificate has been signed by one of the client's trusted CAs.
-	\item That the signature from the server matches their own record of the messages.
+	\item the certificate has been signed by one of the client's trusted CAs, and
+	\item the signature from the server matches their own record of the messages.
 	\end{compactitem}
-\item Finally, the Record Protocol begins to exchange application data.
+\item Finally, the client and server run the TLS Record Protocol to exchange encrypted and authenticated application data.
 \end{compactenum}
 
-\subsubsection{Properties}
-This is very simplified and does not provide many of the features that real TLS provides. However, we can see that it satisfies the properties we desire. 
-
-\paragraph{Protection against Replay Attacks.} Since the random values included in the client and server hello change with every run of the protocol, an attacker cannot reuse handshake messages to pretend to be one party.
+This simplified toy version of the TLS handshake 
+does not provide many of the features that the real TLS handshake
+provides. But it should give you a flavor of what the real 
+handshake looks like.
 
 % TODO: protection of endpoint identities
 
-\section{What TLS does not Provide}
+\section{Properties that TLS does not provide}
 
 \paragraph{Authenticated End-of-File}
-A popular tool to install the toolchain for the trendy systems programming language Rust is \ttt{rustup}. To use the tool and install the Rust toolchain, the recommanded method is to run \ttt{curl https://sh.rustup.rs | sh}. This downloads a bash script from the internet over HTTPS and immediately runs it using \ttt{sh}.
+TLS does not provide any end-of-file authentication,
+or ``clean closure.''
+To explain what this means by example:
 
-Imagine that the contents of the downloaded script create a temporary directory, copy things into it, install some things, and finally delete the temporary directory with something like \ttt{rm -r /tmp/install}. If the attacker cuts of the stream after \ttt{rm -r /}, TLS provides no protection against this and this truncated command will cause the entire system to be deleted. To protect against this, script writers try to design their scripts such that if the stream is cut off, nothing happens---for example, everything can be wrapped in a function that is called at the very end of the script.
+A popular tool to install the toolchain for the trendy systems programming language Rust is \ttt{rustup}. To use the tool and install the Rust toolchain, the recommanded method is to run the 
+command ``\ttt{curl https://sh.rustup.rs | sh}.''
+This downloads a shell script from the internet 
+over HTTPS and immediately runs it using the shell \ttt{sh}.
+
+Imagine that the contents of the downloaded script
+create a temporary directory, copy things into it,
+install some things, and finally delete the
+temporary directory with something like \ttt{rm -r
+/tmp/install}.
+An in-network attacker, who knows the structure of the \ttt{rustup}
+install script, could drop all of the packets in the stream immediately
+after the characters \ttt{rm -r /}.
+Eventually, the TLS connection will timeout, an shell will run
+the command \ttt{rm -r /}, deleting the user's entire file system.
+
+To protect against this, script writers try to
+design their scripts such that if the stream is
+cut off in the middle of a download, nothing happens.
+For example, the install script might consist of a 
+single function definition that is called at the very 
+end of the function.
 
 \paragraph{Plaintext Length Obfuscation}
-As we have discussed, encryption reveals exactly the length of the plaintext. If there is data that is not encrypted that is then included inside the encrypted data as well, this can cause a vulnerability---see the CRIME attack.
+As we have discussed, encryption reveals exactly
+the length of the plaintext. If there is data that
+is not encrypted that is then included inside the
+encrypted data as well, this can cause
+a vulnerability---see the CRIME attack.
 % TODO: Finish this up. It's a clever attack.
