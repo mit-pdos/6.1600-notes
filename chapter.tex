@@ -4,7 +4,15 @@ oneside
 ]{tufte-handout}
 \input{preamble.tex}
 
-\newcommand{\chapter}[1]{\title{#1}\maketitle}
+\newcommand{\chapter}[1]{\title{#1}\maketitle
+\marginnote{\color{red}
+\begin{framed}
+\noindent
+\textbf{Disclaimer:}
+This set of notes is a work in progress. It may have errors and be missing citations. It is certainly incomplete. Please let the staff know of any errors that you find.
+\end{framed}
+}
+}
 \author{6.1600 Course Staff:
 Henry Corrigan-Gibbs,
 Yael Kalai,
@@ -16,12 +24,5 @@ Nickolai Zeldovich}
 \begin{document}
 \bibliographystyle{plain}
 
-{\color{red}
-\begin{framed}
-\noindent
-\textbf{Disclaimer:}
-This set of notes is a work in progress. It may have errors and be missing citations. It is certainly incomplete. Please let the staff know of any errors that you find.
-\end{framed}
-}
 
 

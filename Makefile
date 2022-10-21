@@ -17,15 +17,14 @@ OUT2 = $(addsuffix .pdf,$(basename $(OUT)))
 
 build/%.pdf: lectures/%.tex
 	mkdir -p build
-	$(eval ARGS := -output-directory=build -jobname=$(basename $(notdir $@)) \
+	$(eval ARGS :=  -interaction nonstopmode \
+		-output-directory=build -jobname=$(basename $(notdir $@)) \
 		"\input{chapter}\input{$<}\bibliography{ref}\end{document}")
 	pdflatex $(ARGS)
 	pdflatex $(ARGS)
 	cp ref.bib build/ref.bbl
 	bibtex build/$(basename $(notdir $@))
 	pdflatex $(ARGS)
-
-default: $(OUT2)
 
 henry:
 	latexmk -pdf -pvc \
@@ -35,7 +34,9 @@ henry:
 		-latexoption=-interaction=nonstopmode \
 		-latexoption=-synctex=1 $(PAPER)
 
+all: $(PAPER).pdf $(OUT2)
+
 clean:
 	latexmk -C $(PAPER).tex
-	rm -f lecture-notes.bbl
+	rm -f lecture-notes.bbl build/*
 .PHONY: clean
