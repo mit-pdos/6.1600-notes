@@ -1,0 +1,80 @@
+\chapter{Open Questions in Encryption}
+
+So far, we have established what may seem like a comprehensive set of tools to transmit data over the network: we have schemes for verifying the integrity of data and for hiding the contents of a transmission from an adversary, both with and without a shared key. By building an \textquote{encrypted pipe} between client and server, TLS allows us abstract away must of this, running any of our favorite protocols over the pipe and hiding the data from the attacker. Despite the convenience of this abstraction, it does not provide everything we might desire.
+
+If we were to imagine the best possible security we could ask for regarding network traffic, it might look (imprecisely) something like the following:
+
+\emph{An attacker who controls many parties (clients and servers) as well as the network should \textquote{learn nothing} about who you are talking to and what you are saying.}
+
+Unfortunately, the current reality on the internet is far from this.
+\begin{itemize}
+	\item In order to even begin talking to a server, we need to learn its IP address. This happens using the DNS protocol, which is entirely unencrypted---a network adversary can easily watch the DNS queries you make and learn who you are talking to.
+	\item In order to send IP packets over the internet, the internet's routing system relies on routers in the network knowing the source and destination of each packet: these are included, unencrypted, in the packet header. 
+	\item As we discussed, practical encryption schemes necessarily reveal the length of the ciphertext. In the context of the internet, this means that both sizes of individual packets are revealed. An attacker can monitor these sizes and learn about the underlying traffic.
+\end{itemize}
+
+In some ways, the \textquote{pipe} analogy fits here: anyone can see where the pipe starts and where it ends.
+
+\section{Solution Attempt: Tor}
+A software project called Tor aims to solve these problems by bouncing traffic around the internet and hoping that an attacker does not see too much---there are no formal guarantees, but Tor is publicly available and in practice seems to work fairly well.
+
+Tor works by nesting several of these encrypted pipes: when opening a connection, Tor will first select three \emph{relay nodes} from the Tor network $(a, b, c)$. Tor will then:
+\begin{enumerate}
+	\item Open a TLS connection to $a$.
+	\item Through that TLS connection, instruct $a$ to open a TLS connection to $b$
+	\item Instruct $b$ to open a TLS connection to $c$.
+\end{enumerate}
+
+The client will then send packets with \emph{nested encryption}---each actual IP packet will be encrypted first for $c$, then for $b$, then for $a$. When the client sends this packet over the \emph{circuit} from $a$ to $b$ to $c$ to the real destination, $a$ will first strip off its layer of encryption then forward the inner packet to $b$. $b$ will do the same, stripping off a layer of encryption and forwarding the packet to $c$. Finally, $c$ will strip off the last layer of encryption and be left with a normal IP packet that it can then send to the destination server. As the response makes it back through the network, each relay node wilil add a layer of encryption. The end result of this is that at any stage, an attacker can see only the immediate source and destination---it is never possible to see both the client and the destination server IP addresses in a single packet.
+
+However, this is not perfect. First, if an attacker controls the guard node ($a$) and the exit node $(c)$, they can correlate the timing of when a packet enters the guard node versus when it exits the exit node, an attacker can reconstruct the source and destination of a given packet. Even without controlling relay nodes, an attacker that monitors the network can learn quite a bit by correlating timing and size information.
+
+\section{Problem: Attacker sees packet sizes and timings}
+Even without seeing the destination and source of packets send from and to your machine, an attacker can learn significant amounts about your traffic.
+\begin{itemize}
+	\item Watching a movie: movie traffic is very distinct, and by monitoring, for example, the length of time that you are watching the movie, they can even learn with fairly high accuracy \emph{which movie} you are watching.
+	\item Using ssh: different commands will have different traffic patterns and an attacker can learn which command you are using
+	\item Downloading a file: size leaks which file
+	\item Browsing the web: sizes leak individual pages.
+\end{itemize}
+
+\paragraph{Example: New York Times} The New York Times homepage \ttt{nytimes.com/} downloads 1.56 MB of content, with 76 total assets (images, CSS, JavaScript) required. The webpage to submit a sensitive tip, \ttt{nytimes.com/tips}, downloads 41.92 KB over 15 assets. By trivially counting the number of files you download, an attacker can trivially distinguish these despite TLS theoretically hiding the contents of the requests.
+
+\subsection{Attempts to Solve}
+There have been several attempts to solve these problems, none of which work particularly well. 
+
+\begin{enumerate}
+	\item \textbf{Random Noise:} One solution is to add some random number to the length of each page and to the number of assets required. However, averaging essentially totally kills this: an attacker can take several samples and average them to recover the true requirements, removing the noise. 
+\item \textbf{Padding:} Another option is to just pad every page to match the largest page on the site. For example, for the New York Times, every page could download 50MB and 100 assets, even for tiny pages. This is somewhat secure, but incredibly costly and therefore not practical outside of very specific circumstances.
+\end{enumerate}
+
+\section{A Promising Direction: Metadata Privacy for Messaging}
+Messaging apps like WhatsApp and iMessage are end-to-end encrypted, but still may leak who you are talking to. This problem is more tractable due to the circumstances of messaging:
+
+\begin{itemize}
+	\item Messages are approximately fixed length.
+	\item Some latency is OK.
+	\item Total daily traffic per user is small.
+	\item Each user talks to few messaging partners.
+\end{itemize}
+
+Because of these constraints, it is somewhat feasible to use techniques like padding to greatly reduce the amount of data that messaging metadata reveals and to do so in a way that provides strong formal guarantees about security.
+
+\section{Compromised Servers}
+Even a perfect encrypted pipe that hides metadata, however, is useless if the server gets compromised (or you do not trust the server). The server learns all your data, and is free to lose it in a breach, sell it, or turn it over to law enforcements, etc. We will discuss ways to reduce the impacts of server compromise, but there are also applications of cryptography that can help.
+
+\subsection{Private Information Retrieval}
+A common task between client and server is to read a record from a database. In many cases, we might like to be able to do this without the server learning which record we accessed.\marginnote{A concrete application of this is Google search---in order to give you search results, Google necessarily learns what you are searching. With a PIR scheme, it would be possible for Google to look up search results without learning what you are searching for!}
+
+Consider a server database containing $x_1, x_2, \ldots, x_n \in \bin$. For correctness, we would like that an honest client requesting a record $x_i$ from a server gets the correct $x_i$ in response. For security, our goal is that the clients query is a CPA-secure encryption of the index $i$, meaning that the server can learn nothing about $i$. A simple solution would be for the server to simply return all $n$ bits to the user and allow them to choose the correct bit on the client side. For something like Google search, this would obviously be an infeasible amount of data. Surprisingly, this is possible with $\ll n$ bits of communcation.
+
+To achieve this, we need a new tool called \emph{additively homomorphic encryption}. An additively homomorphic encryption scheme is a CPA-secure secret key encryption scheme $(\Enc, \Dec)$ for messages in $\calM = \Z_p$ with the added property:
+\[ \forall k \in \calK,\, \forall m, \hat{m} \in \calM,\, \Enc(k, m) \star \Enc(k, \hat{m}) = \Enc(k, m + \hat{m}) \]
+In English, additively homomorphic encryption allows us to learn the encryption of the addition of two messages with only the encrypted messages. This also allows us to multiply by constants, and therefore to compute a matrix-vector product of an encrypted vector and a public matrix.
+
+It is possible to construct an additively homomorphic encryption scheme from the DDH assumption, with only a slight tweak to ElGamal encryption.
+
+\subsubsection{PIR Construction}
+We can use this to construct a private information retrieval scheme. To do so, the server must store its database (the $x_i$ values) as a $\sqrt{N} \times \sqrt{N}$ matrix $D$. The client then tells the server which column $j$ it would like by supplying the encryption of a $\sqrt{N} \times 1$ vector $\vec{m}$ with a 1 in the $j$th location. The client sends this encryption (using a key only the client knows) as $\Enc(k, \vec{m})$. The server computes the matrix product $\Enc(k, D\vec{m})$, which gives the $j$th column of the matrix, using additively homomorphic encryption and returns the response to the client, where the client can find the bit they are interested in in the column. 
+
+This allows a client to retrieve a bit from a server's database without the server learning anything about the desired bit, and to do so with only $\sqrt{N}$ communication cost. The server computation cost is high---the server necessarily touches every bit of the database---but this is a very promising idea.
