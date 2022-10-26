@@ -1,22 +1,66 @@
 \chapter{Open Questions in Encryption}
 
-So far, we have established what may seem like a comprehensive set of tools to transmit data over the network: we have schemes for verifying the integrity of data and for hiding the contents of a transmission from an adversary, both with and without a shared key. By building an \textquote{encrypted pipe} between client and server, TLS allows us abstract away must of this, running any of our favorite protocols over the pipe and hiding the data from the attacker. Despite the convenience of this abstraction, it does not provide everything we might desire.
+So far, we have established what may seem like
+a comprehensive set of tools to transmit data over
+the network: we have schemes for verifying the
+integrity of data and for hiding the contents of
+a transmission from an adversary, both with and
+without a shared key.
 
-If we were to imagine the best possible security we could ask for regarding network traffic, it might look (imprecisely) something like the following:
+Transport-layer security (TLS) effectively builds
+and \textquote{encrypted pipe} between a client and a server.
+Through the encrypted pipe that TLS provides, we can run 
+any of our favorite TCP-based
+protocols---HTTP, SMTP, POP, IMAP, etc.---and can
+thus hide our data from an in-network attacker.
+And yet, the security guarantees that TLS provides fall
+short of the strongest possible security notions we could
+desire.
 
-\emph{An attacker who controls many parties (clients and servers) as well as the network should \textquote{learn nothing} about who you are talking to and what you are saying.}
+If we were to imagine the best possible security
+we could ask for regarding network traffic, it
+might look (imprecisely) something like the
+following:
 
-Unfortunately, the current reality on the internet is far from this.
+\begin{framed}\noindent
+\emph{An attacker who controls many parties (clients and servers) as well as the network should \textquote{learn nothing} about who the client is talking to and what she is saying.}
+\end{framed}
+
+Unfortunately, the protocols we have for secure communication today
+fall far short of this goal:
 \begin{itemize}
-	\item In order to even begin talking to a server, we need to learn its IP address. This happens using the DNS protocol, which is entirely unencrypted---a network adversary can easily watch the DNS queries you make and learn who you are talking to.
-	\item In order to send IP packets over the internet, the internet's routing system relies on routers in the network knowing the source and destination of each packet: these are included, unencrypted, in the packet header. 
-	\item As we discussed, practical encryption schemes necessarily reveal the length of the ciphertext. In the context of the internet, this means that both sizes of individual packets are revealed. An attacker can monitor these sizes and learn about the underlying traffic.
+  \item In order to even begin talking to
+    a server, the client must learn the server's IP
+    address. This happens using the DNS protocol,
+    which is entirely unencrypted---a network
+    adversary can easily watch the DNS queries a client
+    makes and learn who it is talking to.
+  \item In order to send IP packets over the
+    internet, the Internet's routing system relies
+    on routers in the network knowing the source
+    and destination IP addresses of each packet: these are
+    included, unencrypted, in the packet header. 
+    (In some ways, the \textquote{pipe} analogy fits
+      here: anyone can see where the pipe starts and
+      where it ends.)
+  \item As we discussed, practical encryption
+    schemes necessarily reveal the length of the
+    ciphertext. In the context of the Internet,
+    this means that an attacker can learn the size
+    of each TCP packet that a client sends, along
+    with timing information.
+    (Here the pipe analogy breaks down: an attacker
+    can see how much traffic flows through the pipe
+    and when.)
 \end{itemize}
 
-In some ways, the \textquote{pipe} analogy fits here: anyone can see where the pipe starts and where it ends.
-
 \section{Solution Attempt: Tor}
-A software project called Tor aims to solve these problems by bouncing traffic around the internet and hoping that an attacker does not see too much---there are no formal guarantees, but Tor is publicly available and in practice seems to work fairly well.
+The Tor system aims to solve these problems by
+bouncing traffic around the internet and hoping
+that an attacker does not see too much---there are
+no formal guarantees, but Tor is publicly
+available and in practice seems to work fairly
+well.
 
 Tor works by nesting several of these encrypted pipes: when opening a connection, Tor will first select three \emph{relay nodes} from the Tor network $(a, b, c)$. Tor will then:
 \begin{enumerate}
