@@ -27,69 +27,169 @@ following:
 \end{framed}
 
 Unfortunately, the protocols we have for secure communication today
-fall far short of this goal:
-\begin{itemize}
-  \item In order to even begin talking to
-    a server, the client must learn the server's IP
-    address. This happens using the DNS protocol,
-    which is entirely unencrypted---a network
-    adversary can easily watch the DNS queries a client
-    makes and learn who it is talking to.
-  \item In order to send IP packets over the
-    internet, the Internet's routing system relies
-    on routers in the network knowing the source
-    and destination IP addresses of each packet: these are
-    included, unencrypted, in the packet header. 
-    (In some ways, the \textquote{pipe} analogy fits
-      here: anyone can see where the pipe starts and
-      where it ends.)
-  \item As we discussed, practical encryption
-    schemes necessarily reveal the length of the
-    ciphertext. In the context of the Internet,
-    this means that an attacker can learn the size
-    of each TCP packet that a client sends, along
-    with timing information.
-    (Here the pipe analogy breaks down: an attacker
-    can see how much traffic flows through the pipe
-    and when.)
-\end{itemize}
+fall far short of this goal.
+In this section, we describe some of the shortcomings of today's
+transport-security tools and some imperfect solutions.
 
-\section{Solution Attempt: Tor}
-The Tor system aims to solve these problems by
-bouncing traffic around the internet and hoping
-that an attacker does not see too much---there are
-no formal guarantees, but Tor is publicly
-available and in practice seems to work fairly
-well.
+\section{Problem: Encryption does not hide\\the source and destination of a packet}
 
-Tor works by nesting several of these encrypted pipes: when opening a connection, Tor will first select three \emph{relay nodes} from the Tor network $(a, b, c)$. Tor will then:
+\iffalse
+In order to even begin talking to
+a server, the client must learn the server's IP
+address. This happens using the DNS protocol,
+which is entirely unencrypted---a network
+adversary can easily watch the DNS queries a client
+makes and learn who it is talking to.
+\fi
+
+In order to send IP packets over the
+internet, the Internet's routing system relies
+on routers in the network knowing the source
+and destination IP addresses of each packet: these are
+included, unencrypted, in the packet header. 
+(In some ways, the \textquote{pipe} analogy fits
+here: anyone can see where the pipe starts and
+where it ends.)
+
+\paragraph{Solution Attempt: Tor}
+The Tor system aims to allow a client to connect
+to a server over the Internet while hiding---from certain
+types of adversaries---which server the client is connecting
+to.
+For example, a Tor client should be able to browse the web
+without anyone learning which websites the client is visiting.
+
+Tor's strategy is to 
+bounce traffic around the Internet and hope
+that no real-world attacker can gather enough information
+to figure out which client is communicate with which server.
+Tor provides no precise security guarantees, and there are
+scores of research papers demonstrating various weaknesses
+in Tor's security plan.
+At the same time, Tor is publicly available,
+is well supported, is widely used, and 
+seems to provide some meaningful privacy benefits in practice.%
+\marginnote{It is difficult to evaluate the security of a tool
+like Tor, since real-world attackers will not necessarily reveal
+that they can break the tool's security guarantees. So using
+a tool like Tor requires taking a leap of faith.}
+
+
+Tor works by nesting several of these encrypted pipes: when opening a connection,
+the Tor client will first select three \emph{relays} from the Tor network $(A, B, C)$. 
+The Tor client will then:
 \begin{enumerate}
-	\item Open a TLS connection to $a$.
-	\item Through that TLS connection, instruct $a$ to open a TLS connection to $b$
-	\item Instruct $b$ to open a TLS connection to $c$.
+  \item Open an encrypted tunnel to the first relay $A$ (the ``guard'').
+	\item Through that tunnel, open an encrypted tunnel to the second relay~$B$.
+	\item Through that tunnel-inside-a-tunnel, open an encrypted tunnel to the
+    third relay $C$ (the ``exit'').
 \end{enumerate}
 
-The client will then send packets with \emph{nested encryption}---each actual IP packet will be encrypted first for $c$, then for $b$, then for $a$. When the client sends this packet over the \emph{circuit} from $a$ to $b$ to $c$ to the real destination, $a$ will first strip off its layer of encryption then forward the inner packet to $b$. $b$ will do the same, stripping off a layer of encryption and forwarding the packet to $c$. Finally, $c$ will strip off the last layer of encryption and be left with a normal IP packet that it can then send to the destination server. As the response makes it back through the network, each relay node wilil add a layer of encryption. The end result of this is that at any stage, an attacker can see only the immediate source and destination---it is never possible to see both the client and the destination server IP addresses in a single packet.
+The client will then send its application-layer traffic 
+through this tunnel-inside-a-tunnel-inside-a-tunnel.
+So each byte of application data will be encrypted first for relay
+$C$, then for relay $B$, then for relay $A$.
+When the client sends this ciphertext over the
+\emph{circuit} from relay $A$ to $B$ to $C$ to the
+real destination, relay $A$ will first strip off its
+layer of encryption then forward the inner packet
+to relay $B$. Relay $B$ will do the same, stripping off
+a layer of encryption and forwarding the packet to
+relay $C$. Finally, relay $C$ will strip off the last layer of
+encryption and be left with a normal IP packet
+that it can then send to the destination server.
+As the response makes it back through the network,
+each relay node will add a layer of encryption.
+The end result of this is that no single relay
+can see the source and destination IP addresses.
 
-However, this is not perfect. First, if an attacker controls the guard node ($a$) and the exit node $(c)$, they can correlate the timing of when a packet enters the guard node versus when it exits the exit node, an attacker can reconstruct the source and destination of a given packet. Even without controlling relay nodes, an attacker that monitors the network can learn quite a bit by correlating timing and size information.
+However, the security that Tor provides is imperfect.
+First, if an attacker controls the guard node (relay $A$) and the
+exit node (relay $C$), the attacker can correlate the timing of
+when a packet enters the guard node and when a packet
+exits the exit node.
+Using this timing an attacker can make a guess at the route
+traffic is taking through the Tor network.
+Even without controlling relay nodes, if an attacker 
+controls certain key points in the Internet (e.g., Internet exchange points
+or undersea fiber links) it may be able to perform this sort
+of traffic analysis even without controlling relays.
 
 \section{Problem: Attacker sees packet sizes and timings}
-Even without seeing the destination and source of packets send from and to your machine, an attacker can learn significant amounts about your traffic.
+As we discussed, practical encryption
+schemes necessarily reveal the length of the
+ciphertext. In the context of the Internet,
+this means that an attacker can learn the size
+of each TCP packet that a client sends, along
+with timing information.
+(Here the ``encrypted pipe'' analogy for TLS
+breaks down: an attacker can see how much traffic
+flows through the encrypted pipe and when.)
+
+Even without seeing the destination and source of packets sent to and from 
+a client's machine, an attacker can learn significant amounts about 
+the client's traffic.
+Some examples are:
 \begin{itemize}
-	\item Watching a movie: movie traffic is very distinct, and by monitoring, for example, the length of time that you are watching the movie, they can even learn with fairly high accuracy \emph{which movie} you are watching.
-	\item Using ssh: different commands will have different traffic patterns and an attacker can learn which command you are using
-	\item Downloading a file: size leaks which file
-	\item Browsing the web: sizes leak individual pages.
+  \item \emph{Watching a movie:} Video traffic has a distinct traffic pattern.
+      By monitoring, for example, the length of time that a client spends 
+      watching a movie, a network attacker learn with 
+      fairly high accuracy \emph{which movie} the client is watching.
+  \item \emph{Using \ttt{ssh}:} 
+      Different commands will have different traffic patterns.
+      An attacker may be able to infer what type of commands a client 
+      is running by inspecting traffic patterns.
+  \item \emph{Downloading a file:}
+      The bitlength of a downloaded file can uniquely identify the
+      file in many cases.
+  \item \emph{Browsing the web:} sizes leak individual pages.
 \end{itemize}
 
-\paragraph{Example: New York Times} The New York Times homepage \ttt{nytimes.com/} downloads 1.56 MB of content, with 76 total assets (images, CSS, JavaScript) required. The webpage to submit a sensitive tip, \ttt{nytimes.com/tips}, downloads 41.92 KB over 15 assets. By trivially counting the number of files you download, an attacker can trivially distinguish these despite TLS theoretically hiding the contents of the requests.
+\paragraph{Example: New York Times} The New York
+Times homepage \ttt{nytimes.com/} downloads 1.56
+MB of content, along with 76 total assets (images, CSS,
+JavaScript). The webpage to submit
+a sensitive tip, \ttt{nytimes.com/tips}, downloads
+41.92 KB and only 15 assets. By counting the
+number of HTTPS requests that a client makes over an
+encrypted connection to \ttt{nytimes.com}, an attacker 
+can easily distinguish whether a client is
+visiting the homepage or the tips page, even if
+the attacker cannot decrypt even a single bit of
+the HTTPS traffic itself.
 
-\subsection{Attempts to Solve}
-There have been several attempts to solve these problems, none of which work particularly well. 
+\paragraph{Attempts at a solution}
+There are several common ways that people attempt
+to protect against this sort of traffic analysis.
+None of these solutions works well. 
 
 \begin{enumerate}
-	\item \textbf{Random Noise:} One solution is to add some random number to the length of each page and to the number of assets required. However, averaging essentially totally kills this: an attacker can take several samples and average them to recover the true requirements, removing the noise. 
-\item \textbf{Padding:} Another option is to just pad every page to match the largest page on the site. For example, for the New York Times, every page could download 50MB and 100 assets, even for tiny pages. This is somewhat secure, but incredibly costly and therefore not practical outside of very specific circumstances.
+  \item \textbf{Random Noise:} 
+    To try to hide the length of the packets it sends,
+    a client can add a randomly chosen number of bytes
+    of dummy data to the end of each packet.
+    The hope is that by randomizing packet lengths, the
+    client prevents the attacker from performing the
+    traffic analysis.
+
+    Unfortunately, a patient attacker can use \emph{averaging}
+    to effectively eliminate the effect of the random noise.
+    That is, if the attacker can trick the client into sending
+    the same message a few times (as is often possible), the
+    attacker can average the noised packet lengths to get a good estimate
+    of the true length.
+
+\item \textbf{Padding:}
+  Another option is to just pad every packet (or
+  webpage or encrypted message, etc.) to match the
+  largest packet that the client will ever send.
+  For example, whenever the client visits a page on
+  \ttt{nytimes.com}, the client could
+  download 50MB of page content and 100 fixed-size assets, even
+  if the true page is tiny.
+  This is somewhat secure, but
+  incredibly costly and therefore not practical
+  outside of very specific circumstances.
 \end{enumerate}
 
 \section{A Promising Direction: Metadata Privacy for Messaging}
