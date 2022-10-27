@@ -202,23 +202,121 @@ Messaging apps like WhatsApp and iMessage are end-to-end encrypted, but still ma
 	\item Each user talks to few messaging partners.
 \end{itemize}
 
-Because of these constraints, it is somewhat feasible to use techniques like padding to greatly reduce the amount of data that messaging metadata reveals and to do so in a way that provides strong formal guarantees about security.
+Because of these constraints, it may be feasible to
+use techniques like padding to greatly reduce the
+amount of data that messaging metadata reveals and
+to do so in a way that provides strong formal
+guarantees about security.
+But still, no widely used messaging app provides
+any sort of metadata-privacy guarantees.
 
-\section{Compromised Servers}
-Even a perfect encrypted pipe that hides metadata, however, is useless if the server gets compromised (or you do not trust the server). The server learns all your data, and is free to lose it in a breach, sell it, or turn it over to law enforcements, etc. We will discuss ways to reduce the impacts of server compromise, but there are also applications of cryptography that can help.
+\section{Problem: Endpoint Compromise}
+
+Say that we have a perfect scheme for transport security---one
+that hides all data and metadata.
+Such a scheme is still not enough to protect our data if
+an adversary can compromise the communication \emph{endpoints}.
+
+For example, in many applications, a client sends 
+some sensitive data to a server (e.g., its Google search queries).
+The server is free to lose it in
+a breach, sell it, or turn it over to law
+enforcement agencies, etc. 
+Later on, we will discuss how to protect against server compromise
+using software-engineering techniques.
+Here, we will give one example of how cryptography can protect user
+data even against a compromised server.
 
 \subsection{Private Information Retrieval}
-A common task between client and server is to read a record from a database. In many cases, we might like to be able to do this without the server learning which record we accessed.\marginnote{A concrete application of this is Google search---in order to give you search results, Google necessarily learns what you are searching. With a PIR scheme, it would be possible for Google to look up search results without learning what you are searching for!}
+In many applications, a client must read a record from a
+database stored at a server.
+The client might like to perform such a database query
+without the server
+learning which record it accessed.\marginnote{A
+concrete application of this is Google search---in
+order to give you search results, Google
+necessarily learns what you are searching. With
+a PIR scheme, it would be possible for Google to
+look up search results without learning what you
+are searching for!}
 
-Consider a server database containing $x_1, x_2, \ldots, x_n \in \bin$. For correctness, we would like that an honest client requesting a record $x_i$ from a server gets the correct $x_i$ in response. For security, our goal is that the clients query is a CPA-secure encryption of the index $i$, meaning that the server can learn nothing about $i$. A simple solution would be for the server to simply return all $n$ bits to the user and allow them to choose the correct bit on the client side. For something like Google search, this would obviously be an infeasible amount of data. Surprisingly, this is possible with $\ll n$ bits of communcation.
+In a \emph{private information retrieval} scheme:
+\begin{itemize}[noitemsep]
+  \item the server holds a 
+    public database of $n$ bits: $x_1, x_2, \ldots, x_n \in \bin$, and
+  \item the client holds a secret index $i \in \{1, \dots, n\}$.
+\end{itemize}
+The client and server interact. At the end of the interaction
+we want the following properties to hold:
+\begin{itemize}[noitemsep]
+  \item \emph{Correctness:} The client outputs $x_i \in \bin$.
+  \item \emph{Security:} The server ``learns nothing'' about the
+    client's secret index $i$. In particular, we demand that the
+    message that the client sends to the server is a CPA-secure
+    encryption of its index $i$.
+\end{itemize}
 
-To achieve this, we need a new tool called \emph{additively homomorphic encryption}. An additively homomorphic encryption scheme is a CPA-secure secret key encryption scheme $(\Enc, \Dec)$ for messages in $\calM = \Z_p$ with the added property:
-\[ \forall k \in \calK,\, \forall m, \hat{m} \in \calM,\, \Enc(k, m) \star \Enc(k, \hat{m}) = \Enc(k, m + \hat{m}) \]
-In English, additively homomorphic encryption allows us to learn the encryption of the addition of two messages with only the encrypted messages. This also allows us to multiply by constants, and therefore to compute a matrix-vector product of an encrypted vector and a public matrix.
+\paragraph{Na\"ive private information retrieval.}
+The simple scheme for private information retrieval
+is to have the server send all $n$ bits of the database
+to the client.
+When the database is large, as it is for Google search,
+this would be an infeasible amount of communication.
+A surprising fact is that there are simple private-information-retrieval
+protocols that involve much less than $n$ bits of client-server
+communication.
 
-It is possible to construct an additively homomorphic encryption scheme from the DDH assumption, with only a slight tweak to ElGamal encryption.
+\subsection{A non-trivial private-information-retrieval scheme.}
+To achieve this, we need a new tool called
+\emph{additively homomorphic encryption}.
 
-\subsubsection{PIR Construction}
-We can use this to construct a private information retrieval scheme. To do so, the server must store its database (the $x_i$ values) as a $\sqrt{N} \times \sqrt{N}$ matrix $D$. The client then tells the server which column $j$ it would like by supplying the encryption of a $\sqrt{N} \times 1$ vector $\vec{m}$ with a 1 in the $j$th location. The client sends this encryption (using a key only the client knows) as $\Enc(k, \vec{m})$. The server computes the matrix product $\Enc(k, D\vec{m})$, which gives the $j$th column of the matrix, using additively homomorphic encryption and returns the response to the client, where the client can find the bit they are interested in in the column. 
+\paragraph{Additively homomorphic encryption}
+A secret-key additively homomorphic encryption scheme is
+a CPA-secure secret-key encryption scheme $(\Enc,
+\Dec)$ over key space $\calK$ and 
+message space in $\calM = \Z_p$ with the
+added property that for all keys $k \in \calK$
+and all messages $m, \hat{m} \in \calM$,
+\[ \Enc(k, m) \star \Enc(k, \hat{m}) = \Enc(k, m + \hat{m}), \]
+where ``$\star$'' is some fixed binary operation on ciphertexts.
 
-This allows a client to retrieve a bit from a server's database without the server learning anything about the desired bit, and to do so with only $\sqrt{N}$ communication cost. The server computation cost is high---the server necessarily touches every bit of the database---but this is a very promising idea.
+In English: given two encrypted messages $m$ and $\hat m$,
+encrypted under an additively homomorphic encryption scheme,
+anyone can compute the encryption of $m + \hat m$.
+Being able to add encrypted messages also allows multiplying
+encrypted messages by public constants, since $m + m = 2m$
+and $2m + 2m = 4m$ and so on.
+Once we can add and multiply by constants, and
+we can compute a matrix-vector product of an
+encrypted vector and a public matrix.
+
+It is possible to construct an additively
+homomorphic encryption scheme from the DDH
+assumption, with only a slight tweak to ElGamal
+encryption.
+
+\paragraph{PIR Construction}
+We can use additively homomorphic encryption
+to construct a private-information-retrieval scheme.
+To do so, the server represents its
+its database (the $x_i$ values) as a $\sqrt{n}
+\times \sqrt{n}$ matrix $D$. The client then tells
+the server which column $j$ it would like by
+supplying the encryption of a $\sqrt{n} \times 1$
+vector $\vec{m}$ with a 1 in the $j$th location.
+The client sends this encryption (using a key only
+the client knows) as $\Enc(k, \vec{m})$. The
+server computes the matrix product $\Enc(k,
+D\vec{m})$, which gives the $j$th column of the
+matrix, using additively homomorphic encryption
+and returns the response to the client, where the
+client can find the bit they are interested in in
+the column. 
+
+This allows a client to retrieve a bit from
+a server's database without the server learning
+anything about the desired bit, and to do so at 
+the communication cost of only $2\sqrt{n}$ ciphertext. The server
+computation cost is high---the server necessarily
+touches every bit of the database---but at least it
+shows that making private queries is feasible in theory.
