@@ -1,0 +1,67 @@
+So far, we have been focusing on security for network communication. We have established many tools to achieve this, from message authentication codes to public-key encryption.
+
+Ultimately, however, applications need to make use of these tools. And for our network security tools to provide meaningful security, the applications themselves must be reasonably secure. There are many things getting in the way of application security:
+\begin{itemize}
+	\item Buggy systems, including hardware and software bugs
+	\item Malicious components, such as malware
+	\item User mistakes
+	\item Malicious users: what if the adversary gets the admin's password?
+\end{itemize}
+This multitude of threats makes designing secure applications quite difficult. To make progress, we will seek to design systems that limit damage when things go wrong. A theme that will be present throughout this section is that we will consider mistakes to be malicious: if we are prepared to handle malicious components, we will similarly be prepared to handle our own buggy code. If we are prepared to limit damage of a malicious user with the admin password, we will also be limiting the damage that a mistake-making admin can cause.
+
+% XXX: not sure where this should go 
+\paragraph{Denial of Service Attacks}
+One type of attack that you may have heard about are \emph{Denial-of-Service} attacks. This is an attack where a malicious party sends many requests to a system with the intention of overloading the system and \emph{denying service} to honest users. Unfortunately, there is no great solution to these attacks because there is no resource-free way of distinguishing spam requests from real one. There are strategies that improve things, such as early authentication, but ultimately some work is still required. Today, the best solution continues to be overprovisioning---spinning up more servers than are required for the honest traffic.
+
+\section{Isolation}
+One of the most effective strategies to limit damage is to split a system into isolated components. If one of these components becomes compromised, it should not be able to compromise the other components. These components will typically run on top of some \emph{host} that enforces isolation. Importantly, this host must be correct! If there are bugs in the host, malicious code in a component may be able to exploit a bug to escape its isolation.
+
+\begin{table}[htpb]
+	\centering
+	\caption{Some common types of isolation}
+	\label{tab:isolationtypes}
+
+	\begin{tabular}{rl}
+		\textbf{Examples} & \textbf{Host} \\
+		Docker Container & Operation System (e.g. Linux) \\
+		VMs & VM Monitor \\
+		Phsical ("air gap") & Physics \\
+		Language-Level (JavaScript, Wasm) & Language Runtime \\
+	\end{tabular}
+\end{table}
+
+In order for these isolated components to be useful, they will need to be able to talk to each other in some form. For example, a client component must be able to make requests to a database component, but we would like to limit the power of the client to do damage. For this, we would like to achieve \textit{controlled sharing}.
+
+\subsection{Controlled Sharing}
+Given two components, we can achieve the \textquote{gold standard} by doing three things with each request:
+\begin{itemize}
+	\item Authenticate: connect the request to some \emph{principal}
+	\item Authorize: decide whether that principal is allowed to make the request
+	\item Audit: keep track of requests that each principal makes
+\end{itemize}
+
+\section{Authorization Policies}
+In order to authorize requests, we need some sense of permissions---a mapping from \emph{objects} to \emph{principals} that can access them. A common way of achieving this, for example in AFS, is via an \emph{access control list} for each file. A nonacademic bug with this approach is that the emptier this list is (the fewer principals that have access) the more people complain. As a result, often these lists end up giving more people access that would be ideal from a security standpoint.
+
+\section{Chained Requests}
+A common system model involves chained requests. For example, when accessing Gmail, a user's browser first sends a request to the Gmail server asking for new messages. The Gmail server then sends a request to the database to fetch the message data.
+
+For the first request, it is fairly clear that the principal should be Alice: the request is coming from Alice's browser, and therefore should have been initiated by Alice directly. Alice will send some credential to the server, and the server can use this credential to verify that it is really alice on the other end. For the second request, however, it is not as clear who the request should be from.
+
+One option is to have the request come from Alice. This protects against compromise of the Gmail server---the adversary cannot see all user data. Systems like SSH and AFS follow a strategy like this. Another option is for the principal of this second request to be the Gmail server itself. This helps with isolation among services access the same database: if the Google calendar code is buggy and gets compromised, the firs tplan would allow an adversary to view Alice's gmail data even is the gmail service was perfectly secure. However, it does not protect other users from a buggy Gmail service.
+
+\subsection{Compound Principal: \textquote{B for A}}
+To achieve something stronger, we can create a new type of \emph{compound principal} that combines a service or device with a user. For example, this server-to-database request could carry a principal of \textquote{Gmail Server for Alice}. This provides protection against both gmail server compromise and against compromise of other services.
+
+However, it is not as clear how to actually implement this. One option is to continue to have Alice send her credential to the server directly. However, then the server can totally impersonate Alice and we gain little protection. What we would really like is for Alice to give permission to the Gmail server to fetch her emails, but not to do anything else. This is called \emph{delegation}.
+
+\section{Delegation}
+In interacting with the Gmail server $B$, we may like for Alice ($A$) to give $B$ permission to authenticate as \textquote{$B$ for $A$} and to do so for only 60 seconds into the future. To achieve this, $A$ can sign a message that outlines the permission it would like to give to $B$. This signature becomes the proof of authorization. As an example:
+\[ \Sign(\sk-A, \text{\textquote{A delegates to B}}, \text{start}=\text{now}, \text{end}=\text{now}+60) \]
+
+Google indeed uses a strategy like this. They have a global DoS-resilient HTTP front-end that performs initial authentication. This frontend is then responsible for generating these scoped delegation signatures for each operation that the user would like to do and sending them along to the individual services. These signatures are then used for all following operation.
+
+\section{Capabilities}
+We may want more fine-grained access control. For example, on Android, the Gmail app may like to delegate permission to a PDF viewer to view an attachment. However, if all the attachments are stored in some common database, we would like to avoid giving the PDF viewer access to view everything in the database. To achieve this, Android (and systems more generally) use a plan called cababilities.
+
+A similar strategy can be seen, for example, in cloud file sharing: when you share a file in google drive, it generates a long random link that allows anyone with access to that link to view that file (and no others).
