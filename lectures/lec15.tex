@@ -1,0 +1,72 @@
+\chapter{Isolation}
+
+In many settings when building systems, it is useful to \emph{isolate} different domains. For example, cloud providers like AWS EC2 run multiple VMs, your phone runs several apps, and your browser runs many sites together. If one of these VMs/apps/websites is malicious or buggy, these platforms would like to protect the other domainsWe would like to prevent these different domains from causing problems in another domain: an ideal scenario would be for each of these domains to run on a different computer. If this were the case, one domain would clearly not be able to touch another's state, but this is clearly impractical.
+
+So, when creating isolation methods, we aim to make it appear as if each domain is running on a separate computer but to do so all on the same computer.
+
+\section{Defining Isolation}
+In order to define isolation, we will think about two key properties: integrity and confidentiality.
+
+\subsection{Integrity}
+For our first property, we would like to prevent one domain from modifying the state of another domain. To formalize this, let's consider two domains running on a single host, an adversary domain $A$ and a victim domain $V$. We would like to guarantee that $A$ cannot change the execution of $V$. We can define something in terms of the \emph{state} of eac domain, $S_A$ and $S_V$. For any pair of starting states $(S_A, S_V)$, after running $A$, we would like the new pair of states to be $(S_A', S_V)$.
+
+\subsection{Confidentiality}
+We would also like to prevent an adversary domain from reading a secret from the victim domain. We can formalize this by considering two worlds, each with a \emph{different} victim state. After running $A$ in each of these worlds, we would like the resulting $S_A'$ to be identical:
+\[ (S_A, S_V^1) \xrightarrow{\text{run} A} (S_A', -) \]
+\[ (S_A, S_V^2) \xrightarrow{\text{run} A} (S_A', -) \]
+This definition of confidentiality is often called \textquote{non-leakage}.
+
+In each of these definitions, you will notice that only the adversary domain runs. In a real system, both the adversary and the victim domain will run. What if the execution of $V$ itself leaks some information about a secret? To truly capture this reality, we need a somewhat more complex definition.
+
+\subsection{Stronger Confidentiality (execution confidentiality)}
+To achieve this, we can include an interleaving of $A$ and $V$ in one world---we would like for the resulting $S_A'$ to be identical whether or not $V$ runs.
+
+\[ (S_A, S_V) \xrightarrow[A, V, V, A, A]{\text{run}\, A, V} (S_A', -) \]
+\[ (S_A, S_V) \xrightarrow[A, A, \ldots, A]{\text{run only}\, A} (S_A', -) \]
+
+This definition is often called something along the lines of \textuote{non-interference}. We can similarly stengthen our definition of integrity by requiring that $S_V'$ is identical after running $V$ whether or not $A$ is run.
+
+\subsection{Non-Interference is Hard}
+In the \textqupte{simple} cases, the state we needed to consider was well-defined: $S_A$ would be, for example, the files that $A$ has access to and $S_V$ would be the same for the victim. When we consider the execution of both domains, we need to consider not only $S_A$ and $S_V$, but also the \emph{execution state}---any information that is stored in the system and could affect the execution of a domain must be considered.
+
+\paragraph{Example: Memory Allocation.} A real system will have some bound on the amount of memory available to it. After this memory is used, the system will be unable to allocate any additional memory. Consider a system with 16GB of memory and a victim process that allocates memory based on the value of some secret:
+
+\begin{lstlisting}
+int secret;
+malloc(secret);
+\end{lstlisting}
+
+An adversary could repeatedly try to allocate memory until the system tells them they cannot. By keeping track of the amount of memory they were able to allocate, the adversary can learn the secret: if the adversary is able to allocate 15GB, the adversary will know that the secret is $2^{27}$, as the victim must have allocated 1GB.
+
+\paragraph{Example: Execution Time.} Consider another victim that runs some computation that takes a variable amount of time to finish depending on the value of a secret. By keeping track of how long the adversary takes to finish, the adversary can learn how much execution time the victim running on the same system takes to finish. Using this information, the adversary may be able to learn information about the secret. This type of information transfer are often called \textquote{timing channels}, and can be quite tricky to work with.
+
+Avoiding these types of information transfer requires hard partitions of hardware resources, but this is not a good fit for most of the instances where we want to multiplex hardware between different domains.
+
+\section{Implementing Isolation}
+In principal, achieving isolation involves three main steps:
+\begin{enumerate}
+	\item Identify the state for each domain
+	\item Identify operations that access state
+	\item Ensure that these operations can read/write only the relevant domain's state.
+\end{enumerate}
+
+However, performance and isolation are at odds with each other: for good performance, we would like the isolated environment to run as if it is running directly on the hardware, but for isolation we need to perform some checks to make sure that it does not access state that does not belong to it.
+
+\subsection{Virtual Machine Isolation}
+If we are running several virtual machines on one physical machine, the state of each VM is the VM's virtualized memory and the VM's virtualized CPU (i.e., the registers). We want the VM to run as if it had its own physical CPU, but to do so with many VMs on a single CPU. For performance, we would like to run instructions from the VM directly on the host CPU---but we need to make sure, for example, that the VM does not access memory belonging to another VM. To achieve isolation and good performance, systems today use several effective techniques.
+
+\subsubsection{Naming / Translation}
+The memory of each of the VMs necessarily lives in the machine's physical memory. To prevent one VM from accessing another's memory, the construct of virtual memory, provided by hardware page table machinery, provides isolation: each VM will have its own page table that is responsible for translating memory addresses to their physical locations in memory. Using this translation, Virtual Machine Monitors can guarantee that a resident VM will not be able to access memory belonging to another VM.
+
+\subsubsection{Time-Multiplexing}
+Another effective strategy, particular for small bits of state such as the CPU registers, is to save the values when switching from one VM and restore them when switching back to that VM. This guarantees that each VM sees only their own registers.
+
+\subsubsection{Trap and Emulate}
+The fallback plan is to explicitly run software checks and emulate hardware behavior in software, if necessary. For example, a VM cannot be allowed to touch the control registers, such as the page table control register, of the real processor. Hardware will typically support configuring certain instructions to \textquote{trap}, allowing the VMM software to execute the instruction with the necesary security checks.
+
+Processes and things like docker containers look a lot like virtual machines, and use many of the same techniques for isolation.
+
+\subsection{Language Runtime Isolation}
+A very different technique for isolation is language-level isolation. For instance, in your web browser, JavaScript allows websites to run code that you have absolutely no reason to trust on your computer while ensuring that it cannot modify or read the state of the rest of your computer. These languages involve a \emph{runtime} that is responsible for translating the source code---in JavaScript's case, statements or an abstract syntax tree, and in WebAssembly's case, opcodes like \ttt{i32.add}.
+
+The runtime for these languages is designed such that the code can access only memory that belongs to the domain. WebAssembly is designed to make this translation cheap.

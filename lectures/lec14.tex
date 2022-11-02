@@ -1,3 +1,5 @@
+\chapter{Architecting a secure system}
+
 So far, we have been focusing on security for network communication. We have established many tools to achieve this, from message authentication codes to public-key encryption.
 
 Ultimately, however, applications need to make use of these tools. And for our network security tools to provide meaningful security, the applications themselves must be reasonably secure. There are many things getting in the way of application security:
@@ -64,4 +66,4 @@ Google indeed uses a strategy like this. They have a global DoS-resilient HTTP f
 \section{Capabilities}
 We may want more fine-grained access control. For example, on Android, the Gmail app may like to delegate permission to a PDF viewer to view an attachment. However, if all the attachments are stored in some common database, we would like to avoid giving the PDF viewer access to view everything in the database. To achieve this, Android (and systems more generally) use a plan called cababilities.
 
-A similar strategy can be seen, for example, in cloud file sharing: when you share a file in google drive, it generates a long random link that allows anyone with access to that link to view that file (and no others).
+A similar strategy can be seen, for example, in cloud file sharing: when you share a file in google drive, it generates a long random link that allows anyone with access to that link to view that file (and no others). This link itself becomes a \emph{capability}---it allows anyone that posesses it to perform some related action.
