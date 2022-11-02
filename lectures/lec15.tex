@@ -24,10 +24,10 @@ To achieve this, we can include an interleaving of $A$ and $V$ in one world---we
 \[ (S_A, S_V) \xrightarrow[A, V, V, A, A]{\text{run}\, A, V} (S_A', -) \]
 \[ (S_A, S_V) \xrightarrow[A, A, \ldots, A]{\text{run only}\, A} (S_A', -) \]
 
-This definition is often called something along the lines of \textuote{non-interference}. We can similarly stengthen our definition of integrity by requiring that $S_V'$ is identical after running $V$ whether or not $A$ is run.
+This definition is often called something along the lines of \textquote{non-interference}. We can similarly stengthen our definition of integrity by requiring that $S_V'$ is identical after running $V$ whether or not $A$ is run.
 
 \subsection{Non-Interference is Hard}
-In the \textqupte{simple} cases, the state we needed to consider was well-defined: $S_A$ would be, for example, the files that $A$ has access to and $S_V$ would be the same for the victim. When we consider the execution of both domains, we need to consider not only $S_A$ and $S_V$, but also the \emph{execution state}---any information that is stored in the system and could affect the execution of a domain must be considered.
+In the \textquote{simple} cases, the state we needed to consider was well-defined: $S_A$ would be, for example, the files that $A$ has access to and $S_V$ would be the same for the victim. When we consider the execution of both domains, we need to consider not only $S_A$ and $S_V$, but also the \emph{execution state}---any information that is stored in the system and could affect the execution of a domain must be considered.
 
 \paragraph{Example: Memory Allocation.} A real system will have some bound on the amount of memory available to it. After this memory is used, the system will be unable to allocate any additional memory. Consider a system with 16GB of memory and a victim process that allocates memory based on the value of some secret:
 
