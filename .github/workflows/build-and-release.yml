@@ -10,10 +10,12 @@ jobs:
       - name: Set up Git repository
         uses: actions/checkout@v2
       - name: Compile LaTeX document
-        uses: xu-cheng/latex-action@v2
+      - uses: xu-cheng/texlive-action/small@v1
         with:
-          root_file: lecture-notes.tex
+          run: |
+            apk add make
+            make all
       - name: Create Release
         uses: ncipollo/release-action@v1
         with:
-          artifacts: "lecture-notes.pdf"
+          artifacts: "lecture-notes.pdf,chapters/*.pdf"

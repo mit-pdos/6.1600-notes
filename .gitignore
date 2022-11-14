@@ -1,3 +1,10 @@
+lecture-notes.pdf
+build
+chapters
+.DS_Store
+
+
+
 ### LaTeX ###
 ## Core latex/pdflatex auxiliary files:
 *.aux
@@ -312,6 +319,3 @@ TSWLatexianTemp*
 *.glstex
 
 # End of https://www.toptal.com/developers/gitignore/api/latex
-lecture-notes.pdf
-build
-.DS_Store

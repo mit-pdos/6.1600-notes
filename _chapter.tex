@@ -1,3 +1,5 @@
+% this is a template for formatting individual chapters
+
 \documentclass[
 letterpaper, % Stock and paper size.
 oneside
@@ -22,7 +24,12 @@ Nickolai Zeldovich}
 
 
 \begin{document}
-\bibliographystyle{plain}
 
+\input{CHAPTER.TEX} % this gets replaced in the build script
+
+\bibliographystyle{plain}
+\bibliography{ref}
+
+\end{document}
 
 
