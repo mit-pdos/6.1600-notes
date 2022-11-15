@@ -5,10 +5,10 @@ $(PAPER).pdf:
 .PHONY: $(PAPER).pdf 
 
 IN = $(wildcard lectures/lec*.tex)
-OUT = $(subst lectures/,build/,$(IN))
+OUT = $(subst lectures/,chapters/,$(IN))
 OUT2 = $(addsuffix .pdf,$(basename $(OUT)))
 
-.PHONY: build/%.pdf.run
+.PHONY: chapters/%.pdf.run
 
 chapters/%.pdf: lectures/%.tex
 	mkdir -p build
