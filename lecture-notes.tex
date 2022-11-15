@@ -1,13 +1,15 @@
 \documentclass[
 letterpaper, % Stock and paper size.
-oneside
+oneside,
+nobib
 ]{tufte-book}
 \input{preamble.tex}
 
+\usepackage[style=verbose, autocite=footnote]{biblatex}
+\addbibresource{ref.bib}
+
 \author{6.1600 Staff}
 \title{6.1600\\Foundations of\\Computer Security}
-
-\usepackage{lipsum} % Just to put in some text
 
 \begin{document}
 
@@ -56,8 +58,7 @@ This set of notes is a work in progress. It may have errors and be missing citat
 
 %%% BIBLIOGRAPHY
 %%% -------------------------------------------------------------
-\bibliographystyle{plain}
-\bibliography{ref}
+\printbibliography
 
 
 \end{document}

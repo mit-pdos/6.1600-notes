@@ -11,7 +11,7 @@ went to some private room and exchanged the key in
 secret, but in many cases this is not practical:
 if they could whisper a key, why not just whisper the message?
 
-Luckily, there is a way to get around this requirement for a shared secret using \emph{public-key cryptography}.\cite{DH76} % TODO: cite DH
+Luckily, there is a way to get around this requirement for a shared secret using \emph{public-key cryptography}.\autocite{DH76} % TODO: cite DH
 \marginnote{The original Diffie-Hellman paper from 1976, which introduced
 public-key cryptography, is a fascinating read.}
 
@@ -145,7 +145,7 @@ This signature scheme is not useful on its own, and is given only as a step towa
 \section{One-time-secure Signatures (Lamport Signatures)} \label{sec:lamport}
 
 In this section we give a very simple and elegant construction 
-of a one-time-secure digital signature scheme, due to Lamport.\cite{L79}
+of a one-time-secure digital signature scheme, due to Lamport.\autocite{L79}
 The construction is a straightforward generalization of  the signature scheme constructed above:  Each message is signed bit-by-bit, where each bit is signed using a fresh and independently generated secret key. 
 
 

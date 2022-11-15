@@ -188,7 +188,7 @@ the answers to the user's security questions.''
 ``What is your mother's maiden name?'')
 As it turned out, it was possible to find the answer
 to all of Palin's account-recovery security questions 
-on the Internet.\cite{palin}
+on the Internet.\autocite{palin}
 Yahoo's implementation may have been perfect, but their
 goal did not provide any meaningful security for certain users.
 
@@ -201,7 +201,7 @@ This had big benefits for performance and for
 compatibility, but as we'll talk about later in
 the semester, researchers have recently exploited
 this timing variability to perform sophisticated
-attacks on wide ranges of processors.\cite{hill:spectre-meltdown}
+attacks on wide ranges of processors.\autocite{hill:spectre-meltdown}
 The processor implementation matched the
 specification, but the specification itself
 allowed for this attack.
@@ -225,7 +225,7 @@ sounds reasonable, together they lead to a bad outcome.
 
 
 \subsubsection{Mat Honan's Gmail Account}
-A journalist for wired named Mat Honan had his Gmail account compromised via a clever attack.\cite{honan}
+A journalist for wired named Mat Honan had his Gmail account compromised via a clever attack.\autocite{honan}
 Honan had a Gmail account.
 Gmail's reset-password feature avoided using security questions, and instead used a backup email account.
 The attacker triggered the reset-password feature, which sent a reset link
@@ -265,7 +265,7 @@ system for CAPTCHAs in general, but attackers who want
 to bypass CAPTCHAs do not do this.
 Instead, they set up computer centers in countries where the cost of
 labor is cheap. Attackers then pay people working in these 
-centers to solve CAPTCHAs.\cite{motoyama:recaptchas}
+centers to solve CAPTCHAs.\autocite{motoyama:recaptchas}
 The result is that it costs some fraction of
 a cent to solve a CAPTCHA. 
 The cost of solving a CAPTCHA is still non-zero,
@@ -282,7 +282,7 @@ exhaustively checks all possible keys.}
 (Academic researchers even at the time of DES's
 design understood that 56-bit keys were not large
 enough to prevent exhaustive
-cryptanalysis.\cite{DH77})
+cryptanalysis.\autocite{DH77})
 
 Because of the weakness of DES against modern computers,
 everyone using the standard had to upgrade their block ciphers.
@@ -302,7 +302,7 @@ iPhone apps are normally created and compiled on a developer's machine, sent to 
 Bugs, misconfigurations, and other mistakes are the most common cause of security issues. A rule of thumb to keep in mind is that every 1000 lines of code will have around 1 bug. This is a very rough estimate, but the basic idea is that more code will have more bugs. An effective strategy to reduce security vulnerabilities is to reduce the amount of code in your system.
 
 \subsubsection{Missing Checks: iCloud}
-Apple's iCloud performs many functions---email, calendar, storage, and Find my iPhone. Each of these had their own way of logging in, but across all of them a common goal was to limit the attacker's ability to guess a user's password. To do this, they added rate limiting to all the login interfaces, allowing something like only 10 login attempts per hour---but they forgot the Find my iPhone login interface.\cite{icloud} Because this authentication code was duplicated all over the place, there were many places to remember to add this rate limiting, but the attacker only needed one weak login interface to brute-force a password. In general, avoiding this repition will make it much easier to build a secure system.
+Apple's iCloud performs many functions---email, calendar, storage, and Find my iPhone. Each of these had their own way of logging in, but across all of them a common goal was to limit the attacker's ability to guess a user's password. To do this, they added rate limiting to all the login interfaces, allowing something like only 10 login attempts per hour---but they forgot the Find my iPhone login interface.\autocite{icloud} Because this authentication code was duplicated all over the place, there were many places to remember to add this rate limiting, but the attacker only needed one weak login interface to brute-force a password. In general, avoiding this repition will make it much easier to build a secure system.
 
 \subsubsection{Insecure Defaults}
 When you set up a new service, they almost always come with some defaults to make the setup simpler. Wi-Fi routers come with default passwords, AWS S3 buckets come with default permissions, and so on. These defaults can be convenient, but they are very important to security because many people will forget or neglect to change the default. Because of this, the default becomes the way that the system operates. In order to build a secure system, it is important that the default is secure.
