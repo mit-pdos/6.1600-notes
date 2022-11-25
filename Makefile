@@ -1,30 +1,22 @@
 PAPER=lecture-notes
 
 $(PAPER).pdf:
-	latexmk -pdf \
-		-latexoption=-file-line-error \
-		-latexoption=-shell-escape\
-		-latexoption=-halt-on-error\
-		-latexoption=-interaction=nonstopmode \
-		-latexoption=-synctex=1 $(PAPER)
+	./latexrun/latexrun --bibtex-cmd biber $(PAPER).tex
 .PHONY: $(PAPER).pdf 
 
 IN = $(wildcard lectures/lec*.tex)
-OUT = $(subst lectures/,build/,$(IN))
+OUT = $(subst lectures/,chapters/,$(IN))
 OUT2 = $(addsuffix .pdf,$(basename $(OUT)))
 
-.PHONY: build/%.pdf.run
+.PHONY: chapters/%.pdf.run
 
-build/%.pdf: lectures/%.tex
+chapters/%.pdf: lectures/%.tex
 	mkdir -p build
-	$(eval ARGS :=  -interaction nonstopmode \
-		-output-directory=build -jobname=$(basename $(notdir $@)) \
-		"\input{chapter}\input{$<}\bibliography{ref}\end{document}")
-	pdflatex $(ARGS)
-	pdflatex $(ARGS)
-	cp ref.bib build/ref.bbl
-	bibtex build/$(basename $(notdir $@))
-	pdflatex $(ARGS)
+	mkdir -p chapters
+	cp ref.bib build/ref.bib
+	# creates a temporary file from the _chapter.tex template that we then compile
+	sed s:CHAPTER.TEX:$<: <_chapter.tex >build/$*_standalone.tex 
+	./latexrun/latexrun -o chapters/$*.pdf --bibtex-cmd biber build/$*_standalone.tex
 
 henry:
 	latexmk -pdf -pvc \
@@ -37,6 +29,6 @@ henry:
 all: $(PAPER).pdf $(OUT2)
 
 clean:
-	latexmk -C $(PAPER).tex
-	rm -f lecture-notes.bbl build/*
+	./latexrun/latexrun --clean-all
+	rm -f lecture-notes.bbl build/* chapters/*
 .PHONY: clean

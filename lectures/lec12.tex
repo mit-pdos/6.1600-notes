@@ -43,7 +43,7 @@ This is a fairly simple application of file security. However, file encryption c
 \subsection{Case Study: PDF v1.5 Encryption}
 One instance of this desire for extra features
 that ended up going wrong was a previous version
-of the PDF standard, PDF v1.5.\cite{muller2019practical}
+of the PDF standard, PDF v1.5.\autocite{muller2019practical}
 This standard provided several features:
 \begin{compactenum}
 	\item It is possible to password-encrypt some or all of the document.
@@ -187,7 +187,7 @@ set of goals:
       \item \textbf{Forward secrecy with respect
         to key compromise:} if an attacker
         steals the secrets stored on the client or the server, 
-        the attacker cannot encrypt past traffic.
+        the attacker cannot decrypt past traffic.
         \marginnote{To provide forward secrecy, modern cryptographic
         protocols use long-term secrets only for signing---not for
         encryption.

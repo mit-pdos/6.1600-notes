@@ -1,8 +1,14 @@
+% this is a template for formatting individual chapters
+
 \documentclass[
 letterpaper, % Stock and paper size.
-oneside
+oneside,
+nobib
 ]{tufte-handout}
 \input{preamble.tex}
+
+\usepackage[style=verbose, autocite=footnote]{biblatex}
+\addbibresource{ref.bib}
 
 \newcommand{\chapter}[1]{\title{#1}\maketitle
 \marginnote{\color{red}
@@ -22,7 +28,11 @@ Nickolai Zeldovich}
 
 
 \begin{document}
-\bibliographystyle{plain}
 
+\input{CHAPTER.TEX} % this gets replaced in the build script
+
+\printbibliography
+
+\end{document}
 
 
