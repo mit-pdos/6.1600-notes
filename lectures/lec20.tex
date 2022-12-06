@@ -1,25 +1,41 @@
 \chapter{Privilege Separation}
 
-Last chapter left off on a somewhat unsatisfying note: our software is bound to have bugs and those bugs are likely to be exploitable. Today, we will try to limit the impact that these bugs can have by \emph{planning for compromise} and aiming to limit the damage that each component can cause assuming that it is compromised.
+The last chapter left off on a somewhat unsatisfying note: our software is bound to have bugs and those bugs are likely to be exploitable. Today, we will try to limit the impact that these bugs can have by \emph{planning for compromise} and aiming to limit the damage that each component can cause if an attacker compromises it.
 
 The philosophy that we will employ is called the \emph{Principle of Least Privilege}. By limiting the access that each component of our software has to do sensitive actions, we can prevent the compromise of our whole system when a single piece is attacked.
+To summarize our strategy:
 
-\begin{definition}[Principal of Least Privilege]
+\begin{quote}
+  \textbf{Principle of Least Privilege:}
 	Each component should have the smallest set of privileges necessary to do its job.	
-\end{definition}
+\end{quote}
 
-Assuming that a given component of our system is compromised, this principal gives us \textquote{the best security we could ask for.} However, most real systems do not actually achieve this minimum due to many challenges that arise in trying to implement this. 
+In some sense, a system that perfectly implements the principle of least privilege 
+gives one with the ``best security we could ask for,'' in the face of component compromise.
+\marginnote{An orthogonal, but important, strategy is to reduce the number of privileges
+that a component needs to do its job.}
+However, most real systems do not completely implement the principle of least privilege
+for a number of reasons:
 
-\paragraph{Challenge: Splitting Boundaries.} In order to split up our software into permissioned components, we need to find boundaries on which we can separate our software. 
+\paragraph{Challenge: Splitting Boundaries.} 
+A large piece of software has many components that often have many points of interaction.
+To effectively implement least privilege, we need to find
+boundaries on which we can separate our software. 
+\marginnote{If we don't split up a large piece of software
+into components, the software just consists of one \"uber-component.
+An attacker who breaks into this one component can hijack the entire system.
+}
+A few common ways to partition a system or application are:
 \begin{itemize}
-	\item By user
-	\item By feature
-	\item Splitting off buggy code
-	\item Exposed vs. Internal code
-	\item Isolating sensitive keys
+	\item By user -- standard in operating systems
+	\item By feature -- common on the server side of large business applications
+  \item Splitting off buggy code -- e.g., sandboxing video codecs in a web browser (\cref{sec:split:codec})
+	\item Exposed vs. Internal code -- e.g., Google's front-end HTTP servers are separate from core application logic
+	\item Isolating sensitive keys -- e.g., hardware security modules
 \end{itemize}
 
-\paragraph{Challenge: Interface/API.} If we chop our monolithic app into different domains, we also need to clearly define an API that the different domains can use to interact. This API must allow us to preserve the functionality of the system while avoiding any bypasses of the permission system. As designers of this isolation, we must also be concerned with the performance overhead of the separation system and with the complexity overhead that the system adds---it is possible for the addition of this isolation to add new bugs and exploits.
+\paragraph{Challenge: Interface/API.}
+If we chop our monolithic app into different domains, we also need to clearly define an API that the different domains can use to interact. This API must allow us to preserve the functionality of the system while avoiding any bypasses of the permission system. As designers of this isolation, we must also be concerned with the performance overhead of the separation system and with the complexity overhead that the system adds---it is possible for the addition of this isolation to add new bugs and exploits.
 
 \section{Examples}
 \subsection{Logging}
@@ -32,7 +48,7 @@ However, this design does not guarantee everything that we might like: an attack
 
 This division also allows our crypto code to do some meaningful logging: imagine that the crypto module saves every signature it creates to a log. Compromise of the main app would allow an attacker to generate arbitrary signatures, but administrators could then see every signature that was generated during the compromise. This would be very helpful in recovery.
 
-\subsection{Media Codecs in Web Browsers}
+\subsection{Media Codecs in Web Browsers}\label{sec:split:codec}
 Media codecs for things like JPEG decoding are notoriously bug-prone due to their complexity. This codec libraries have been the cause of many web browser exploits because of this. If we were able to isolate these codecs, we could prevent these bugs from allowing an attacker to access data other than the media file being decoded.
 
 However, these codecs require a much more sophisticated interface than the simple logging and signing examples we have seen so far. Videos are progressively decoded as data arrives, for example, and even image decoders progressively decode images, improving resolution as more data arrives. Supporting this functionality without adding vulnerabilities or excessive latency presents many challenges.
