@@ -68,9 +68,7 @@ This gives us a sense of how much noise is necessary: if the function changes by
 In order to specify exactly how much noise to add, the Laplace distribution is used. The laplace distribution is:
 \[ h(y) = \frac{1}{2b} e^{-\frac{\abs{y}}{b}} \]
 
-\begin{thm}
 For a function $f$, if $A$ adds noise to $f$ from the Laplace distribution with $b \geq \frac{GS_f}{\epsilon}$, then $A$ is $\epsilon$-DP.
-\end{thm}
 
 % \begin{proof}
 % 	For $A$ to be epsilon-private, we want that:
