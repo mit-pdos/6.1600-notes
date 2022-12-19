@@ -267,7 +267,7 @@ and we need to construct a two-input CRHF $H_2(x, y)$.
 \paragraph{Bad idea.} An obvious solution to construct the two-input hash function $H_2$ 
 is to concatenate the two values, so that $H_2(x, y) = H(x || y)$.
 However, this construction allows two different pairs of messages to hash to the same value:
-\[ _2(\text{"key", "value"}) = H_2(\text{"ke", "yvalue"}).\]
+\[ H_2(\text{"key", "value"}) = H_2(\text{"ke", "yvalue"}).\]
 Both Amazon and Flickr had a bug arising from
 this---they concatenated all parameters before
 hashing, and had parameters such that two
