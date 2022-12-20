@@ -59,7 +59,7 @@ However, it is not as clear how to actually implement this. One option is to con
 
 \section{Delegation}
 In interacting with the Gmail server $B$, we may like for Alice ($A$) to give $B$ permission to authenticate as \textquote{$B$ for $A$} and to do so for only 60 seconds into the future. To achieve this, $A$ can sign a message that outlines the permission it would like to give to $B$. This signature becomes the proof of authorization. As an example:
-\[ \Sign(\sk-A, \text{\textquote{A delegates to B}}, \text{start}=\text{now}, \text{end}=\text{now}+60) \]
+\[ \Sign(\sk_A, \text{\textquote{A delegates to B}}, \text{start}=\text{now}, \text{end}=\text{now}+60) \]
 
 Google indeed uses a strategy like this. They have a global DoS-resilient HTTP front-end that performs initial authentication. This frontend is then responsible for generating these scoped delegation signatures for each operation that the user would like to do and sending them along to the individual services. These signatures are then used for all following operation.
 
