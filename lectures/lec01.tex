@@ -23,8 +23,8 @@ computer systems.
 Security is a very broad property, but generally
 the goal of computer security 
 is to ensure that a particular computer system is 
-``behaves correctly'' even in the
-face of an ``adversary'' (or ``attacker'') whose goal is to foil the
+\emph{behaves correctly} even in the
+face of an \emph{adversary} (or \emph{attacker}) whose goal is to foil the
 system.
 \marginnote{We will use the terms ``adversary'' and ``attacker''
 interchangeably throughout this course.}
@@ -32,57 +32,97 @@ interchangeably throughout this course.}
 To achieve this goal, we will need some kind of
 systematic plan.
 That is, we will have to carefully define 
-what it means for our system to ``behave correctly''
+what it means for our system to \emph{behave correctly}
 and we will have to specify the class of 
-``adversaries'' against which we want to defend.
+\emph{adversaries} against which we want to defend.
 
 For the purposes of this course, we will typically
 structure our plan in terms of three components:
-a \emph{goal}, 
-a \emph{threat model}, and
+a \emph{model} of the system and the adversary,
+a security \emph{goal}, 
 an \emph{implementation}.
 
 \begin{itemize}
+\item \textbf{Model:}\marginnote{Sometimes people call this the ``threat model.''
+    For the purposes of this chapter, think of the model as describing \emph{how} the 
+    attacker and system interact and the security goal as defining \emph{what} our
+    implementation is trying to achieve.
+    }
+    The system model specifies:
+    \begin{enumerate}
+      \item what the system is that we are trying to defend, 
+      \item what the attacker is, and
+      \item how the system and attacker interact.
+    \end{enumerate}
+    For example, in network security we might think of the
+    system and the attacker as being two computers that
+    interact over a network. In this model, 
+    the attacker can send network packets
+    to the victim system. (The attacker in this model cannot,
+    for example, swap out the hard drive of the victim system.)
+
+    When we are studying hardware security, we might consider
+    a different model: The system we are trying to defend is a CPU,
+    and the adversary is an external device that can 
+    read all of the contents of the victim system's RAM. (The
+    attacker in this model cannot, for example, read the internal
+    state of the victim's CPU.)
+
+    When we are studying ATM security, the system
+    we are trying to defend is an ATM machine. For
+    an attacker, we might consider a person
+    interacting with the ATM through it's normal
+    interface: the 
+    attacker can insert a malformed ATM card into the machine and type
+    arbitrary PINs into the device. (The attacker in this model cannot,
+    for example, take a jackhammer to the ATM to extract the cash.)
+
+    Modeling the adversary and the system in question is almost
+    always the first step of thinking about system security.
+    While we often only have an informal system model in mind, the more
+    precise you---as a system designer---can be about your system model,
+    the clearer your security properties can be.
+
   \item \textbf{Goal:} 
-    The security goal defines what we want our system to achieve.
-    For example, a informal goal might be that ``only Alice can read the file $F$,''
-    or ``if anyone tampers with the file $F$, Alice will detect it.''
+    The security goal defines what we want our system to achieve in our specified model.
+
+    For example, in network security, we might want the property that ``only someone
+    knowing Alice's secret password can execute shell commands on the machine.''
+    In hardware security, we might want the property that ``the attacker learns nothing
+    about the data stored in RAM, apart from its size.''
+    In ATM security, we might want the property that ``an attacker can fraudulently 
+    authenticate as a victim with probability at most $1/10000$.''
+
     As you will learn throughout the course, figuring out exactly what your
     security goal should be is often quite subtle and challenging.
 
-  \item \textbf{Threat model:} 
-    The threat model (or ``adversary model'') specifies the class of 
-    adversaries against which we want to defend.
-    Or, put another way, the threat model specifies the adversary's power:
-    what can the adversary do in trying to break our security goal?
-    By defining a threat model, we can make it
-    tractable to achieve a security goal. 
-    For example, in analyzing the security of a password-based login system,
-    our threat model might specify that 
-    the adversary can guess passwords, but cannot steal the server.
   \item \textbf{Implementation:}
     The implementation is how we achieve the goal.
-    For example, we might set permissions on a file $F$, 
-    use Linux to enforce those permissions, 
-    and require two-factor authentication to access the system.
+    For example, in securing a computer system on a network, we 
+    might use password-based authentication to protect access to a computer system.
 \end{itemize}
 
-Together, the goal and the threat model create our
+Together, the model and the goal model create our
 \textit{definition} of security.\marginnote{When you read
 about security failures in the news, it is worth trying
 to understand whether the failure arose from a problem with the
-goal, the threat model, or the implementation.}
-As such, they
-cannot be ``wrong''---the goal might turn out to
-not be exactly what we needed, 
+model, the goal, or the implementation.}
+As such, the model and goal
+cannot be ``wrong''---%
 the threat model might not have captured all of
-the attacks that our system might actually face
-in the real world, and the system designer might
-be surprised when they discover this,
-but together the goal and threat model define 
-the security properties that we set out to achieve.
+the attacks that a real-world adversary can mount,
+and goal might turn out to
+not be exactly what we needed.
+Often, the process of designing the model and goal is iterative:
+when the system designer discovers a surprising gap in the security
+goal (we will see some shortly), she patches the goal and the implementation
+accordingly.
+
 The implementation, on the other hand, can definitely be wrong---if 
-the implementation does not guarantee the goal under the threat model, due to bugs or oversights or supply chain vulnerabilities or anything else, the implementation has a mistake.
+the implementation does not guarantee the goal
+under the model in question, due to bugs or
+oversights or supply chain vulnerabilities or
+anything else, the implementation has a mistake.
 
 \subsection{Security is Hard}
 
@@ -92,7 +132,7 @@ There are at least two broad reasons for this.
 \paragraph{Secure systems must defend against worst-case behavior.}
 First, a secure system must defend against
 \emph{all possible attacks} within the scope of 
-the threat model.
+the system model.
 In contrast, when we are just concerned about functionality or
 correctness, we are often satisfied with a system 
 that performs well for the cases that users care about.
@@ -101,28 +141,36 @@ of their system for all possible inputs and corner cases; this is
 is indeed the mindset that is often necessary for security.}
 In other words, security is concerned with behavior in
 \emph{worst-case situations}, while correctness is often
-about behavior in \emph{expected situations}.
+about behavior in 
+\emph{expected situations} (i.e., \emph{average-case situations}).
 
-For example, suppose that we have
-a student-information system that should achieve the security
-goal: ``\textbf{only} TAs can access grades.''
-It is easy to test if a random sample of TAs can
-access grades (correctness), but it is much harder to test whether
-there is some sequence of interactions that allow
-\textit{anyone else} to access the grades (security).
+For example, suppose that you are a car manufacturer and you
+want to test a car stereo functions correctly.
+Testing that the stereo  works well \emph{on average} (i.e., in expected situations)
+is easy: turn the stereo on and off 10,000 times, try playing some music
+through it, and accept it as working if all of these checks pass.
+Testing that the stereo works well \emph{in the worst case} is not as
+easy: it is possible that if someone connects an adversarial USB device that sends
+some specially crafted malicious packets to the
+stereo, they can hijack the car and cause it to explode. But you will never
+find these malicious packets by random testing---only by careful 
+inspection.\marginnote{These attacks are actually possible in practice! See: \cite{koscher2010experimental}}
+A secure system must defend against all possible attacks within the threat model;
+being certain that a system satisfies this strong security property is a challenge.
+
 
 \paragraph{An implementation can never defend against all possible threats.}
-When we specify a threat model, we delimit the set of adversaries 
+When we specify a system model, we delimit the set of adversaries 
 against which our implementation must defend.
 But real-world adversaries can behave in ways that are 
-outside of our threat model and thereby violate our security goals.
+outside of our model and thereby violate our security goals.
 
 For example, someone besides a TA might be able to
-access the grades by:
+access the grades file for our class by:
 \begin{itemize}
 	\item finding a bug in the server software,
 	\item breaking into a TA's office,
-        \item compromise the TA's laptop,
+  \item compromising the TA's laptop,
 	\item stealing the password to an administrator's account,
 	\item tricking a TA into disclosing grades,
 	\item breaking the server's cryptography,
@@ -164,7 +212,51 @@ classes of attacks (or make them much harder).
 We give a handful of examples of security failures arising from poor
 choices of security goals or threat model.
 
-\subsection{Bad Goals}
+\subsection{Insufficient Attack Models}
+
+\subsubsection{Assuming specific strategy: CAPTCHA}
+CAPTCHAs were designed to be expensive to
+solve via automation, but easy for a human to read.
+Indeed it might be expensive to build an optical-character recognition 
+system for CAPTCHAs in general, but attackers who want
+to bypass CAPTCHAs do not do this.
+Instead, they set up computer centers in countries where the cost of
+labor is cheap. Attackers then pay people working in these 
+centers to solve CAPTCHAs.\autocite{motoyama:recaptchas}
+The result is that it costs some fraction of
+a cent to solve a CAPTCHA. 
+The cost of solving a CAPTCHA is still non-zero,
+but the cost is much lower than the system designers
+may have intended.
+
+\subsubsection{Assuming low limit on computational power: DES}
+There used to be an encryption standard called DES that had $2^{56}$ possible keys.
+At the time that it was designed, the U.S.~government standards agencies asserted that it was
+secure against even powerful attackers,
+but today a modern computer can try all $2^{56}$ keys at only modest cost.\marginnote{For
+example, \url{https://crack.sh/} uses an array of FPGAs to provide a service that
+exhaustively checks all possible keys.}
+(Academic researchers even at the time of DES's
+design understood that 56-bit keys were not large
+enough to prevent exhaustive
+cryptanalysis.\autocite{DH77})
+
+Because of the weakness of DES against modern computers,
+everyone using the standard had to upgrade their block ciphers.
+For example, MIT had to switch from using DES for authentication 
+to newer block ciphers with longer keys, such as AES.
+
+\subsubsection{Assuming a secure out-of-band channel: Two-factor authentication (2FA) via SMS}
+Many 2FA systems use a text message for authentication, but an attacker then
+just needs to convince the clerk at the AT\&T store to give them a new SIM card for your phone number.
+\marginnote{These attacks are often called ``SIM swapping'' or ``SIM hijacking''.}
+
+\subsubsection{Assuming a correct compiler: Xcode}\label{sec:intro:xcode}\marginnote{This
+prescient paper from 1984 anticipated the XcodeGhost attack: \cite{thompson1984reflections}}
+iPhone apps are normally created and compiled on a developer's machine, sent to Apple's App Store, and sent to iPhones from there. iPhone apps are created using a tool called Xcode that is normally downloaded from Apple servers. However, Xcode is a big piece of software and for developers behind China's firewall, it was very slow to download. Someone within China set up a much faster mirror of Xcode, and lots of developers in China used the version of Xcode from this mirror. However, this mirror was not serving exactly Apple's version of Xcode---instead, it was serving a slightly modified version of Xcode that would inject some malicious code into every app that was compiled with it. This took a long time to detect.
+\marginnote{The Wikipedia article on XcodeGhost, \url{https://en.wikipedia.org/wiki/XcodeGhost}, provides more details about this attack.}
+
+\subsection{Insufficient security goal}
 \subsubsection{Business-class airfare}
 An airline tried to add value to their
 business-class tickets by allowing ticket-holders to 
@@ -195,18 +287,17 @@ Yahoo's implementation may have been perfect, but their
 goal did not provide any meaningful security for certain users.
 
 \subsubsection{Instruction Set Architecture (ISA) Specification}
-When defining ISAs for processors, designers did
-not think that timing was important, and
-processors could take a variable number of cycles
-to execute a particular instruction.
+When defining ISAs for processors, computer architects
+thought it would be acceptable for each instruction
+to take a different number of cycles to execute.
 This had big benefits for performance and for
 compatibility, but as we'll talk about later in
 the semester, researchers have recently exploited
 this timing variability to perform sophisticated
 attacks on wide ranges of processors.\autocite{hill:spectre-meltdown}
-The processor implementation matched the
-specification, but the specification itself
-allowed for this attack.
+Even if a processor's implementation faithfully implements
+the specification, the specification itself
+allows for certain types of timing side-channel attacks.
 
 \subsubsection{Complicated access-control policies}
 A school in Fairfax, Virginia used an online
@@ -257,51 +348,15 @@ account.
 Complex chains of systems like this can be very hard to reason about,
 but these interactions ultimately are security-critical.
 
-\subsection{Bad Threat Models}
-
-\subsubsection{Assuming specific strategy: CAPTCHA}
-CAPTCHAs were designed to be expensive to
-solve via automation, but easy for a human to read.
-Indeed it might be expensive to build an optical-character recognition 
-system for CAPTCHAs in general, but attackers who want
-to bypass CAPTCHAs do not do this.
-Instead, they set up computer centers in countries where the cost of
-labor is cheap. Attackers then pay people working in these 
-centers to solve CAPTCHAs.\autocite{motoyama:recaptchas}
-The result is that it costs some fraction of
-a cent to solve a CAPTCHA. 
-The cost of solving a CAPTCHA is still non-zero,
-but the cost is much lower than the system designers
-may have intended.
-
-\subsubsection{Computational Power: DES}
-There used to be an encryption standard called DES that had $2^{56}$ possible keys.
-At the time that it was designed, the U.S.~government standards agencies asserted that it was
-secure against even powerful attackers,
-but today a modern computer can try all $2^{56}$ keys at only modest cost.\marginnote{For
-example, \url{https://crack.sh/} uses an array of FPGAs to provide a service that
-exhaustively checks all possible keys.}
-(Academic researchers even at the time of DES's
-design understood that 56-bit keys were not large
-enough to prevent exhaustive
-cryptanalysis.\autocite{DH77})
-
-Because of the weakness of DES against modern computers,
-everyone using the standard had to upgrade their block ciphers.
-For example, MIT had to switch from using DES for authentication 
-to newer block ciphers with longer keys, such as AES.
-
-\subsubsection{Dependencies: Two-factor authentication (2FA) via SMS}
-Many 2FA systems use a text message for authentication, but an attacker then
-just needs to convince the clerk at the AT\&T store to give them a new SIM card for your phone number.
-\marginnote{These attacks are often called ``SIM swapping'' or ``SIM hijacking''.}
-
-\subsubsection{Software Versions: Xcode}\label{sec:intro:xcode}
-iPhone apps are normally created and compiled on a developer's machine, sent to Apple's App Store, and sent to iPhones from there. iPhone apps are created using a tool called Xcode that is normally downloaded from Apple servers. However, Xcode is a big piece of software and for developers behind China's firewall, it was very slow to download. Someone within China set up a much faster mirror of Xcode, and lots of developers in China used the version of Xcode from this mirror. However, this mirror was not serving exactly Apple's version of Xcode---instead, it was serving a slightly modified version of Xcode that would inject some malicious code into every app that was compiled with it. This took a long time to detect.
-\marginnote{The Wikipedia article on XcodeGhost, \url{https://en.wikipedia.org/wiki/XcodeGhost}, provides more details about this attack.}
-
-\subsection{Problematic Implementations}
-Bugs, misconfigurations, and other mistakes are the most common cause of security issues. A rule of thumb to keep in mind is that every 1000 lines of code will have around 1 bug. This is a very rough estimate, but the basic idea is that more code will have more bugs. An effective strategy to reduce security vulnerabilities is to reduce the amount of code in your system.
+\subsection{Buggy implementations}
+Bugs, misconfigurations, and other mistakes are
+the most common cause of security issues. A rule
+of thumb to keep in mind is that every 1000 lines
+of code will have around one bug. This is a very
+rough estimate, but the basic idea is that more
+code will have more bugs. An effective strategy to
+reduce security vulnerabilities is to reduce the
+amount of code in your system.
 
 \subsubsection{Missing Checks: iCloud}
 Apple's iCloud performs many functions---email, calendar, storage, and Find my iPhone. Each of these had their own way of logging in, but across all of them a common goal was to limit the attacker's ability to guess a user's password. To do this, they added rate limiting to all the login interfaces, allowing something like only 10 login attempts per hour---but they forgot the Find my iPhone login interface.\autocite{icloud} Because this authentication code was duplicated all over the place, there were many places to remember to add this rate limiting, but the attacker only needed one weak login interface to brute-force a password. In general, avoiding this repition will make it much easier to build a secure system.
@@ -309,8 +364,10 @@ Apple's iCloud performs many functions---email, calendar, storage, and Find my i
 \subsubsection{Insecure Defaults}
 When you set up a new service, they almost always come with some defaults to make the setup simpler. Wi-Fi routers come with default passwords, AWS S3 buckets come with default permissions, and so on. These defaults can be convenient, but they are very important to security because many people will forget or neglect to change the default. Because of this, the default becomes the way that the system operates. In order to build a secure system, it is important that the default is secure.
 
+
+
 \section{What are the general principles for secure system design?}
-\subsection{Goals and Threat Models}
+\subsection{Threat Models and Goals}
 \begin{itemize}
 	\item Create simple, general goals.
 	\item Avoid assumptions (such as ``no one else will be able to get a user's SIM card'') through better designs.
