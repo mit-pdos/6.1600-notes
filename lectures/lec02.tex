@@ -199,7 +199,7 @@ password-based authentication entirely is the safest option where
 possible.
 
 When a system must use passwords for authentication, the safest
-way to store them (e.g., on a server) is using an 
+way to store them (e.g., on a server) is using a
 \emph{salted cryptographic password-hashing function}.
 The goal is to make it as difficult as possible for an attacker
 to recover the plaintext passwords, given the hashed values stored on the server.
@@ -216,7 +216,7 @@ The server then stores a table that looks like this:
   user & salt & $H(\text{salt}\|\text{pw})$ \\
 	\hline
 	alice & $r_a$ & $h_a$ \\
-	bob & $r_a$ & $h_b$ \\
+	bob & $r_b$ & $h_b$ \\
 \end{tabular}
 \medskip
 
