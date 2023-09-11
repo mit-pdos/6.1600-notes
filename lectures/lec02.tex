@@ -9,12 +9,31 @@ how to handle it.
 For this, it is crucial to know
 \textit{who} issued the request. Then, we can
 decide whether the system should allow the request. 
+\marginnote{\emph{Entropy} is a
+way to quantify the adversary's uncertainty about
+a value sampled using a random process, or from a particular probability distribution.
+If a distribution has $b$ bits of entropy, then
+it will take at least roughly $2^b$ guesses for an attacker to correctly
+guess a value sampled from this distribution.
+
+The uniform distribution over 128-bit strings has 128 bits of entropy.
+The distribution from which humans typically choose their passwords
+has much less entropy---empirically, more like 20 bits.}
 
 Typically, a computer system performs two steps before processing
 a request:
 \begin{enumerate}
-  \item \textbf{Authenticate:} Identify the person or machine (the ``\emph{principal}'') making the request.
-  \item \textbf{Authorize:} Decide if the principal is authorized to make the request.
+  \item \textbf{Authenticate:} Identify the person 
+          or machine (the ``\emph{principal}'') making the request.
+  \item \textbf{Authorize:} Decide if the principal 
+          is authorized to make the request.
+  \item \textbf{Audit:} Log some information about what
+          requests your system authorized, so that you can 
+          identify malicious requests after the fact and/or
+          clean up your system after attacks on the authentication
+          system. (For example, a user who accidentally reveals
+          their password to an attacker.)
+
 \end{enumerate}
 
 \section{Passwords}
@@ -35,8 +54,9 @@ are ``bad?''
 Many sites would let you use
 \ttt{PaSsW0rd1!} as your password but would not allow
 you to use \ttt{purple-student-hat}.
-However, what really matters is the adversary's
-uncertainty about your password.
+
+What really matters is the adversary's
+\emph{uncertainty} about your password.
 That is, what we really care about is that the adversary
 will not be able to guess your password in
 a small number of guesses.
@@ -49,15 +69,22 @@ a small number of guesses.
   \caption{The most common passwords, according to
   NordPass (\url{https://nordpass.com/most-common-passwords-list/}),
   sorted by their frequency descending.
-  A small number of common passwords dominate.
-  \todo{Fix the $y$-axis here.}}
+A small number of common passwords dominate.}
 \end{figure}
 
 Ideally, we would want all passwords to be equally as likely,
 from the adversary's perspective.
-But that is not the case.
-People have to remember their passwords,
-and it turns out that many people are likely to choose the same password.
+(These would be ``high-entropy'' passwords.)
+If a system generated a truly random password for each user,
+each password would be indeed equally likely.
+But then it becomes very difficult for a user to remember their 
+password, much less many random passwords for many different services.
+
+Typically, people have to remember their passwords,
+so we let them pick their own passwords.
+When they do,
+it turns out that many people are likely to choose
+the same password.
 
 \marginnote[-2in]{
   \begin{tabular}{cc}
@@ -123,26 +150,17 @@ easy-to-guess passwords.
 What can we do about this?
 
 \subsection{Dealing with poor passwords}
-A ``good'' password might be sampled from a distribution with roughly
-20 bits of \marginnote{\emph{Entropy} is a
-way to quantify the adversary's uncertainty about
-a value sampled using a random process, or from a particular probability distribution.
-If a distribution has $b$ bits of entropy, then
-it will take at least roughly $2^b$ guesses for an attacker to correctly
-guess a value sampled from this distribution.
-
-The uniform distribution over 128-bit strings has 128 bits of entropy.
-The distribution from which humans typically choose their passwords
-has much less entropy---empirically, more like 20 bits.}
+A typical password might be sampled from a distribution with roughly
+20 bits of 
 entropy---if an adversary is able to make $2^{20}$ guesses
 at the password, they can expect to guess the password correctly.
-And with current technology, guessing $2^{20}$ times is easy.
-So when using passwords as an authentication mechanism,
-we must find a way to limit guesses. 
+One can computer easily make $2^{20}$
+authentication requests to another in a few
+minutes.
+Therefore, when using passwords as an authentication
+mechanism, an authentication system must \emph{always} 
+somehow limit the number of password guesses.
 
-A standard way to deal with the fact that passwords are easily
-guessable is to limit the number of guesses an attacker gets
-at the password.
 For example, some phones allow 10 guesses at the screen-lock PIN 
 before the device resets itself.
 Limiting the number of guesses effectively prevents a \emph{single}
@@ -160,39 +178,8 @@ can often compromise \emph{some} account on the machine if it is allowed
 Preventing these types of attacks requires some additional measures: websites
 that use password authentication rate-limit guesses by IP, or use CAPTCHAs, etc.
 
-\subsection{Storing Passwords}
+\subsection{Storing Passwords on a Server}
 
-\iffalse
-The most obvious way to store passwords on
-a server would be to just store each username
-along with their password.
-
-\begin{tabular}{c|c}
-	user & password \\
-	\hline
-	alice & \ttt{abc123} \\
-	bob & \ttt{1234} \\
-\end{tabular}
-
-\textbf{Risk}: adversary steals the password table (by breaking in to the system, stealing the hard drive, etc). Now, every user's account is compromised. However, since many users use the same password across many sites, those other sites are now compromised too.
-
-So, it would be great if we could check whether a user's inputted password is correct without storing the actual password. To do this, we can use a \textit{hash function}. For our current purposes, a hash function is a deterministic way of scrambling the input such that it cannot easily be reversed. That is, the same input will always produce the same output, but given an output there is no easy way to determine the corresponding input.
-
-\begin{tabular}{c|c}
-  user & $H(\text{pw})$ \\
-	\hline
-	alice & $h_a$ \\
-	bob & $h_b$ \\
-\end{tabular}
-
-Now, if the database gets compromised, only the \textit{hashes} of those passwords are made public. Assuming we choose a \textit{one-way} hash function, meaning that there is no easy way to compute $pw$ given only $H(pw)$, the only way to find $pw$ and log into the user's account then is to figure out the mapping from each possible password to H(pw) and find the one that matches. 
-
-To make this more difficult, systems can make use of an expensive $H$ function. These are often called Key Derivation Functions to separate them from hashes that are meant to be fast. Examples are bcrypt and scrypt. In effect, stealing the database removes any rate limiting that is enforced by the server. But we can add cryptographic rate limiting by using a KDF to generate the hash.
-
-However, if all systems use the same hash function (hash functions are hard to make, so they are likely to), then many adversaries could get together and compute a \textit{rainbow table} that maps $H(pw)$ to $pw$. 
-
-\subsection{Avoiding pre-computation: salting}
-\fi
 
 Since, as we have seen, passwords are easy to guess, avoiding 
 password-based authentication entirely is the safest option where
@@ -235,24 +222,25 @@ To explain the rationale for this design:
         (instead of the microseconds required to compute a standard hash function,
         such as SHA256).
   \item The use of a per-user random salt ensures that guesses at one user's password
-        are useless in inverting another user's password hash.
+    are useless in inverting another user's password hash.\marginnote{A \emph{rainbow table}
+    is a common data structure that an attacker can use to invert unsalted password hashes.
+    A rainbow table is essentially a compressed table $(\texttt{passwd}, H(\texttt{passwd}))$
+    pairs, where $H$ is a common hash function, and $\texttt{passwd}$ ranges over a 
+    large set of common passwords.
+
+    An attacker can download rainbow tables for common cryptographic hash
+    functions, such as MD5 or SHA1, from the web.
+    If the password hash is salted with a 128-bit
+    salt, it will be infeasible to produce a table that covers
+    any reasonably large fraction of the $(\texttt{salt}\|\texttt{passwd})$ pairs.
+}
         Salting also defeats \emph{precomputation attacks}, in which an attacker
         precomputes the hashes of many common passwords to speed up this hash-inversion
         step later on.
 \end{itemize}
 
 
-\section{Authentication over the Network}
-We have so far been talking about a human manually
-authenticating to a device (ATM, phone, laptop, etc.)
-by physically entering a PIN or password into the device.
-But we often log in to some server on the network---Facebook,
-Gmail, MIT, and so on. 
-In this scenario, we can get much more creative
-with the authentication mechanism we use and the
-security properties we can demand.
-
-\subsection{Password Manager}
+\subsection{Storing Passwords on a Client: Password Manager}
 When using passwords to authenticate to a website, 
 a user can install a password manager on their
 computer that will generate random passwords for them.
@@ -275,10 +263,23 @@ servers and the corresponding passwords:
 
 But password-based authentication, even with a strong password,
 still requires sending passwords over the network.
-If an adversary can watch our network, they can see our password.
+If an adversary can watch our network or can compromise the authentication
+server, they can see our password.
 Transport-later security, which we will discuss later on, can
 protect against network eavesdroppers, but a better solution is to
 authenticate without ever sending the password over the network.
+That is the topic of the next section.
+
+\section{Authentication over the Network}
+We have so far been talking about a human manually
+authenticating to a device (ATM, phone, laptop, etc.)
+by physically entering a PIN or password into the device.
+But we often log in to some server on the network---Facebook,
+Gmail, MIT, and so on. 
+In this scenario, we can get much more creative
+with the authentication mechanism we use and the
+security properties we can demand.
+
 
 \subsection{Challenge-Response Protocols}
 We now assume that our computer has some key~$k$
