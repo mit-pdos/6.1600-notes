@@ -225,12 +225,16 @@ down to $\lambda$-bit strings, sketched out in \Cref{fig:merkle-damgard}.
     \draw [->] (Hdot) edge (Hn);
     \node [above=.5cm of Hn] (mn) {$m_n$};
     \draw [->] (mn) edge (Hn);
-    \node [right=.5cm of Hn] (out) {Output};
-    \draw [->] (Hn) edge (out);
+    \node [right=.5cm of Hn] (Hfinal) [draw] {$H_\textrm{small}$};
+    \draw [->] (Hn) edge (Hfinal);
+    \node [above=.5cm of Hfinal] (len) {Msg length};
+    \draw [->] (len) edge (Hfinal);
+    \node [right=.5cm of Hfinal] (out) {Output};
+    \draw [->] (Hfinal) edge (out);
   \end{tikzpicture}
   \caption{Sketch of the Merkle-Damg\aa{}rd construction for a
     collision-resistant hash function.}
-  \label{fig:auth-attacks}
+  \label{fig:merkle-damgard}
 \end{figure}
 
 
@@ -293,7 +297,7 @@ and we need to construct a two-input CRHF $H_2(x, y)$.
 \paragraph{Bad idea.} An obvious solution to construct the two-input hash function $H_2$ 
 is to concatenate the two values, so that $H_2(x, y) = H(x || y)$.
 However, this construction allows two different pairs of messages to hash to the same value:
-\[ _2(\text{"key", "value"}) = H_2(\text{"ke", "yvalue"}).\]
+\[H_2(\text{"key", "value"}) = H_2(\text{"ke", "yvalue"}).\]
 Both Amazon and Flickr had a bug arising from
 this---they concatenated all parameters before
 hashing, and had parameters such that two
@@ -320,8 +324,31 @@ function that was \emph{only} guaranteed to be
 collision resistant, but we assumed that it had other
 properties (such as that it is guaranteed to be
 difficult to compute the hash of an extension of
-the original message).
-\todo{the diagram here would be very helpful}
+the original message).  \Cref{fig:merkle-damgard-extension}
+sketches out the length-extension attack on the Merkle-Damg\aa{}rd
+construction from \Cref{fig:merkle-damgard}.
+
+\begin{figure}[htpb]
+  \centering
+  \begin{tikzpicture}
+    \node (start) {Hash of $m_1 || m_2 || \ldots || m_n$};
+    \node [right=.5cm of start] (H1) [draw] {$H_\textrm{small}$};
+    \draw [->] (start) edge (H1);
+    \node [above=.5cm of H1] (x) {$x$};
+    \draw [->] (x) edge (H1);
+    \node [right=.5cm of H1] (Hfinal) [draw] {$H_\textrm{small}$};
+    \draw [->] (H1) edge (Hfinal);
+    \node [above=.5cm of Hfinal] (len) {Extended length};
+    \draw [->] (len) edge (Hfinal);
+    \node [right=.5cm of Hfinal] (out) {Output};
+    \draw [->] (Hfinal) edge (out);
+  \end{tikzpicture}
+  \caption{Sketch of the extension attack on the Merkle-Damg\aa{}rd
+    construction, starting with a hash of $m_1 || m_2 || \ldots || m_n$
+    to compute the hash of $m_1 || m_2 || \ldots || m_n || \textsf{ToBlock}(n) || x$.}
+  \label{fig:merkle-damgard-extension}
+\end{figure}
+
 
 \section{Applications: Merkle Trees}
 In many settings, an origin server has $N$ files (e.g., Android app binaries)
