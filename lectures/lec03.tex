@@ -205,9 +205,35 @@ on a large domain.}
 The Merkle-Damg\aa{}rd construction gives a way to construct
 a collision-resistant hash function for all bitstrings (i.e., $\zo^*$)
 from a collision resistant hash function that maps $2\lambda$-bit strings
-down to $\lambda$-bit strings.
+down to $\lambda$-bit strings, sketched out in \Cref{fig:merkle-damgard}.
 
-\todo{Insert picture here}
+\begin{figure}[htpb]
+  \centering
+  \begin{tikzpicture}
+    \node (iv) {$0^\lambda$};
+    \node [right=.5cm of iv] (H1) [draw] {$H_\textrm{small}$};
+    \draw [->] (iv) edge (H1);
+    \node [above=.5cm of H1] (m1) {$m_1$};
+    \draw [->] (m1) edge (H1);
+    \node [right=.5cm of H1] (H2) [draw] {$H_\textrm{small}$};
+    \draw [->] (H1) edge (H2);
+    \node [above=.5cm of H2] (m2) {$m_1$};
+    \draw [->] (m2) edge (H2);
+    \node [right=.5cm of H2] (Hdot) {$\ldots$};
+    \draw [->] (H2) edge (Hdot);
+    \node [right=.5cm of Hdot] (Hn) [draw] {$H_\textrm{small}$};
+    \draw [->] (Hdot) edge (Hn);
+    \node [above=.5cm of Hn] (mn) {$m_n$};
+    \draw [->] (mn) edge (Hn);
+    \node [right=.5cm of Hn] (out) {Output};
+    \draw [->] (Hn) edge (out);
+  \end{tikzpicture}
+  \caption{Sketch of the Merkle-Damg\aa{}rd construction for a
+    collision-resistant hash function.}
+  \label{fig:auth-attacks}
+\end{figure}
+
+
 The Merkle-Damg\aa{}rd construction first splits the
 message into $\lambda$-sized blocks $[m_1, \ldots, m_n]$ and successively hashes them together.
 In the following pseudocode,
