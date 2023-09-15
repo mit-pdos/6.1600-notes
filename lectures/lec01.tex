@@ -124,6 +124,19 @@ under the model in question, due to bugs or
 oversights or supply chain vulnerabilities or
 anything else, the implementation has a mistake.
 
+\paragraph{The implementation is always public: Kerckhoff's principle.}
+Throughout this course, we will always assume that the attacker knows
+the implementation of whatever security mechanism we are using.
+The only thing that we keep secret from the adversary are the system's
+secret keys.
+This is known as \emph{Kerckhoff's principle}.
+The logic behind this way of thinking is that: (1) it is often
+relatively easy for the attacker to learn bits of information 
+about the system design and (2) it is much easier to replace
+a set of cryptographic keys (if the attacker learns them) than
+to redesign the entire system from scratch.
+
+
 \subsection{Security is Hard}
 
 Building secure systems is challenging.
