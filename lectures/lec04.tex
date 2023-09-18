@@ -321,11 +321,58 @@ So $x + y \in \Z_p$ means that we add $x$ and $y$
 as integers and reduce the result modulo~$p$.
 Typically, we will think of $p$ as a prime---of
 64 bits, for example.
-
-The MAC uses a fixed a prime number $p$ as a parameter,
-where $p \approx 2^n$ on security parameter $n$.\marginnote{So
+The construction uses a fixed a prime number $p$ as a parameter,
+where $p \approx 2^n$ for security parameter $n$.\marginnote{So
 in practice, we take $p \approx 2^{128}$
 for 128-bit security.}
+
+\paragraph{Universal hash function.}
+
+Before we look at the construction of the Carter-Wegman MAC, we first
+define an important building block: the notion of a \emph{universal hash
+function}, or UHF for short.  A universal hash function is keyed, and
+provides collision-resistance when the adversary does not know the key.
+Specifically, we say that $H$ is a universal hash function if, when an
+adversary chooses two messages $m$ and $m'$ where $m\neq m'$,
+
+$$
+Pr[H(k, m) = H(k, m')] \leq \text{negl.}
+$$
+
+Intuitively, a universal hash function is a weaker primitive than a
+collision-resistant hash function: the adversary does not know the
+precise hash function that will be applied to their messages, because
+the adversary does not know what key will be used.
+
+One simple and practical construction of a universal hash function
+is based on polynomials.  Given a long message $m$, break it up into
+fixed-size chunks $m_0, m_1, \ldots, m_{l-1}$.\marginnote{In practice,
+these fixed-size chunks are going to be 128 or 256 bits long.}  Then,
+the hash of that message is defined as:
+
+$$
+H(k, m_0 || m_1 || \ldots || m_{l-1}) = (m_0 + m_1 k + m_2 k^2 +
+  \ldots + m_{l-1} k^{l-1}) \mod p
+$$
+
+We can give some intuition for why $H$ is a universal hash function
+(i.e., collision-resistant for a randomly chosen key).  In order for
+a pair of messages $m$ and $m'$ to collide, it must mean that
+$H(k, m) = H(k, m')$, which in turn means that $H(k, m) - H(k, m') = 0$.
+Expanding the definition of $H$ as a polynomial, this means that
+
+$$
+(m_0 - m'_0) + (m_1 - m'_1) k + (m_2 - m'_2) k^2 + \ldots + (m_{l-1} - m'_{l-1}) k^{l-1} = 0
+$$
+
+which is another way of saying that $k$ is a root of that degree-$l-1$
+polynomial.  We know that there can be at most $l-1$ roots of a
+degree-$l-1$ polynomial, but there are $p \approx 2^n$ possible choices
+for $k$, so the probability that our randomly-chosen $k$ happens to be
+one of those roots is $\frac{l-1}{p}$, which is negligible.
+
+\paragraph{MAC construction.}
+
 The MAC uses a pseudorandom function 
 $F \colon \calK \times \Z_p \to \Z_p$.
 \marginnote{Here, the input space of the pseudorandom 
@@ -333,7 +380,6 @@ function $F$ is the set of integers in $\{0, \dots, p-1\}$.
 Given a pseudorandom function on bitstrings, it is indeed
 possible to construct one that operates on numbers in 
 $\Z_p$ like this by interpreting each number as a bitstring.}
-
 The keyspace for the MAC is $\calK$, so the MAC key consists of a key for 
 the pseudorandom function.
 The message space for the MAC is $\calM = \Z_p^{\leq L}$,
