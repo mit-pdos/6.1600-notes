@@ -413,153 +413,117 @@ It is possible to formally argue that given a signature scheme satisfying \cref{
 
 \section{From one-time security to many-time security}
 \label{sec:sig:manytime}
-After applying the hash-and-sign strategy above to our Lamport scheme, we have a signature scheme that is one-time secure for messages of arbitrary length. In order for the scheme to be useful and satisfy our security definition, we need to be able to sign polynomially many messages with a single key pair. To do this, we will use a construction very similar to he Merkle tree construction we have seen before.
+After applying the hash-and-sign strategy above to our Lamport scheme, we
+have a signature scheme that is one-time secure for messages of arbitrary
+length. In order for the scheme to be useful and satisfy our security
+definition, we need to be able to sign polynomially many messages with
+a single key pair. To do this, we will use a construction very similar
+to the Merkle tree construction we have seen before.
 
-We will show how to do this for a message space of
-size $\bin^n$, but hash and sign can be applied to
-make this work for arbitrary-length messages. 
+Informally, we will build up a binary tree of Lamport keys of depth 256.
+The signing key in each of the $2^{256}$ leaf nodes will be used to
+actually sign messages; we will use a random leaf node to sign a message,
+so the fact that there are $2^{256}$ of them means that the probability
+of accidentally choosing the same leaf twice is negligible ($2^{-128}$).
+The signing key in an intermediate nodes (and in the root) will be used
+to sign the (public) verification keys of the two corresponding child
+nodes in the tree.  \cref{fig:lamport_tree} shows a sketch of this tree.
 
 
-\begin{claim}
-Assume that we are given:
+\begin{figure}[htpb]
+	\centering
+	\begin{forest}
+		[ {$\sk_\varepsilon, \sigma_\varepsilon = \Sign_0(\sk_\varepsilon, \vk_0 || \vk_1))$}
+			[ {$\sk_0, \sigma_0 = \Sign_0(\sk_0, \vk_{00} || \vk_{01})$ }
+				[ {$\sk_{00}, \sigma_{00}$ }
+                                  [ $\ldots$ $\ldots$ ] ]
+				[ {$\sk_{01}, \sigma_{01} = \Sign_0(\sk_{01}, \vk_{010} || \vk_{011})$} [ $\ldots$ $\ldots$  ] ]
+			]
+			[ {$\sk_1, \sigma_1$ }
+				[ {$\sk_{10}, \sigma_{10}$} [ $\ldots$ $\ldots$  ] ]
+				[ {$\sk_{11}, \sigma_{11}$} [ $\ldots$ $\ldots$  ] ]
+			]
+		]
+	\end{forest}
+	\caption{Sketch of the tree of Lamport signature keys used for the
+          many-time secure signature construction.}
+	\label{fig:lamport_tree}
+\end{figure}
+
+Importantly, every signing key in the tree will be used to sign only one
+message ever: the key at non-leaf nodes will only ever sign the pair of
+its children, and the key at leaf nodes will only ever be used to sign
+a single message.
+
+The signature, in this scheme, will consist of the signatures and
+verification keys along the path from the root to the chosen leaf node.
+The signature will also include information about which child node
+was chosen.
+
+This tree, of course, is impractically large, but we can solve that
+problem by lazily constructing it using a pseudorandom function.
+That is, instead of actually building up all of the leaves of the tree,
+we will build up the tree (i.e., generate the signing keys, verification
+keys, and signatures) on-demand, and furthermore, we will build it in
+a deterministic way using the pseudorandom function, so that we don't
+have to remember what parts we might have already computed in the past.
+
+To make the construction more precise, we will assume that we are given:
 \begin{compactitem}
-  \item a pseudorandom function, and 
+  \item a pseudorandom function $f$ with keyspace $\calK$, and
   \item a one-time secure signature scheme $(\Gen_0, \Sign_0, \Ver_0)$.
 \end{compactitem}
-Then, for any $t \geq 0$, we can construct a many-time secure 
-signature scheme $(\Gen_t, \Sign_t, \Ver_t)$ on message space $\zo^{t}$,
-where the running time of all algorithms on 
-security parameter $\lambda$ is $\poly(\lambda, t)$.
-\end{claim}
-
-By taking $t \approx 256$, and combining this signature
-scheme with the hash-and-sign paradigm, 
-we can get a many-time-secure signature scheme 
-for arbitrary-length messages.
-
-\begin{proof}[Proof (Informal)]
-By induction on $t$.
-
-\paragraph{Base case ($t=0$).}
-The signature scheme is just $(\Gen_0, \Sign_0, \Ver_0)$.
-
-\paragraph{Induction step.}
-Assume the claim for $t-1$.
-Then we construct the signature scheme for $t$.
-
-Let the PRF keyspace be $\calK$.
-For a PRF key $k \in \calK$ and string $s$, we write $\Gen_0^{F(k, s)}()$
-to indicate the process of running the key-generation algorithm
+We will need the ability to run the (non-deterministic) $\Gen_0$
+algorithm on specific randomness, so as to make it deterministic.
+For a PRF key $k \in \calK$ and string $s$, we will write $\Gen_0^{F(k,
+s)}()$ to indicate the process of running the key-generation algorithm
 $\Gen_0$ using randomness derived from the output of the PRF $F(k, s)$.
+We will assume the use of SHA256 (with a 256-bit digest length) as
+a collision-resistant hash function.  Using these building blocks,
+we will construct a many-time secure signature scheme $(\Gen, \Sign,
+\Ver)$ for arbitrary-length messages (i.e., on message space $\zo^\ast$),
+where all of the algorithms are efficient ($\poly(\cdot)$ running time).
 
-We have:
+Our construction is as follows:
+
 \begin{framed}
 \begin{itemize}
-  \item $\Gen_t() \to (\sk, \vk)$:
+  \item $\Gen() \to (\sk, \vk)$:
     \begin{itemize}
       \item Sample a fresh PRF key $k \getsr \calK$.
       \item Set $(\sk_\epsilon, \vk_\epsilon) \gets \Gen_0^{F(k, \text{``''})}()$.
-      \item Output $(\sk, \vk) \gets ((\sk_\epsilon, k), \vk_\epsilon)$.
+      \item Output $(\sk, \vk) \gets (k, \vk_\epsilon)$.
     \end{itemize}
 
-  \item $\Sign_t((\sk_\epsilon, k), m) \to \sigma$: 
+  \item $\Sign_t(k, m) \to \sigma$: 
     \begin{itemize}
-      \item Write the message $m$ as bits $(m_1, \dots, m_t) \in \zo^t$.
-      \item Compute $(\sk_0, \vk_0) \gets \Gen_0^{F(k, \text{``0''})}()$
-      and $(\sk_1, \vk_1) \gets \Gen_0^{F(k, \text{``1''})}()$.
-      \item Set $\sigma_\epsilon \gets \Sign_0(\sk_\epsilon, \vk_0 \| \vk_1)$.
-      \item Set $\sigma_m \gets \Sign_{t-1}(\sk_{m_1}, m_{2}m_3 \dots m_t)$.
-      \item Output $\sigma \gets (\vk_0, \vk_1, \sigma_\epsilon, \sigma_m)$.
+      \item Choose a random 256-bit value $r = (r_1 \dots r_{256}) \in \zo^{256})$.
+      \item Compute $(\sk_r, \vk_r) \gets \Gen_0^{F(k, \text{r})}()$
+      \item Compute $\sigma_r \gets \Sign_0(\sk_r, \text{SHA256}(m))$.
+      \item Compute $\sigma_\varepsilon$, $\vk_0$, $\vk_1$,
+                    $\sigma_{r_1}$, $\vk_{r_1 0}$, $\vk_{r_1 1}$,
+                    $\sigma_{r_1 r_2}$, $\ldots$,
+                    $\sigma_{r_1 r_2 \ldots r_{255}}$,
+                    $\vk_{r_1 r_2 \ldots r_{255} 0}$,
+                    $\vk_{r_1 r_2 \ldots r_{255} 1}$
+            as shown in \cref{fig:lamport_tree}.
+      \item Output $\sigma \gets (r, \sigma_\varepsilon, \vk_0, \vk_1, \sigma_{r_1}, \vk_{r_1 0}, \vk_{r_1 1}, \ldots, \sigma_r)$.
     \end{itemize}
   \item $\Ver_t(\vk_\epsilon, m, \sigma) \to \zo$:
     \begin{itemize}
-      \item Parse $(\vk_0, \vk_1, \sigma_\epsilon, \sigma_m) \gets \sigma$.
+      \item Parse $(r, \sigma_\varepsilon, \vk_0, \vk_1, \sigma_{r_1}, \vk_{r_1 0}, \vk_{r_1 1}, \ldots, \sigma_r) \gets \sigma$.
       \item Output ``1'' if and only if 
         \begin{itemize}
-          \item $\Ver_0(\vk_\epsilon, \vk_0 \| \vk_1, \sigma_\epsilon)$
+          \item $\Ver_0(\vk_r, \sigma_r, \text{SHA256}(m)) = 1$
         and 
-      \item $\Ver_{t-1}(\vk_{m_1}, m_2m_3\dots m_n, \sigma_m)$.
+      \item $\Ver_0(\vk_x, \sigma_x, \vk_{x0} || \vk_{x1}) = 1$ for every
+        prefix $x$ of $r$ (from $\varepsilon$ to $r_1 r_2 \ldots r_{255}$).
         \end{itemize}
     \end{itemize}
 \end{itemize}
 \end{framed}
 
-The efficiency claim follows by inspection.
-To sketch the security proof: 
-In a forged message-signature pair, consider
-the pair $(\vk_0,\vk_1)$. Either 
-\begin{itemize}
-  \item These keys are different from those that the signer generated.
-        In this case, the adversary has broken the one-time signature scheme. Or:
-  \item These keys are the same as those that the signer generated.
-        In this case, the adversary has broken the signature 
-        scheme for $(t-1)$-bit messages. This violates the induction hypothesis.
-\end{itemize}
-Either way, we get a contradiction.
-So we have (informally) proved the claim.
-\end{proof}
-\iffalse
 
-We
-will first show an inefficient construction, and
-then use a pseudorandom to make it practical.
-
-We first generate a single key pair for every possible message in the message space: $2^n$ total $(\sk_i^n, \vk_i^n)$ pairs for $i \in \bin^n$. These will be the leaves of our tree. For every two adjacent keys, we will then generate a key pair ($2^{n-1}$ pairs total) Then continue for all $j \in [0, \ldots, n]$, where the keys for each $j$ form layer $n-j$ of the tree (with leaves at level $n$).
-
-% TODO: diagram of tree
-
-As an example, to construct a hash function for 2-bit messages:
-
-\begin{figure}[htpb]
-	\centering
-	\begin{subfigure}{.5\textwidth}
-		\centering
-		\begin{forest}
-			[$\sk_\varepsilon$
-				[ $\sk_0 $ 
-					[ $\sk_{00}$ ]
-					[ $\sk_{01}$ ]
-				]
-				[ $ \sk_1 $ 
-					[ $\sk_{10}$ ]
-					[ $\sk_{11}$ ]
-				]
-			]
-		\end{forest}
-		\caption{A subfigure}
-		\label{fig:sub1}
-	\end{subfigure}%
-	\begin{subfigure}{.5\textwidth}
-		\centering
-		\begin{forest}
-			[$\sk_\varepsilon$
-				[ $\sk_0 $ 
-					[ $\sk_{00}$ ]
-					[ $\sk_{01}$ ]
-				]
-				[ $ \sk_1 $ 
-					[ $\sk_{10}$ ]
-					[ $\sk_{11}$ ]
-				]
-			]
-		\end{forest}
-		\caption{A subfigure}
-		\label{fig:sub2}
-	\end{subfigure}
-	\caption{A figure with two subfigures}
-	\label{fig:test}
-\end{figure}
-
-Importantly, every key in the tree will be used to sign only one message ever: the key at non-leaf nodes will only ever sign the pair of its children, and the key at leaf nodes will only ever be used to sign the corresponding message. 
-
-To sign a given message, we generate the signature by providing the actual signature of $\vk_m$ over $m$ \emph{alongside} the remainder of the verification keys and signatures needed to trace all the way back up to the root verification key $\vk_\varepsilon$.
-
-% TODO: finish this explanation.
-
-\subsection{Improving Inefficiency}
-In the scheme above, we required $O(2^n)$ keys for our secret key. This is far too many keys to be pracical, but we still need to be able to use each of these keys to sign a given message. To bridge this gap, we will use a PRF to generate these secret keys \textquote{on the fly} and use those secret keys to generate the corresponding verification key.
-
-\fi
 
 \section{Choosing Signature Schemes}
 The signature scheme we presented in \cref{sec:sig:manytime}
