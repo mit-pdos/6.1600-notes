@@ -88,8 +88,10 @@ In some applications, we want to prohibit an attacker from finding \emph{any}
 new message-signature pair. We call this security notion ``\emph{strong} existential unforgeability under chosen message attack.''  
 The definition is the same as in \cref{def:sig-sec} except that we require
 the adversary to find a valid-message signature pair $(m^*, \sigma^*)$
-such that $(m^*, \sigma^*) \not \in \{ (m_1, \sigma_1), (m_2, \sigma_2), \dots \}$.  Standard digital-signature schemes, such as the elliptic-curve digital signature
-algorithm (EC-DSA) is believed to have this strong security property.
+such that $(m^*, \sigma^*) \not \in \{ (m_1, \sigma_1), (m_2, \sigma_2), \dots \}$.
+Standard digital-signature schemes, such as the elliptic-curve digital signature
+algorithm (EC-DSA) or the RSA algorithm with full-domain hashing (RSA-FDH),
+are believed to have this strong security property.
 
 \section{Constructing a Signature Scheme}
 In the following sections, we will show how to construct a digital-signature
@@ -102,8 +104,8 @@ Widely used modern digital signature schemes (e.g., EC-DSA) have signatures
 of $O(\lambda)$ bits.\marginnote{One benefit of the signature scheme that 
 we present here is that---unlike EC-DSA, RSA, DSA, and other widely used
 signature schemes---this one is plausibly secure even against \emph{quantum}
-adversaries.\todo{Cite NIST PQ signature schemes and compare}
-}
+adversaries.  There is ongoing work to standardize signature schemes secure
+against quantum adversaries; see \url{https://csrc.nist.gov/projects/pqc-dig-sig}}
 
 We will construct this scheme in three stages:
 
@@ -367,11 +369,13 @@ This gives a \emph{one-time-secure} signature scheme for messages of arbitrary l
 
 Another reason to not use hash and MAC is that MACs can be faster to compute than collision-resistant hash functions.}
 
-In practice, hash-and-sign can actually \emph{increase} the security of our signature scheme, in a certain sense. As shown in case 2 above, it is absolutely crucial that the hash function used is collision-resistant: if not, an adversary can find messages that cause collisions, and then a signature for one message will also be a valid signature for the other. However, in practice we often think of hash functions like SHA2 as behaving like \emph{random oracles}.
+In practice, hash-and-sign can actually \emph{increase} the security of our signature scheme, in a certain sense. As shown in case 2 above, it is absolutely crucial that the hash function used is collision-resistant: if not, an adversary can find messages that cause collisions, and then a signature for one message will also be a valid signature for the other. However, in practice we often think of hash functions like SHA256 as behaving like \emph{random oracles}.
 That is, for a hash function $h \colon \zo^* \to \zo^\lambda$ and a string $x \in \zo^*$ we think of the value $h(x)$ as being an independently
-sampled and uniformly random value from the co-domain of the hash function, $\zo^\lambda$.\marginnote{A real-world hash function
-is \emph{never actually} a random oracle. A random oracle from $h \colon \zo^* \to \zo^\lambda$
-would take infinitely many bits to describe, while real-world hash functions have finite size (and polynomial-size descriptions).}
+sampled and uniformly random value from the co-domain of the hash function, $\zo^\lambda$.
+(Of course, a real-world hash function is \emph{never actually} a random
+oracle. A random oracle from $h \colon \zo^* \to \zo^\lambda$ would take
+infinitely many bits to describe, while real-world hash functions have
+finite size (and polynomial-size descriptions).)
 
 Recall that the standard security definition for
 digital signatures (\cref{def:sig-sec}) allows
