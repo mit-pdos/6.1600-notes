@@ -2,10 +2,17 @@
 \chapter{RSA Signatures}
 
 In this chapter, we will discuss the RSA digital-signature scheme.
-%
-%\paragraph{Why study RSA?} 
-Even though the RSA cryptosystem is going out of style, for reasons
-we will discuss, the RSA cryptosystem is still worth studying for a few reasons:
+The RSA paper\autocite{RSA} was tremendously influential because it gave
+the first constructions of digital signatures and public-key encryption.
+(We will talk about public-key encryption in detail later on.)
+
+The RSA cryptosystem is going out of style for a few reasons: 
+generating RSA keys is relatively expensive and the keys are relatively large
+(4096 bits for RSA versus 256 bits for more modern elliptic-curve-based cryptosystems).
+In addition, a large-scale quantum computer could---in theory, at least---break
+RSA-style cryptosystems.
+
+The RSA cryptosystem is worth studying for a few reasons:
 \begin{itemize}
   \item RSA's security is related to the problem of factoring large integers,
         which is (arguably) the most natural ``hard'' computational problem
@@ -23,33 +30,15 @@ we will discuss, the RSA cryptosystem is still worth studying for a few reasons:
     of today, around 94\% of certificates in the Certificate Transparency logs use RSA signatures:
 \url{https://ct.cloudflare.com/}.}
 
+The most commonly used type of RSA signatures (``PKCS \#1 v1.5'') is
+more complicated---and no more secure---than the
+construction we describe here, but that
+construction is still used for historical reasons.
+
 \section{Background: RSA}
-\paragraph{1974:} Ralph Merkle introduced public key exchange in an 1974
-        undergraduate project report at Berkeley~\autocite{M78}.
-        He gave a key-exchange protocol based on one-way functions in
-        which the honest parties run in time $n$ and the best attack
-        runs in time $\Omega(n^2)$.
 
-\paragraph{1976:} Diffie and Hellman, in their \emph{New Directions} paper~\autocite{DH76},
-        defined public key exchange, public-key encryption, and digital signatures.
-        They constructed a key-exchange scheme from discrete log with conjectured security
-        against all poly-time adversaries: honest parties run in time $n$, 
-        attacker runs in superpolynomial time.
 
-\paragraph{1977:} Rivest, Shamir, and Adleman (RSA)~\autocite{G77,RSA} give the \emph{first} construction
-        of public-key encryption and digital signatures from a problem 
-        related to the hardness of factoring integers.
-       
-        Later results from Lamport, Merkle, Naor and Yung, and others showed that 
-        it is possible to build digital-signature schemes from one-way functions alone---i.e.,
-        just from standard hash functions.
-        Today, we still do not know how to construct public-key encryption or key exchange
-        from one-way functions.
 
-\paragraph{2011:} Google stops using RSA-based key exchange by default on their front-end web servers.
-      Instead, they use RSA-based key exchange only for backwards compatibility with old clients.
-      (Most HTTPS servers today still use RSA for digital signatures to authenticate
-      the messages in a Diffie-Hellman key exchange.) 
 
 \end{itemize}
 
@@ -263,6 +252,13 @@ relatively fast: it just requires three multiplications
 modulo a 2048-bit number $N$. That is, to compute $x^5 \bmod N$, we compute:
 \[ (x^2)^2 \cdot x = x^5\mod N.\]
 
+When we use RSA, we implicitly make 
+the following cryptographic assumption:
+\begin{defn}[RSA Assumption]
+For $(\sk, \pk) \gets \Gen()$, 
+the RSA function $F(\pk, \cdot)$ is a one-way function.
+\end{defn}
+
 \medskip
 
 Before describing the RSA inversion algorithm, we discuss 
@@ -394,6 +390,12 @@ Then:
 \end{align*}
 We could write $5d = k \phi(N) + 1$ because from \cref{lemma:inv},
 we know that $5d \equiv 1 \bmod \phi(N)$.
+
+\paragraph{Inverting RSA is easy on a negligible fraction of points.}
+Recall the RSA is 
+If the preimage under the RSA function of a point $y$ is very very small,
+then 
+If $x < N^{1/5}$, then computing $x$ given $y = x^5 \bmod N$ is \emph{easy}.
 
 
 \paragraph{Is inverting RSA as hard as factoring the modulus $N$?}
