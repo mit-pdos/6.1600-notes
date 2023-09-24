@@ -39,10 +39,29 @@ construction is still used for historical reasons.
 
 \section{Trapdoor one-way permutations}
 
-\subsection{Definition}
-RSA implements a \emph{trapdoor one-way permutation} (``trapdoor OWP''), which we will now define.
+\begin{figure}
+\includegraphics[width=0.45\textwidth]{figs/rsa-owf.pdf}
+\includegraphics[width=0.55\textwidth]{figs/rsa-trapdoor.pdf}
+\caption{A one-way function (at left) is hard to invert on random inputs.
+A trapdoor one-way function/permutation (at right) is a function keyed
+by a public key. The function is easy to invert given the secret key 
+and is hard to invert otherwise.
+}
+\end{figure}
 
-A trapdoor one-way permutation over input space $\calX$ is a triple of
+RSA implements a \emph{trapdoor one-way function}.
+Informally, a trapdoor one-way function is a function that is
+easy to compute in the forward direction but that is hard to 
+invert \emph{except} to someone knowing a secret key.
+So it is like a one-way function with a ``trapdoor'' that allows
+efficient inversion.
+
+RSA actually implements a trapdoor one-way \emph{permutation}---that is,
+it maps an input space onto itself with no collisions.
+
+\subsection{Definition}
+
+Formally, a trapdoor one-way permutation over input space $\calX$ is a triple of
 efficient algorithms:\marginnote{If we wanted to be completely formal, the
 input space would be parameterized by the security parameter $\lambda$.
 So we would have a family of input spaces $\{\calX_\lambda\}_{\lambda \in \N}$---%
@@ -82,6 +101,11 @@ such that
   x &\getsr \calX
 \end{aligned}\right] \leq \negl(\lambda).\]
 
+When we use the RSA cryptosystem, we make the assumption 
+that the RSA function is hard to invert given only the public key:
+\begin{defn}[RSA Assumption]
+The RSA function $(\Gen, F, I)$ is a trapdoor one-way permutation.
+\end{defn}
 
 \paragraph{\textbf{IMPORTANT}:}
 Just as a one-way function is only hard to invert on a \emph{randomly sampled input},
@@ -128,8 +152,8 @@ We construct a digital-signature scheme $(\Gen, \Sign, \Ver)$ as follows:
         trapdoor one-way permutation.
   \item $\Sign(\sk, m) \to \sigma$.
         Hash the message down to an element $h$ of the input space $\calX$
-        of the trapdoor OWP using the hash function $H$. Then invert
-        the trapdoor OWP at that point:
+        of the trapdoor one-way permutation using the hash function $H$. Then invert
+        the trapdoor one-way permutation at that point:
         \begin{itemize}
           \item Compute $h \gets H(m)$.
           \item Output $\sigma \gets I(\sk, h)$.
@@ -146,8 +170,7 @@ security, since (in the random oracle) it means that forging a signature
 is as hard as inverting $F$ on a random point in its co-domain.
 Without the hash function, forging a signature is only as hard as 
 inverting $F$ on an attacker-chosen point in its co-domain, which 
-could be easy.\marginnote{In fact, inverting $F$ at attacker-chosen points
-\emph{is} easy when $F$ is the RSA function.} 
+could be easy.
 
 \paragraph{Correctness.}
 For all $\lambda \in \N$, $(\sk, \pk) \gets \Gen(1^\lambda)$, and $m \in \zo^*$,
@@ -201,23 +224,8 @@ choices of $e$.
   \item $F(\pk = N, x) \to y$.
 \begin{itemize}
   \item The input space for the RSA function is \\
-      $\calX = \Z_N = \{0, 1, 2, 3, \dots, N-1\}$.\marginnote{%
-      To be completely precise, we should write that the 
-      input space of the RSA function is $\Z^*_N$, which is the
-      set of numbers in $\Z_N$ that are relatively prime to the modulus~$N$.
-      Since we only ever sample random numbers
-      from $\calX$, the probability that a random sample 
-      from $\Z_N$ is not also in $\Z_N^*$ is
-\begin{align*}
-  1 - \frac{\abs{\Z^*_N}}{\abs{\Z_N}} &= 1 - \frac{(p-1)(q-1)}{N}\\
-&= 1 - \frac{N - p - q + 1}{N}\\
-&\leq \frac{p + q}{N}\\
-&\approx 2/\sqrt{N}\\
-&\approx 2^{-\lambda}\end{align*}
-      which is negligible in the security parameter $\lambda$.
-      In other words, you are as likely to hit one of these ``bad''
-      elements as you are to guess a prime factor of $N$.
-    }
+    $\calX = \Z^*_N$---the set of elements in $\{0, 1, 2, \dots, N-1\}$
+    relatively prime to $N$.
     \item Output $y \gets x^5 \bmod N$.
 \end{itemize}
 \end{itemize}
@@ -247,12 +255,6 @@ relatively fast: it just requires three multiplications
 modulo a 2048-bit number $N$. That is, to compute $x^5 \bmod N$, we compute:
 \[ (x^2)^2 \cdot x = x^5\mod N.\]
 
-When we use RSA, we implicitly make 
-the following cryptographic assumption:
-\begin{defn}[RSA Assumption]
-For $(\sk, \pk) \gets \Gen()$, 
-the RSA function $F(\pk, \cdot)$ is a one-way function.
-\end{defn}
 
 \medskip
 
@@ -340,9 +342,11 @@ Then
 \[ X = a^{\phi(N)}X \bmod N \quad \Rightarrow\quad 1 = a^{\phi(N)} \bmod N.\]
 \end{proof}
 
+
+
 \begin{lemma}\label{lemma:inv}
 Let $p$ and $q$ be distinct primes congruent to $4$ modulo $5$.
-Define $d = \frac{\phi(N) - 4}{5} + 1$.
+Define the integer $d = \frac{\phi(N) - 4}{5} + 1$.
 Then $5d \equiv 1 \bmod \phi(N)$.
 \end{lemma}
 
@@ -385,6 +389,18 @@ Then:
 \end{align*}
 We could write $5d = k \phi(N) + 1$ because from \cref{lemma:inv},
 we know that $5d \equiv 1 \bmod \phi(N)$.
+
+\paragraph{Using other public exponents.}
+For our RSA-inversion algorithm to work, we need only to
+compute the multiplicative inverse $e$ modulo $\phi(N)$.
+That is, we need to compute an integers $d$ such that
+$ed \equiv 1 \bmod \phi(N)$.
+Such an inverse always exists when $e$ and $\phi(N)=(p-1)(q-1)$ are
+relatively prime.
+RSA implementations typically use the extended Euclidean
+algorithm to compute the multiplicative inverse of $e$ modulo $\phi(N)$.
+That algorithm is more general, but the one we used in \cref{lemma:inv}
+is simpler and is self-contained.
 
 \paragraph{Inverting RSA is easy on a negligible fraction of points.}
 Recall the RSA is 
