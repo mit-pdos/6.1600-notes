@@ -23,8 +23,10 @@ jobs:
             make all
       - name: Commit generated PDFs
         run: |
-          git rm .gitignore
-          git add lecture-notes.pdf chapters/*.pdf
+          mkdir -p docs
+          cp lecture-notes.pdf docs/
+          cp chapters/*.pdf docs/
+          git add docs/*.pdf
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
           git commit -m "Generated PDFs"
