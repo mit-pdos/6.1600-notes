@@ -1,307 +1,322 @@
-\chapter{Encryption in Practice}
+\chapter{Open Questions in Encryption}
 
-So far, we have established several constructions
-that allow us to hide the contents of
-transmissions: we created chosen-plaintext- 
-and chosen-ciphertext-secure
-encryption schemes that worked with and without
-a shared key.
-We will now discuss a few practical applications
-of transport encryption, and why it is often difficult
-to get right.
+So far, we have established what may seem like
+a comprehensive set of tools to transmit data over
+the network: we have schemes for verifying the
+integrity of data and for hiding the contents of
+a transmission from an adversary, both with and
+without a shared key.
+
+Transport-layer security (TLS) effectively builds
+and \textquote{encrypted pipe} between a client and a server.
+Through the encrypted pipe that TLS provides, we can run 
+any of our favorite TCP-based
+protocols---HTTP, SMTP, POP, IMAP, etc.---and can
+thus hide our data from an in-network attacker.
+And yet, the security guarantees that TLS provides fall
+short of the strongest possible security notions we could
+desire.
+
+If we were to imagine the best possible security
+we could ask for regarding network traffic, it
+might look (imprecisely) something like the
+following:
+
+\begin{framed}\noindent
+\emph{An attacker who controls many parties (clients and servers) as well as the network should \textquote{learn nothing} about who the client is talking to and what she is saying.}
+\end{framed}
+
+Unfortunately, the protocols we have for secure communication today
+fall far short of this goal.
+In this section, we describe some of the shortcomings of today's
+transport-security tools and some imperfect solutions.
+
+\section{Problem: Encryption does not hide\\the source and destination of a packet}
+
+\iffalse
+In order to even begin talking to
+a server, the client must learn the server's IP
+address. This happens using the DNS protocol,
+which is entirely unencrypted---a network
+adversary can easily watch the DNS queries a client
+makes and learn who it is talking to.
+\fi
+
+In order to send IP packets over the
+internet, the Internet's routing system relies
+on routers in the network knowing the source
+and destination IP addresses of each packet: these are
+included, unencrypted, in the packet header. 
+(In some ways, the \textquote{pipe} analogy fits
+here: anyone can see where the pipe starts and
+where it ends.)
+
+\paragraph{Solution Attempt: Tor}
+The Tor system aims to allow a client to connect
+to a server over the Internet while hiding---from certain
+types of adversaries---which server the client is connecting
+to.
+For example, a Tor client should be able to browse the web
+without anyone learning which websites the client is visiting.
+
+Tor's strategy is to 
+bounce traffic around the Internet and hope
+that no real-world attacker can gather enough information
+to figure out which client is communicate with which server.
+Tor provides no precise security guarantees, and there are
+scores of research papers demonstrating various weaknesses
+in Tor's security plan.
+At the same time, Tor is publicly available,
+is well supported, is widely used, and 
+seems to provide some meaningful privacy benefits in practice.%
+\marginnote{It is difficult to evaluate the security of a tool
+like Tor, since real-world attackers will not necessarily reveal
+that they can break the tool's security guarantees. So using
+a tool like Tor requires taking a leap of faith.}
 
 
-\section{File Encryption}
-Perhaps the most straightforward use of encryption is file encryption.
+Tor works by nesting several of these encrypted pipes: when opening a connection,
+the Tor client will first select three \emph{relays} from the Tor network $(A, B, C)$. 
+The Tor client will then:
+\begin{enumerate}
+  \item Open an encrypted tunnel to the first relay $A$ (the ``guard'').
+	\item Through that tunnel, open an encrypted tunnel to the second relay~$B$.
+	\item Through that tunnel-inside-a-tunnel, open an encrypted tunnel to the
+    third relay $C$ (the ``exit'').
+\end{enumerate}
 
-\paragraph{Example: WhatsApp Encrypted Backup.}
-WhatsApp allows the app's users to back up their 
-messages and contacts to the cloud.
-This way, a user can recover her messages 
-if she loses or breaks her phone.
-To hide the user's data from WhatsApp's cloud servers, WhatsApp
-uses encrypted backup.
-To achieve this, the user's device generates
-a 128-bit AES key $k$ at the time of backup
-and encrypt the message data
-(photos, messages, etc.) using AES-GCM$(k, \cdot)$
-before sending the \emph{ciphertext} to the
-server. In order to allow you to restore your
-backup on a new phone, the app allows you to
-export 64 decimal digits that encode the AES key
-used. When restoring your backup, you will enter
-these digits and your phone will fetch the
-ciphertext from the server and use these digits to
-reconstruct the key and decrypt your messages.
-\marginnote{See \href{https://scontent.fphl1-1.fna.fbcdn.net/v/t39.8562-6/241394876_546674233234181_8907137889500301879_n.pdf?_nc_cat=108&ccb=1-7&_nc_sid=ad8a9d&_nc_ohc=ANW9FNYPigIAX93N8Oj&_nc_ht=scontent.fphl1-1.fna&oh=00_AT9IVosU4uWqddd5woEO4eUWw3mbd76IgvwjcqDApb3p9A&oe=63565D66}{\textbf{this document}}
-for details on how WhatsApp encrypts backups.
-(The document also describes a more complicated
-backup scheme that uses passwords for encryption.)}
+The client will then send its application-layer traffic 
+through this tunnel-inside-a-tunnel-inside-a-tunnel.
+So each byte of application data will be encrypted first for relay
+$C$, then for relay $B$, then for relay $A$.
+When the client sends this ciphertext over the
+\emph{circuit} from relay $A$ to $B$ to $C$ to the
+real destination, relay $A$ will first strip off its
+layer of encryption then forward the inner packet
+to relay $B$. Relay $B$ will do the same, stripping off
+a layer of encryption and forwarding the packet to
+relay $C$. Finally, relay $C$ will strip off the last layer of
+encryption and be left with a normal IP packet
+that it can then send to the destination server.
+As the response makes it back through the network,
+each relay node will add a layer of encryption.
+The end result of this is that no single relay
+can see the source and destination IP addresses.
 
-This is a fairly simple application of file security. However, file encryption can be much more tricky: many applications require or desire features beyond simple encryption and decryption.
+However, the security that Tor provides is imperfect.
+First, if an attacker controls the guard node (relay $A$) and the
+exit node (relay $C$), the attacker can correlate the timing of
+when a packet enters the guard node and when a packet
+exits the exit node.
+Using this timing an attacker can make a guess at the route
+traffic is taking through the Tor network.
+Even without controlling relay nodes, if an attacker 
+controls certain key points in the Internet (e.g., Internet exchange points
+or undersea fiber links) it may be able to perform this sort
+of traffic analysis even without controlling relays.
 
-\subsection{Case Study: PDF v1.5 Encryption}
-One instance of this desire for extra features
-that ended up going wrong was a previous version
-of the PDF standard, PDF v1.5.\autocite{muller2019practical}
-This standard provided several features:
-\begin{compactenum}
-	\item It is possible to password-encrypt some or all of the document.
-        (The encryption scheme does not matter, but think of it as
-        a secure authenticated-encryption scheme.)
-        For example, a PDF could have an unencrypted title page 
-        and have the rest of the pages be encrypted.
-	\item A PDF document can contain a form that the PDF reader
-        submits to a server via HTTP.
-	\item A form in a PDF document can reference other parts of a document.
-	\item The PDF reader may submit a form when an event happens:
-        when the PDF is opened, closed, decrypted, etc.
-\end{compactenum}
+\section{Problem: Attacker sees packet sizes and timings}
+As we discussed, practical encryption
+schemes necessarily reveal the length of the
+ciphertext. In the context of the Internet,
+this means that an attacker can learn the size
+of each TCP packet that a client sends, along
+with timing information.
+(Here the ``encrypted pipe'' analogy for TLS
+breaks down: an attacker can see how much traffic
+flows through the encrypted pipe and when.)
 
-Each of these features individually seems innocuous.
-However, when combined, there is a clever attack that allows an attacker to 
-learn the contents of the encrypted portion of a PDF.
-
-The attack works against a PDF document with an \emph{unecrypted (public)
-title page}
-and an \emph{encrypted (secret) body}.
-We assume that the attacker can modify the PDF 
-file on its way to the victim.
-
-To mount the attacker, the attacker intercepts the
-PDF on the way to the victim and replaces the
-title page with an \textquote{evil} title page.
-The evil title page:
-\begin{itemize}[noitemsep]
-    \item contains an invisible PDF form,
-    \item reads the contents of the decrypted pages into a PDF form element,
-          on the event that decryption of the PDF body succeeds, 
-          and then
-    \item submits the form via HTTP to \texttt{evil.com}
+Even without seeing the destination and source of packets sent to and from 
+a client's machine, an attacker can learn significant amounts about 
+the client's traffic.
+Some examples are:
+\begin{itemize}
+  \item \emph{Watching a movie:} Video traffic has a distinct traffic pattern.
+      By monitoring, for example, the length of time that a client spends 
+      watching a movie, a network attacker learn with 
+      fairly high accuracy \emph{which movie} the client is watching.
+  \item \emph{Using \ttt{ssh}:} 
+      Different commands will have different traffic patterns.
+      An attacker may be able to infer what type of commands a client 
+      is running by inspecting traffic patterns.
+  \item \emph{Downloading a file:}
+      The bitlength of a downloaded file can uniquely identify the
+      file in many cases.
+  \item \emph{Browsing the web:} sizes leak individual pages.
 \end{itemize}
-So when the victim recipient enters her password into the PDF
-reader to decrypt the document, the evil title page is exfiltrates
-the decrypted content to \texttt{evil.com} via a PDF form.
 
-\paragraph{What went wrong?}
-The core issue here was that the unencrypted
-contents of the document were not authenticated.
-That is, an attacker could modify the
-unencrypted pages of the document without detection.
-A better design would have been to either use
-a MAC over all pages of the document or to use
-a primitive called ``Authenticated Encryption with
-Associated Data'' to authenticate the encrypted data
-together with the unencrypted data.
+\paragraph{Example: New York Times} The New York
+Times homepage \ttt{nytimes.com/} downloads 1.56
+MB of content, along with 76 total assets (images, CSS,
+JavaScript). The webpage to submit
+a sensitive tip, \ttt{nytimes.com/tips}, downloads
+41.92 KB and only 15 assets. By counting the
+number of HTTPS requests that a client makes over an
+encrypted connection to \ttt{nytimes.com}, an attacker 
+can easily distinguish whether a client is
+visiting the homepage or the tips page, even if
+the attacker cannot decrypt even a single bit of
+the HTTPS traffic itself.
 
-One downside of MACing the entire document is that,
-before rendering even a single page of the PDF,
-the reader would have to compute a MAC over the
-entire PDF.
-If the PDF consists of many thousands of pages, 
-this could be expensive.
-Using a more sophisticated cryptographic construction:
-per-page MACs, plus MACs on the document metadata, etc.,
-we might be able to construct a scheme that protects
-document integrity while allowing partial document
-rendering.
-But the design of such a scheme would have to carefully
-defend document integrity against the sort of attacks
-we describe here.
+\paragraph{Attempts at a solution}
+There are several common ways that people attempt
+to protect against this sort of traffic analysis.
+None of these solutions works well. 
 
-\section{Stream Encryption: Transport Layer Security (TLS)}
-The standard Internet data transfer protocols---TCP and UDP---%
-provide no integrity or confidentiality whatsoever.
-To protect the data that we send over the network, 
-we use the \emph{transport-layer security} (TLS) protocol.
-The TLS protocol runs on top of TCP and aims to 
-provide an encrypted \textquote{tunnel} between a
-client and server.\marginnote{HTTPS is simply HTTP run over
-TLS.}
+\begin{enumerate}
+  \item \textbf{Random Noise:} 
+    To try to hide the length of the packets it sends,
+    a client can add a randomly chosen number of bytes
+    of dummy data to the end of each packet.
+    The hope is that by randomizing packet lengths, the
+    client prevents the attacker from performing the
+    traffic analysis.
 
-While designing a stream-encryption protocol may seem straightforward
-at first glance, the task is much more subtle than it would seem.
-However, as is often the case in security, 
-features and practical requirements make the situation much more complex.
+    Unfortunately, a patient attacker can use \emph{averaging}
+    to effectively eliminate the effect of the random noise.
+    That is, if the attacker can trick the client into sending
+    the same message a few times (as is often possible), the
+    attacker can average the noised packet lengths to get a good estimate
+    of the true length.
 
-\subsection{Downgrade Attack}
-We now give one example of a \emph{downgrade attack}---the
-sort of subtle security issue that can arise in protocol design.
+\item \textbf{Padding:}
+  Another option is to just pad every packet (or
+  webpage or encrypted message, etc.) to match the
+  largest packet that the client will ever send.
+  For example, whenever the client visits a page on
+  \ttt{nytimes.com}, the client could
+  download 50MB of page content and 100 fixed-size assets, even
+  if the true page is tiny.
+  This is somewhat secure, but
+  incredibly costly and therefore not practical
+  outside of very specific circumstances.
+\end{enumerate}
 
-The current version of TLS is TLS 1.3. An older
-version of the TLS standard, called SSLv3,
-is vulnerable to devastating
-attacks that allow an attacker to recover the plaintext traffic.
-However, for backwards compatibility, many TLS clients
-and servers still supported SSLv3 until quite recently.
+\section{A Promising Direction: Metadata Privacy for Messaging}
+Messaging apps like WhatsApp and iMessage are end-to-end encrypted, but still may leak who you are talking to. This problem is more tractable due to the circumstances of messaging:
 
-When a TLS client connects to a TLS server, the two parties
-first exchange some messages to decide which version of the TLS
-protocol to use.
-In particular, the client will try to connect to the server using
-the latest version of TLS it supports.
-The server will respond back with either a confirmation 
-(if the server supports the client's proposed TLS version) or with garbage
-(if not).
-If garbage, the client will try to connect to the server
-with an older version of TLS.
+\begin{itemize}
+	\item Messages are approximately fixed length.
+	\item Some latency is OK.
+	\item Total daily traffic per user is small.
+	\item Each user talks to few messaging partners.
+\end{itemize}
 
-An important point is that \emph{none} of these negotiation messages
-are authenticated---the client and server cannot start
-using authentication (MACs, signatures, etc.) until they agree on 
-which version of TLS to use!
-So, an active in-network attacker
-can simply replace all of the server responses in
-this protocol-negotiation phase
-with garbage until the client downgrades all the way to SSLv3.
-Once the client and server agree to use SSLv3,
-believing that this is their best available option,
-the attacker can then monitor and decrypt their
-traffic using known attacks on SSLv3.
+Because of these constraints, it may be feasible to
+use techniques like padding to greatly reduce the
+amount of data that messaging metadata reveals and
+to do so in a way that provides strong formal
+guarantees about security.
+But still, no widely used messaging app provides
+any sort of metadata-privacy guarantees.
 
-The best defense against this attack is for both parties to
-disable support for SSLv3 completely.
+\section{Problem: Endpoint Compromise}
 
-\subsection{TLS Structure}
-TLS consists of two main phases:
-\begin{compactenum}
-\item \textbf{Handshake:}
-  In this phase, the client and server use a key-exchange protocol to agree on a shared key to use to encrypt their application-layer traffic. This step uses public-key cryptography, since the client and server initially have no shared secret.
-\item \textbf{Record protocol:} This phase is where the actual application-layer communication happens. This phases uses the secret key that the client and server agreed  upon in the handshake phase for authentication and encryption. 
-\end{compactenum}
+Say that we have a perfect scheme for transport security---one
+that hides all data and metadata.
+Such a scheme is still not enough to protect our data if
+an adversary can compromise the communication \emph{endpoints}.
 
-\subsection{TLS Handshake Properties}
-In our definitions of public-key encryption, we
-had only two (relatively simple) properties: 
-correctness and security. 
-The TLS handshake, however, has a much more complicated
-set of goals:
+For example, in many applications, a client sends 
+some sensitive data to a server (e.g., its Google search queries).
+The server is free to lose it in
+a breach, sell it, or turn it over to law
+enforcement agencies, etc. 
+Later on, we will discuss how to protect against server compromise
+using software-engineering techniques.
+Here, we will give one example of how cryptography can protect user
+data even against a compromised server.
 
-\begin{compactitem}
-\item \textbf{Correctness:} Both parties agree on the same session key 
-        at the conclusion of the handshake.
-      \item \textbf{Security:} adversary \textquote{learns nothing} about the secret
-        key that the parties agree upon at the conclusion of the handshake.
-      \item \textbf{Peer authentication:} At the end of the handshake, each party believes that they are talking to the other party.
-      \item \textbf{Downgrade protection:} The parties agree on the same version of TLS that they would agree on absent an in-network attacker.
-      \item \textbf{Forward secrecy with respect
-        to key compromise:} if an attacker
-        steals the secrets stored on the client or the server, 
-        the attacker cannot decrypt past traffic.
-        \marginnote{To provide forward secrecy, modern cryptographic
-        protocols use long-term secrets only for signing---not for
-        encryption.
-        These protocols use \emph{ephemeral} (one-time-use) 
-        cryptographic keys for key exchange and encryption.
-        Protocol participants delete these ephemeral keys on
-        connection teardown and/or they rotate these keys often.
+\subsection{Private Information Retrieval}
+In many applications, a client must read a record from a
+database stored at a server.
+The client might like to perform such a database query
+without the server
+learning which record it accessed.\marginnote{A
+concrete application of this is Google search---in
+order to give you search results, Google
+necessarily learns what you are searching. With
+a PIR scheme, it would be possible for Google to
+look up search results without learning what you
+are searching for!}
 
-        This way, if an attacker compromises a party's secret key,
-        the attacker can only sign messages on behalf of that party;
-        the attacker cannot use the secret to decrypt past messages.}
-      \item \textbf{Protection against key-compromise impersonation:} If an attacker steals a client's secret key, the attacker should not be able to impersonate other servers to the client.
-      \item \textbf{Protection of endpoint
-        identities:} The public keys of the two
-        parties should never flow over the wire in
-        the clear. For example, if a client is
-        connecting to a website that uses
-        a content-distribution network, such as
-        Akamai or Cloudflare, an attacker should
-        not be able to tell which website the
-        client is connecting to---only that it is
-        hosted on Akamai or Cloudflare.
-\end{compactitem}
+In a \emph{private information retrieval} scheme:
+\begin{itemize}[noitemsep]
+  \item the server holds a 
+    public database of $n$ bits: $x_1, x_2, \ldots, x_n \in \bin$, and
+  \item the client holds a secret index $i \in \{1, \dots, n\}$.
+\end{itemize}
+The client and server interact. At the end of the interaction
+we want the following properties to hold:
+\begin{itemize}[noitemsep]
+  \item \emph{Correctness:} The client outputs $x_i \in \bin$.
+  \item \emph{Security:} The server ``learns nothing'' about the
+    client's secret index $i$. In particular, we demand that the
+    message that the client sends to the server is a CPA-secure
+    encryption of its index $i$.
+\end{itemize}
 
-\subsection{TLS Handshake}
-The TLS handshake is very carefully designed to achieve these properties. A grossly simplified version looks something like the following:
+\paragraph{Na\"ive private information retrieval.}
+The simple scheme for private information retrieval
+is to have the server send all $n$ bits of the database
+to the client.
+When the database is large, as it is for Google search,
+this would be an infeasible amount of communication.
+A surprising fact is that there are simple private-information-retrieval
+protocols that involve much less than $n$ bits of client-server
+communication.
 
-\begin{compactenum}
-\item At the start of the handshake, the TLS client
-  holds the public $\pk_{\text{CA}}$ of a certificate authority.
-  The TLS server (for example, MIT) holds its secret signing key
-  $\sk_\text{MIT}$ and a public-key certificate $\text{cert}_{MIT}$
-  binding its public key $\pk_\text{MIT}$ to its domain \texttt{mit.edu}.
-\item \textbf{Client Hello}: The client sends the following values to
-  the server:
-	\begin{compactitem}
-		\item a random nonce,
-		\item list of supported ciphersuites, and
-      \marginnote{A \emph{ciphersuite} contains all of the
-          cryptographic parameters needed to perform key exchange,
-          hashing, authentication, and encryption.
-          For example, one possible ciphersuite for TLS 1.2 is
-          \texttt{ECDHE-RSA-AES256-GCM-SHA384}.
-          This indicates use of ephemeral elliptic-curve
-          Diffie-Hellman key exchange (\texttt{DHE}) with
-          RSA signatures (\texttt{RSA}), 256-bit AES
-          encryption in GCM mode (\texttt{AES256-GCM}),
-          and SHA2-384 as the hash function (\texttt{SHA384}).}
-		\item an ephemeral Diffie-Hellman public key.
-          (The client constructs this Diffie-Hellman public key
-          using its preferred ciphersuite. If the server does not
-          support the ciphersuite the client picked, the client
-          will have to re-run this step using a different
-          ciphersuite.)
-	\end{compactitem}
-\item \textbf{Server Hello}: The server sends several values to the client, choosing a ciphersuite to use and completing the Diffie-Hellman key exchange. 
-  That is, the server sends:
-	\begin{compactitem}
-		\item a random nonce,
-		\item a ciphersuite to use,
-		\item and an ephemeral Diffie-Hellman public key
-	\end{compactitem}
-\item Both partices compute a shared session key $k$
-  using Diffie-Hellman key agreement on the ephemeral keys 
-  they exchanged.
-\item Under encryption using the keys derived from the session key $k$, the server sends the certificate for \ttt{mit.edu} as well as a signature over all messages sent so far, using its long-term secret key $\sk_\text{MIT}$. The client then checks that:
-	\begin{compactitem}
-	\item the certificate has been signed by one of the client's trusted CAs, and
-	\item the signature from the server matches their own record of the messages.
-	\end{compactitem}
-\item Finally, the client and server run the TLS Record Protocol to exchange encrypted and authenticated application data.
-\end{compactenum}
+\subsection{A non-trivial private-information-retrieval scheme.}
+To achieve this, we need a new tool called
+\emph{additively homomorphic encryption}.
 
-This simplified toy version of the TLS handshake 
-does not provide many of the features that the real TLS handshake
-provides. But it should give you a flavor of what the real 
-handshake looks like.
+\paragraph{Additively homomorphic encryption}
+A secret-key additively homomorphic encryption scheme is
+a CPA-secure secret-key encryption scheme $(\Enc,
+\Dec)$ over key space $\calK$ and 
+message space in $\calM = \Z_p$ with the
+added property that for all keys $k \in \calK$
+and all messages $m, \hat{m} \in \calM$,
+\[ \Enc(k, m) \star \Enc(k, \hat{m}) = \Enc(k, m + \hat{m}), \]
+where ``$\star$'' is some fixed binary operation on ciphertexts.
 
-% TODO: protection of endpoint identities
+In English: given two encrypted messages $m$ and $\hat m$,
+encrypted under an additively homomorphic encryption scheme,
+anyone can compute the encryption of $m + \hat m$.
+Being able to add encrypted messages also allows multiplying
+encrypted messages by public constants, since $m + m = 2m$
+and $2m + 2m = 4m$ and so on.
+Once we can add and multiply by constants, and
+we can compute a matrix-vector product of an
+encrypted vector and a public matrix.
 
-\section{Properties that TLS does not provide}
+It is possible to construct an additively
+homomorphic encryption scheme from the DDH
+assumption, with only a slight tweak to ElGamal
+encryption.
 
-\paragraph{Authenticated End-of-File}
-TLS does not provide any end-of-file authentication,
-or ``clean closure.''
-To explain what this means by example:
+\paragraph{PIR Construction}
+We can use additively homomorphic encryption
+to construct a private-information-retrieval scheme.
+To do so, the server represents its
+its database (the $x_i$ values) as a $\sqrt{n}
+\times \sqrt{n}$ matrix $D$. The client then tells
+the server which column $j$ it would like by
+supplying the encryption of a $\sqrt{n} \times 1$
+vector $\vec{m}$ with a 1 in the $j$th location.
+The client sends this encryption (using a key only
+the client knows) as $\Enc(k, \vec{m})$. The
+server computes the matrix product $\Enc(k,
+D\vec{m})$, which gives the $j$th column of the
+matrix, using additively homomorphic encryption
+and returns the response to the client, where the
+client can find the bit they are interested in in
+the column. 
 
-A popular tool to install the toolchain for the trendy systems programming language Rust is \ttt{rustup}. To use the tool and install the Rust toolchain, the recommanded method is to run the 
-command ``\ttt{curl https://sh.rustup.rs | sh}.''
-This downloads a shell script from the internet 
-over HTTPS and immediately runs it using the shell \ttt{sh}.
-
-Imagine that the contents of the downloaded script
-create a temporary directory, copy things into it,
-install some things, and finally delete the
-temporary directory with something like \ttt{rm -r
-/tmp/install}.
-An in-network attacker, who knows the structure of the \ttt{rustup}
-install script, could drop all of the packets in the stream immediately
-after the characters \ttt{rm -r /}.
-Eventually, the TLS connection will timeout, an shell will run
-the command \ttt{rm -r /}, deleting the user's entire file system.
-
-To protect against this, script writers try to
-design their scripts such that if the stream is
-cut off in the middle of a download, nothing happens.
-For example, the install script might consist of a 
-single function definition that is called at the very 
-end of the function.
-
-\paragraph{Plaintext Length Obfuscation}
-As we have discussed, encryption reveals exactly
-the length of the plaintext. If there is data that
-is not encrypted that is then included inside the
-encrypted data as well, this can cause
-a vulnerability---see the CRIME attack.
-% TODO: Finish this up. It's a clever attack.
+This allows a client to retrieve a bit from
+a server's database without the server learning
+anything about the desired bit, and to do so at 
+the communication cost of only $2\sqrt{n}$ ciphertext. The server
+computation cost is high---the server necessarily
+touches every bit of the database---but at least it
+shows that making private queries is feasible in theory.

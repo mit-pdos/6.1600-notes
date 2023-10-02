@@ -1,157 +1,307 @@
-\chapter{Public-Key Encryption}
+\chapter{Encryption in Practice}
 
-So far, all of the encryption schemes we have seen
-require the sender and recipient to 
-\emph{share a secret encryption key}.
-In this section, we show that it is possible for
-a sender to encrypt a message to a recipient even
-if the two parties do not share a secret key.
+So far, we have established several constructions
+that allow us to hide the contents of
+transmissions: we created chosen-plaintext- 
+and chosen-ciphertext-secure
+encryption schemes that worked with and without
+a shared key.
+We will now discuss a few practical applications
+of transport encryption, and why it is often difficult
+to get right.
 
-In particular, in ``symmetric-key'' or ``secret-key'' encryption
-schemes we have seen so far, the sender and recipient use the \emph{same key}
-to encrypt and decrypt messages.
-In the ``asymmetric-key'' or ``public-key'' encryption schemes
-we consider now, the sender and recipient use \emph{different keys}
-to encrypt and decrypt messages.
 
-\section{Defining Public-Key Encryption}
-The definition for a public-key encryption scheme will be similar to the 
-definitions we saw for symmetric-key encryption:
+\section{File Encryption}
+Perhaps the most straightforward use of encryption is file encryption.
 
-\begin{definition}[Public-Key Encryption Scheme]
-	A public-key encryption scheme over message space $\calM$ 
-  consists of three efficient algorithms $(\Gen, \Enc, \Dec)$:
-	\begin{compactitem}
-    \item $\Gen() \to (\sk, \pk)$: Generates a keypair with secret key $\sk$ and public key $\pk$.
-    \item $\Enc(\pk, m) \to c$: Uses public key $\pk$ to encrypts a message $m \in \calM$ 
-            to a ciphertext $c$.
-    \item $\Dec(\sk, c) \to m$: Uses secret key $\sk$ to decrypt ciphertext $c$ into message $m \in \calM$.
-	\end{compactitem}
-\end{definition}
+\paragraph{Example: WhatsApp Encrypted Backup.}
+WhatsApp allows the app's users to back up their 
+messages and contacts to the cloud.
+This way, a user can recover her messages 
+if she loses or breaks her phone.
+To hide the user's data from WhatsApp's cloud servers, WhatsApp
+uses encrypted backup.
+To achieve this, the user's device generates
+a 128-bit AES key $k$ at the time of backup
+and encrypt the message data
+(photos, messages, etc.) using AES-GCM$(k, \cdot)$
+before sending the \emph{ciphertext} to the
+server. In order to allow you to restore your
+backup on a new phone, the app allows you to
+export 64 decimal digits that encode the AES key
+used. When restoring your backup, you will enter
+these digits and your phone will fetch the
+ciphertext from the server and use these digits to
+reconstruct the key and decrypt your messages.
+\marginnote{See \href{https://scontent.fphl1-1.fna.fbcdn.net/v/t39.8562-6/241394876_546674233234181_8907137889500301879_n.pdf?_nc_cat=108&ccb=1-7&_nc_sid=ad8a9d&_nc_ohc=ANW9FNYPigIAX93N8Oj&_nc_ht=scontent.fphl1-1.fna&oh=00_AT9IVosU4uWqddd5woEO4eUWw3mbd76IgvwjcqDApb3p9A&oe=63565D66}{\textbf{this document}}
+for details on how WhatsApp encrypts backups.
+(The document also describes a more complicated
+backup scheme that uses passwords for encryption.)}
 
-\begin{definition}[Public-Key Encryption - Correctness]
-For all keypairs $(\sk, \pk) \gets \Gen()$ and for all messages $m \in \calM$,
-it holds that $$\Dec(\sk, \Enc(\pk, m)) = m.$$
-\end{definition}
+This is a fairly simple application of file security. However, file encryption can be much more tricky: many applications require or desire features beyond simple encryption and decryption.
 
-\begin{definition}[Public-Key Encryption - Security against chosen-plaintext attacks (Weak)]
-  \marginnote{The literature sometimes calls security against chosen-plaintext attacks (``CPA security'')
-  \emph{semantic security}.}
-  A public-key encryption scheme $(\Gen, \Enc, \Dec)$ is \emph{secure against chosen-plaintext attacks}
-  if all efficient adversaries $\calA$ 
-  win the following game with probability $\leq \tfrac{1}{2} + \negl$:
+\subsection{Case Study: PDF v1.5 Encryption}
+One instance of this desire for extra features
+that ended up going wrong was a previous version
+of the PDF standard, PDF v1.5.\autocite{muller2019practical}
+This standard provided several features:
+\begin{compactenum}
+	\item It is possible to password-encrypt some or all of the document.
+        (The encryption scheme does not matter, but think of it as
+        a secure authenticated-encryption scheme.)
+        For example, a PDF could have an unencrypted title page 
+        and have the rest of the pages be encrypted.
+	\item A PDF document can contain a form that the PDF reader
+        submits to a server via HTTP.
+	\item A form in a PDF document can reference other parts of a document.
+	\item The PDF reader may submit a form when an event happens:
+        when the PDF is opened, closed, decrypted, etc.
+\end{compactenum}
 
-	\begin{compactitem}
-  \item The challenger generates $(\sk, \pk) \gets \Gen()$ and $b \getsr \bin$ and sends 
-        the public key $\pk$ to $\A$.
-  \item The adversary $\A$ sends $m_0, m_1 \in \calM$ to the challenger,
-        where $\abs{m_0} = \abs{m_1}$.
-  \item The challenger responds with $\Enc(\pk, m_b)$		
-  \item The adversary outputs $b'$ and wins if $b' = b$.
-	\end{compactitem}
-\end{definition}
-Note that since this is a public-key encryption
-scheme, the adversary can use the public key to
-generate encryptions of any message of their choice. 
-As in the secret-key setting, here it is crucial that
-the encryption algorithm be randomized---otherwise
-two encryptions of the same message are identical
-and the attacker can break CPA security.
+Each of these features individually seems innocuous.
+However, when combined, there is a clever attack that allows an attacker to 
+learn the contents of the encrypted portion of a PDF.
 
-For symmetric-key encryption, we also defined
-a stronger notion of security that we called
-security against chosen-ciphertext attacks (CCA security).
-We can extend this definition of CCA security
-to the public-key setting.
+The attack works against a PDF document with an \emph{unecrypted (public)
+title page}
+and an \emph{encrypted (secret) body}.
+We assume that the attacker can modify the PDF 
+file on its way to the victim.
 
-This security definition asserts that the attacker should not be
-able to distinguish the encryption $c^*$ of two messages of its choice,
-even if the attacker can obtain decryptions of any ciphertext except
-$c^*$.
-This is a very strong notion of security (since the security definition
-gives the attacker a lot of power) and it is the notion of security
-that we typically demand in practice.
+To mount the attacker, the attacker intercepts the
+PDF on the way to the victim and replaces the
+title page with an \textquote{evil} title page.
+The evil title page:
+\begin{itemize}[noitemsep]
+    \item contains an invisible PDF form,
+    \item reads the contents of the decrypted pages into a PDF form element,
+          on the event that decryption of the PDF body succeeds, 
+          and then
+    \item submits the form via HTTP to \texttt{evil.com}
+\end{itemize}
+So when the victim recipient enters her password into the PDF
+reader to decrypt the document, the evil title page is exfiltrates
+the decrypted content to \texttt{evil.com} via a PDF form.
 
-\begin{definition}[Public-Key Encryption - Security against chosen-ciphertext attacks (Strong)]
-  A public-key encryption scheme $(\Gen, \Enc, \Dec)$ is \emph{secure against chosen-ciphertext attacks}
-  if all efficient adversaries $\calA$ 
-  win the following game with probability $\leq \tfrac{1}{2} + \negl$:
+\paragraph{What went wrong?}
+The core issue here was that the unencrypted
+contents of the document were not authenticated.
+That is, an attacker could modify the
+unencrypted pages of the document without detection.
+A better design would have been to either use
+a MAC over all pages of the document or to use
+a primitive called ``Authenticated Encryption with
+Associated Data'' to authenticate the encrypted data
+together with the unencrypted data.
+
+One downside of MACing the entire document is that,
+before rendering even a single page of the PDF,
+the reader would have to compute a MAC over the
+entire PDF.
+If the PDF consists of many thousands of pages, 
+this could be expensive.
+Using a more sophisticated cryptographic construction:
+per-page MACs, plus MACs on the document metadata, etc.,
+we might be able to construct a scheme that protects
+document integrity while allowing partial document
+rendering.
+But the design of such a scheme would have to carefully
+defend document integrity against the sort of attacks
+we describe here.
+
+\section{Stream Encryption: Transport Layer Security (TLS)}
+The standard Internet data transfer protocols---TCP and UDP---%
+provide no integrity or confidentiality whatsoever.
+To protect the data that we send over the network, 
+we use the \emph{transport-layer security} (TLS) protocol.
+The TLS protocol runs on top of TCP and aims to 
+provide an encrypted \textquote{tunnel} between a
+client and server.\marginnote{HTTPS is simply HTTP run over
+TLS.}
+
+While designing a stream-encryption protocol may seem straightforward
+at first glance, the task is much more subtle than it would seem.
+However, as is often the case in security, 
+features and practical requirements make the situation much more complex.
+
+\subsection{Downgrade Attack}
+We now give one example of a \emph{downgrade attack}---the
+sort of subtle security issue that can arise in protocol design.
+
+The current version of TLS is TLS 1.3. An older
+version of the TLS standard, called SSLv3,
+is vulnerable to devastating
+attacks that allow an attacker to recover the plaintext traffic.
+However, for backwards compatibility, many TLS clients
+and servers still supported SSLv3 until quite recently.
+
+When a TLS client connects to a TLS server, the two parties
+first exchange some messages to decide which version of the TLS
+protocol to use.
+In particular, the client will try to connect to the server using
+the latest version of TLS it supports.
+The server will respond back with either a confirmation 
+(if the server supports the client's proposed TLS version) or with garbage
+(if not).
+If garbage, the client will try to connect to the server
+with an older version of TLS.
+
+An important point is that \emph{none} of these negotiation messages
+are authenticated---the client and server cannot start
+using authentication (MACs, signatures, etc.) until they agree on 
+which version of TLS to use!
+So, an active in-network attacker
+can simply replace all of the server responses in
+this protocol-negotiation phase
+with garbage until the client downgrades all the way to SSLv3.
+Once the client and server agree to use SSLv3,
+believing that this is their best available option,
+the attacker can then monitor and decrypt their
+traffic using known attacks on SSLv3.
+
+The best defense against this attack is for both parties to
+disable support for SSLv3 completely.
+
+\subsection{TLS Structure}
+TLS consists of two main phases:
+\begin{compactenum}
+\item \textbf{Handshake:}
+  In this phase, the client and server use a key-exchange protocol to agree on a shared key to use to encrypt their application-layer traffic. This step uses public-key cryptography, since the client and server initially have no shared secret.
+\item \textbf{Record protocol:} This phase is where the actual application-layer communication happens. This phases uses the secret key that the client and server agreed  upon in the handshake phase for authentication and encryption. 
+\end{compactenum}
+
+\subsection{TLS Handshake Properties}
+In our definitions of public-key encryption, we
+had only two (relatively simple) properties: 
+correctness and security. 
+The TLS handshake, however, has a much more complicated
+set of goals:
+
 \begin{compactitem}
-\item The challenger generates $(\sk, \pk) \gets \Gen()$ and $b \getsr \bin$ and sends 
-  the public key $\pk$ to the adversary $\A$.
-\item The adversary may make polynomially many \emph{decryption queries}:
-    \begin{compactitem}
-    \item The adversary $\A$ sends ciphertext $c$ to the challenger.
-    \item The challenger responds with $m \gets \Dec(\sk, c)$		
-    \end{compactitem}
-\item At some point, the adversary sends a pair of messages $m_0, m_1 \in \calM$
-  to the challenger, where $\abs{m_0}=\abs{m_1}$.
-\item The challenger returns $c^* \gets \Enc(\pk, m_b)$.
-\item The adversary can continue to make decryption queries, provided that
-      it never asks the challenger to decrypt the ciphertext $c^*$.
-\item The adversary outputs $b'$ and wins if $b' = b$.
+\item \textbf{Correctness:} Both parties agree on the same session key 
+        at the conclusion of the handshake.
+      \item \textbf{Security:} adversary \textquote{learns nothing} about the secret
+        key that the parties agree upon at the conclusion of the handshake.
+      \item \textbf{Peer authentication:} At the end of the handshake, each party believes that they are talking to the other party.
+      \item \textbf{Downgrade protection:} The parties agree on the same version of TLS that they would agree on absent an in-network attacker.
+      \item \textbf{Forward secrecy with respect
+        to key compromise:} if an attacker
+        steals the secrets stored on the client or the server, 
+        the attacker cannot decrypt past traffic.
+        \marginnote{To provide forward secrecy, modern cryptographic
+        protocols use long-term secrets only for signing---not for
+        encryption.
+        These protocols use \emph{ephemeral} (one-time-use) 
+        cryptographic keys for key exchange and encryption.
+        Protocol participants delete these ephemeral keys on
+        connection teardown and/or they rotate these keys often.
+
+        This way, if an attacker compromises a party's secret key,
+        the attacker can only sign messages on behalf of that party;
+        the attacker cannot use the secret to decrypt past messages.}
+      \item \textbf{Protection against key-compromise impersonation:} If an attacker steals a client's secret key, the attacker should not be able to impersonate other servers to the client.
+      \item \textbf{Protection of endpoint
+        identities:} The public keys of the two
+        parties should never flow over the wire in
+        the clear. For example, if a client is
+        connecting to a website that uses
+        a content-distribution network, such as
+        Akamai or Cloudflare, an attacker should
+        not be able to tell which website the
+        client is connecting to---only that it is
+        hosted on Akamai or Cloudflare.
 \end{compactitem}
-\end{definition}
 
-\section{ElGamal Encryption Scheme}
-In public-key encryption, we want a sender to be able to encrypt a message
-to a recipient 
-The goal of public-key encryption is to perform encryption without a shared secret key.
+\subsection{TLS Handshake}
+The TLS handshake is very carefully designed to achieve these properties. A grossly simplified version looks something like the following:
 
-ElGamal's encryption scheme essentially uses Diffie-Hellman key exchange to allow
-the sender and recipient to agree on a shared secret key $k$, and then has
-the sender encrypt her message with a symmetric-key cryptosystem under key $k$.
-\marginnote{ElGamal's scheme was not the first
-public-key encryption scheme. The first scheme,
-RSA, was much more complicated despite
-Diffie-Hellman already having been published.}
+\begin{compactenum}
+\item At the start of the handshake, the TLS client
+  holds the public $\pk_{\text{CA}}$ of a certificate authority.
+  The TLS server (for example, MIT) holds its secret signing key
+  $\sk_\text{MIT}$ and a public-key certificate $\text{cert}_{MIT}$
+  binding its public key $\pk_\text{MIT}$ to its domain \texttt{mit.edu}.
+\item \textbf{Client Hello}: The client sends the following values to
+  the server:
+	\begin{compactitem}
+		\item a random nonce,
+		\item list of supported ciphersuites, and
+      \marginnote{A \emph{ciphersuite} contains all of the
+          cryptographic parameters needed to perform key exchange,
+          hashing, authentication, and encryption.
+          For example, one possible ciphersuite for TLS 1.2 is
+          \texttt{ECDHE-RSA-AES256-GCM-SHA384}.
+          This indicates use of ephemeral elliptic-curve
+          Diffie-Hellman key exchange (\texttt{DHE}) with
+          RSA signatures (\texttt{RSA}), 256-bit AES
+          encryption in GCM mode (\texttt{AES256-GCM}),
+          and SHA2-384 as the hash function (\texttt{SHA384}).}
+		\item an ephemeral Diffie-Hellman public key.
+          (The client constructs this Diffie-Hellman public key
+          using its preferred ciphersuite. If the server does not
+          support the ciphersuite the client picked, the client
+          will have to re-run this step using a different
+          ciphersuite.)
+	\end{compactitem}
+\item \textbf{Server Hello}: The server sends several values to the client, choosing a ciphersuite to use and completing the Diffie-Hellman key exchange. 
+  That is, the server sends:
+	\begin{compactitem}
+		\item a random nonce,
+		\item a ciphersuite to use,
+		\item and an ephemeral Diffie-Hellman public key
+	\end{compactitem}
+\item Both partices compute a shared session key $k$
+  using Diffie-Hellman key agreement on the ephemeral keys 
+  they exchanged.
+\item Under encryption using the keys derived from the session key $k$, the server sends the certificate for \ttt{mit.edu} as well as a signature over all messages sent so far, using its long-term secret key $\sk_\text{MIT}$. The client then checks that:
+	\begin{compactitem}
+	\item the certificate has been signed by one of the client's trusted CAs, and
+	\item the signature from the server matches their own record of the messages.
+	\end{compactitem}
+\item Finally, the client and server run the TLS Record Protocol to exchange encrypted and authenticated application data.
+\end{compactenum}
 
-\begin{definition}[Hashed ElGamal Encryption]
-Let $p$, $q$, and $g$ be integers of the sort we use for Diffie-Hellman
-key exchange (\cref{sec:dh}).
-In particular, $p \approx q \approx 2^{2048}$
-and $g \in \Z^*_p$.
-  \marginnote{In practice, we typically use elliptic-curve groups to 
-  instantiate ElGamal encryption, instead of $\Z^*_p$.
-  But the general principle is exactly the same.}
+This simplified toy version of the TLS handshake 
+does not provide many of the features that the real TLS handshake
+provides. But it should give you a flavor of what the real 
+handshake looks like.
 
-Let $H: \Z^*_p \rightarrow \bin^*$ be a hash function (modelled as a random oracle). Let $(\Enc', \Dec')$ 
-be a symmetric-key authenticated-encryption scheme. Then define:
+% TODO: protection of endpoint identities
 
-\begin{compactitem}
-\item $\Gen() \to (\sk, \pk)$:
-    \begin{itemize}[noitemsep]
-          \item Choose $a \gets \{1, \dots, q\}$.
-          \item Compute $A \gets g^a \in \Z^*_p$.
-          \item Output $(\sk, \pk) \gets (a, A)$.	
-    \end{itemize}
-  \item $\Enc(\pk, m) \to c$:
-    \begin{itemize}[noitemsep]
-      \item Choose $r \gets \{1, \dots, q\}$.
-      \item Compute $R \gets g^r \in \Z^*_p$.
-      \item Compute $k \gets H(\pk^r \in \Z^*_p)$.
-      \item Output $c \gets (R, \Enc'(k, m)$.
-    \end{itemize}
+\section{Properties that TLS does not provide}
 
-  \item $\Dec(\sk, c) \to m$:
-    \begin{itemize}[noitemsep]
-      \item Parse $(R, c') \gets c$.
-      \item Compute $k \gets H(R^a \in \Z^*_p)$.
-      \item Output $m \gets \Dec'(k, c')$.
-    \end{itemize}
-\end{compactitem}
-\end{definition}
+\paragraph{Authenticated End-of-File}
+TLS does not provide any end-of-file authentication,
+or ``clean closure.''
+To explain what this means by example:
 
-\subsection{Performance}
-The performance of this scheme is limited by the exponentiations---the symmetric encryption scheme is quite fast (gigabytes per second), but a single exponentiation can take a millisecond on modern processors. For encryption, this scheme requires two exponentiations ($g^r$ and $\pk^r$). Decryption requires one exponentiation $(R^\sk)$.
-To speed up the encryption routine, we can precompute powers of $g$: $g^2, g^4, g^8, g^{16}, \dots$, which saves a factor of two in exponentiations.
-\marginnote{Hashed ElGamal encryption is one of the most common public-key encryption
-schemes used today.}
+A popular tool to install the toolchain for the trendy systems programming language Rust is \ttt{rustup}. To use the tool and install the Rust toolchain, the recommanded method is to run the 
+command ``\ttt{curl https://sh.rustup.rs | sh}.''
+This downloads a shell script from the internet 
+over HTTPS and immediately runs it using the shell \ttt{sh}.
 
-\subsection{Security}
-If we model the hash function $H$ as a random oracle, 
-we can prove security of ElGamal encryption from 
-(a) the computational Diffie-Hellman assumption (\cref{defn:cdh}) and
-(b) the CCA security of the underlying authenticated-encryption
-scheme $(\Enc', \Dec')$.
+Imagine that the contents of the downloaded script
+create a temporary directory, copy things into it,
+install some things, and finally delete the
+temporary directory with something like \ttt{rm -r
+/tmp/install}.
+An in-network attacker, who knows the structure of the \ttt{rustup}
+install script, could drop all of the packets in the stream immediately
+after the characters \ttt{rm -r /}.
+Eventually, the TLS connection will timeout, an shell will run
+the command \ttt{rm -r /}, deleting the user's entire file system.
 
+To protect against this, script writers try to
+design their scripts such that if the stream is
+cut off in the middle of a download, nothing happens.
+For example, the install script might consist of a 
+single function definition that is called at the very 
+end of the function.
+
+\paragraph{Plaintext Length Obfuscation}
+As we have discussed, encryption reveals exactly
+the length of the plaintext. If there is data that
+is not encrypted that is then included inside the
+encrypted data as well, this can cause
+a vulnerability---see the CRIME attack.
+% TODO: Finish this up. It's a clever attack.
