@@ -46,6 +46,28 @@ decrypted value (such as whether the decrypted ciphertext is a
 well-formed request or not), the attacker could potentially learn 
 the entire secret key!
 
+As a concrete application-level example, consider what could
+happen if SSH (the secure shell protocol) used the counter-mode
+encryption scheme, as described in the previous lecture, without any
+authentication.  A user might send the command
+\texttt{echo secret > secret-file} to write their secret string,
+\texttt{secret}, to their own private file \texttt{secret-file}.
+The encryption of this command, sent over the network, would be the XOR
+of the command and the PRF-generated pseudorandom bytes.  Suppose that
+the adversary knows the user is running this command, but doesn't know
+the contents of the 6-byte secret string.  Consider what
+happens if the adversary XORs the encrypted message with the hexadecimal
+bytes \texttt{00 00 00 00 00 00 00 00 00 00 00 00 00 00 5c 11 0e 02 4a
+04 58 04 05 05 06}.  The leading zeroes mean that the first part of the
+command, \texttt{echo secret > }, will remain unchanged.  When the server
+decrypts the latter part of the command (originally \texttt{secret-file}),
+however, it will obtain the XOR of \texttt{secret-file} and the bytes that
+the adversary XOR'ed in, which happens to turn into the string \texttt{/tmp/public}.
+As a result, if the server now runs this command, the user's secret data
+will be written to a file \texttt{/tmp/public}, which might be available
+to an adversary that also has an account on that same server and can look
+at files in \texttt{/tmp}.
+
 Chosen-ciphertext security guarantees that such attacks are ineffective.
 
 
