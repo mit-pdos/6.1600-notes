@@ -178,7 +178,7 @@ the application, it should be difficult for the attacker
 to compromise the logs as well.
 
 
-\section{Delegation and chained Requests}
+\section{Delegation and Chained Requests}
 Users often interact with systems \emph{indirectly}.
 For example, when accessing Gmail, a user's browser first sends a request to the Gmail server asking for new messages. The Gmail server then sends a request to the database to fetch the message data.
 
@@ -186,18 +186,18 @@ For the first request, it is fairly clear that the principal should be Alice: th
 
 One option is to have the request come from Alice. This protects against compromise of the Gmail server---the adversary cannot see all user data. Systems like SSH and AFS follow a strategy like this. Another option is for the principal of this second request to be the Gmail server itself. This helps with isolation among services access the same database: if the Google calendar code is buggy and gets compromised, the firs tplan would allow an adversary to view Alice's gmail data even is the gmail service was perfectly secure. However, it does not protect other users from a buggy Gmail service.
 
-\subsection{Compound Principal: \textquote{B for A}}
+\paragraph{Compound Principal: \textquote{B for A.}}
 To achieve something stronger, we can create a new type of \emph{compound principal} that combines a service or device with a user. For example, this server-to-database request could carry a principal of \textquote{Gmail Server for Alice}. This provides protection against both gmail server compromise and against compromise of other services.
 
 However, it is not as clear how to actually implement this. One option is to continue to have Alice send her credential to the server directly. However, then the server can totally impersonate Alice and we gain little protection. What we would really like is for Alice to give permission to the Gmail server to fetch her emails, but not to do anything else. This is called \emph{delegation}.
 
-\section{Delegation}
+\paragraph{Delegation with cryptography.}
 In interacting with the Gmail server $B$, we may like for Alice ($A$) to give $B$ permission to authenticate as \textquote{$B$ for $A$} and to do so for only 60 seconds into the future. To achieve this, $A$ can sign a message that outlines the permission it would like to give to $B$. This signature becomes the proof of authorization. As an example:
 \[ \Sign(\sk-A, \text{\textquote{A delegates to B}}, \text{start}=\text{now}, \text{end}=\text{now}+60) \]
 
 Google indeed uses a strategy like this. They have a global DoS-resilient HTTP front-end that performs initial authentication. This frontend is then responsible for generating these scoped delegation signatures for each operation that the user would like to do and sending them along to the individual services. These signatures are then used for all following operation.
 
-\section{Capabilities}
+\paragraph{Capabilities.}
 We may want more fine-grained access control. For example, on Android, the Gmail app may like to delegate permission to a PDF viewer to view an attachment. However, if all the attachments are stored in some common database, we would like to avoid giving the PDF viewer access to view everything in the database. To achieve this, Android (and systems more generally) use a plan called cababilities.
 
 A similar strategy can be seen, for example, in cloud file sharing: when you share a file in google drive, it generates a long random link that allows anyone with access to that link to view that file (and no others). This link itself becomes a \emph{capability}---it allows anyone that posesses it to perform some related action.
