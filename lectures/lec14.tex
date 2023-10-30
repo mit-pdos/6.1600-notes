@@ -2,21 +2,59 @@
 
 So far, we have been focusing on security for network communication. We have established many tools to achieve this, from message authentication codes to public-key encryption.
 
-Ultimately, however, applications need to make use of these tools. And for our network security tools to provide meaningful security, the applications themselves must be reasonably secure. There are many things getting in the way of application security:
-\begin{itemize}
-	\item Buggy systems, including hardware and software bugs
-	\item Malicious components, such as malware
-	\item User mistakes
-	\item Malicious users: what if the adversary gets the admin's password?
-\end{itemize}
-This multitude of threats makes designing secure applications quite difficult. To make progress, we will seek to design systems that limit damage when things go wrong. A theme that will be present throughout this section is that we will consider mistakes to be malicious: if we are prepared to handle malicious components, we will similarly be prepared to handle our own buggy code. If we are prepared to limit damage of a malicious user with the admin password, we will also be limiting the damage that a mistake-making admin can cause.
+Ultimately, however, applications need to make use of these tools. And for our network security tools to provide meaningful security, the applications themselves must be reasonably secure. 
 
-% XXX: not sure where this should go 
-\paragraph{Denial of Service Attacks}
-One type of attack that you may have heard about are \emph{Denial-of-Service} attacks. This is an attack where a malicious party sends many requests to a system with the intention of overloading the system and \emph{denying service} to honest users. Unfortunately, there is no great solution to these attacks because there is no resource-free way of distinguishing spam requests from real one. There are strategies that improve things, such as early authentication, but ultimately some work is still required. Today, the best solution continues to be overprovisioning---spinning up more servers than are required for the honest traffic.
+In discussing platform and application security, there are two classes of
+problem that we want to defend against.
+\paragraph{1. Mistakes of various types.}
+\begin{itemize}
+	\item Buggy systems: including hardware and software bugs
+  \item User mistakes: phishing, misconfiguration
+\end{itemize}
+
+\paragraph{2. Malicious people or components.}
+\begin{itemize}
+	\item Malicious components: malware, supply-chain attacks
+	\item Malicious users: what if the adversary gets the admin's password?
+  \item Attacker gets access to the system: insider attacks, the adversary guesses credentials,
+\end{itemize}
+
+In computer security, we tend to treat mistakes/bugs and 
+malicious software/components in the same way.
+We do that because (1) it's often difficult to specify
+what it means for a component to be ``non-maliciously buggy''
+and (2) an attacker can often leverage what seems like a benign bug
+into full-fledged misbehavior.
+
+Thus, a theme that will be present throughout this section is that we will consider mistakes to be malicious: if we are prepared to handle malicious components, we will similarly be prepared to handle our own buggy code. If we are prepared to limit damage of a malicious user with the admin password, we will also be limiting the damage that a mistake-making admin can cause.
+
+This multitude of threats makes designing secure applications quite difficult. To make progress, we will seek to design systems that limit damage when things go wrong. 
+
+When we design for security, we have essentially three goals:
+\begin{enumerate}
+\item \textbf{Defend against known attacks.}
+\item \textbf{Defend against unknown attacks.}
+\item \textbf{Limiting damage.} In the cryptography part of this course, systems
+    are either security or insecure. In systems security, things are much more
+    gray. Attacks we care about often are outside of our threat model---even
+    when this happens, we'd like to somehow contain the damage.
+\end{enumerate}
+
 
 \section{Isolation}
-One of the most effective strategies to limit damage is to split a system into isolated components. If one of these components becomes compromised, it should not be able to compromise the other components. These components will typically run on top of some \emph{host} that enforces isolation. Importantly, this host must be correct! If there are bugs in the host, malicious code in a component may be able to exploit a bug to escape its isolation.
+One of the most effective strategies to limit damage is to split a system into isolated components. If one of these components becomes compromised, it should not be able to compromise the other components. 
+For example, if you run code in one virtual machine, it should not be able to tamper with data in
+another virtual machine.
+\marginnote{When choosing what mechanism to use to isolate various components, 
+we think a lot about the \emph{performance overhead} of an isolation mechanism.
+The challenge of building a good isolation mechanism is ensuring strong isolation
+without slowing down the isolation components too much (or taking up too much extra
+memory).
+}
+
+These components will typically run on top of some \emph{host} that enforces isolation. Importantly, this host must be correct! If there are bugs in the host, malicious code in a component may be able to exploit a bug to escape its isolation.
+The success of an isolation mechanism depends on the correctness 
+and configuration of the host.
 
 \begin{table}[htpb]
 	\centering
@@ -26,27 +64,123 @@ One of the most effective strategies to limit damage is to split a system into i
 	\begin{tabular}{rl}
 		\textbf{Examples} & \textbf{Host} \\
 		Docker Container & Operation System (e.g. Linux) \\
-		VMs & VM Monitor \\
-		Phsical ("air gap") & Physics \\
+    Browser tabs & Browser\\
 		Language-Level (JavaScript, Wasm) & Language Runtime \\
+    Process & Linux kernel\\
+    Virtual machines (VMs) & VM Monitor \\
+		Physical (``air gap'') & Physics \\
 	\end{tabular}
 \end{table}
+
 
 In order for these isolated components to be useful, they will need to be able to talk to each other in some form. For example, a client component must be able to make requests to a database component, but we would like to limit the power of the client to do damage. For this, we would like to achieve \textit{controlled sharing}.
 
 \subsection{Controlled Sharing}
-Given two components, we can achieve the \textquote{gold standard} by doing three things with each request:
+For an isolation mechanism to be useful, it additionally 
+needs to have some way to interact with other isolated components.
+For example, some JavaScript code isolated in a browser tab
+still needs some means by which to make requests over the network.
+
+When a host decide whether to allow a request from a particular component,
+it typically needs to do three things with each request:
+\marginnote{Since all three of these actions start with the letters
+``Au,'' we sometimes call this the \emph{gold standard} for controlled sharing.}
 \begin{itemize}
-	\item Authenticate: connect the request to some \emph{principal}
-	\item Authorize: decide whether that principal is allowed to make the request
-	\item Audit: keep track of requests that each principal makes
+	\item Authenticate: Associate the request with some \emph{principal}.
+    A principal could be a user name, an ``origin'' in the web context (e.g., \texttt{google.com}),
+    a program, or some other entity in the system.
+	\item Authorize: Decide whether that principal is allowed to make the request.
+	\item Audit: Keep track of requests that each principal makes.
+        Auditing is about limiting damage: often a host will mistakenly allow
+        requests it shouldn't; audit logs make it easier to discover
+        such mistakes and to clean up afterwards.
+        
 \end{itemize}
 
-\section{Authorization Policies}
-In order to authorize requests, we need some sense of permissions---a mapping from \emph{objects} to \emph{principals} that can access them. A common way of achieving this, for example in AFS, is via an \emph{access control list} for each file. A nonacademic bug with this approach is that the emptier this list is (the fewer principals that have access) the more people complain. As a result, often these lists end up giving more people access that would be ideal from a security standpoint.
+It is crucial that an isolation mechanism perform these three checks on 
+every single request---a single hold in the isolation boundary is often
+enough to completely break any benefits isolation that would have provided. 
 
-\section{Chained Requests}
-A common system model involves chained requests. For example, when accessing Gmail, a user's browser first sends a request to the Gmail server asking for new messages. The Gmail server then sends a request to the database to fetch the message data.
+\section{Authentication}
+Since we already had an entire module on authentication using signatures,
+MACs, passwords, and so on, we will not discuss authentication further here.
+
+\section{Authorization Policies}
+In order to authorize requests, we need some sense of permissions---a mapping from \emph{objects} to \emph{principals} that can access them. We call these permissions the authorization \emph{policy}.
+
+\paragraph{Storing policies.}
+We can think of an authorization policy as a gigantic matrix with one row per object
+and one column per principal.
+For example, in a file system, we could have one row per file, and one column per user
+in the system.
+The entry in column $i$ and row $j$ lists the actions that user $i$ can perform 
+on file $j$: read, write, execute, etc.
+A common way of storing this gigantic matrix, for
+example in AFS, is via an \emph{access control
+list} for each object. 
+
+\paragraph{Setting policies.}
+There are many approaches to setting authorization policies.
+As always in computer systems, there is no one perfect solution:
+
+\begin{itemize}
+\item \textbf{Discretionary access control: ``Owner'' of each object sets the policy.}
+      This approach is useful in file systems---each file has an owner and 
+      the owner can determine who has access to the file.
+      A problem is that if an attacker hijacks the owner's account
+      (or just one application that the owner runs), the attacker
+      can tamper with the policy for all of the user's files.
+      In addition, it may be difficult for non-expert users to 
+      set policies.
+      
+
+\item \textbf{Mandatory access control: Administrator sets policy.}
+      This approach often is useful in a large organization, when
+      administrators have opinions about which user should have 
+      access to which files or systems.
+      A classic example of this is for systems that handle
+      classified data in government systems. Normal users of the
+      system cannot give unprivileged users access to a classified files.
+
+      One limitation of this approach is that it is very coarse
+      grained: administrators may not know exactly who should have
+      access to what.
+      
+\end{itemize}
+
+Systems in practice often use some combination of both of these strategies.\marginnote{%
+  \emph{Role-based access control} tries to hit some midpoint between discretionary
+  and mandatory access control.
+  In these systems, there is a centrally defined set of ``roles.''
+  In a university, these could be ``Students,'' ``Faculty,'' and ``Staff.''
+  The security administrator assigns users to roles.
+  Then application developers determine which roles have access to the application. 
+}
+
+Common issues are:
+\begin{itemize}
+  \item It is difficult to keep policies up to date as the set of users evolves.
+        Expiring permissions is one strategy.
+  \item Users will complain if they do not have enough permissions, but they will
+        never complain if they have too many permissions. As a result, users
+        often end up with more access than they need from a security standpoint.
+\end{itemize}
+
+
+\section{Auditing}
+
+We have relatively little to say about this.
+The most important thing to remember about auditing is
+that a system should store the audit logs in a container
+that is separate from the container holding application logic.
+That is important because if the attacker compromises
+the application, it should be difficult for the attacker
+to compromise the logs as well.
+
+
+\section{Delegation and chained Requests}
+Users often interact with systems \emph{indirectly}.
+For example, when accessing Gmail, a user's browser first sends a request to the Gmail server asking for new messages. The Gmail server then sends a request to the database to fetch the message data.
 
 For the first request, it is fairly clear that the principal should be Alice: the request is coming from Alice's browser, and therefore should have been initiated by Alice directly. Alice will send some credential to the server, and the server can use this credential to verify that it is really alice on the other end. For the second request, however, it is not as clear who the request should be from.
 
