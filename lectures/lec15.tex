@@ -1,33 +1,99 @@
 \chapter{Isolation}
 
-In many settings when building systems, it is useful to \emph{isolate} different domains. For example, cloud providers like AWS EC2 run multiple VMs, your phone runs several apps, and your browser runs many sites together. If one of these VMs/apps/websites is malicious or buggy, these platforms would like to protect the other domainsWe would like to prevent these different domains from causing problems in another domain: an ideal scenario would be for each of these domains to run on a different computer. If this were the case, one domain would clearly not be able to touch another's state, but this is clearly impractical.
+In many settings when building systems, it is
+useful to \emph{isolate} different components of
+a computer system.
+For example, cloud providers such as Amazon Web Services' EC2 run multiple virtual machines,
+your phone runs several apps, and your browser runs many sites together. 
+If one of these virtual machines (or apps or websites) 
+is malicious or buggy, these platforms would like to protect the buggy
+component from interfering with the execution of other code in the system. 
+We often refer to separate isolated components as running in
+separate \emph{isolation domains}.
+
+Ideally, we could have each isolation domain run on 
+separate physical computer.
+If this were the case, (modulo physical side-channel attacks)
+one domain would clearly not be able to touch another's state.
+Unfortunately, the cost of this physical ``air gap'' isolation is 
+far too high for most practical applications.
+\marginnote{Computer systems for high-stakes 
+applications (e.g., classified government data)
+do in fact use this type of ``air gap'' isolation.}
+
+
 
 So, when creating isolation methods, we aim to make it appear as if each domain is running on a separate computer but to do so all on the same computer.
 
 \section{Defining Isolation}
 In order to define isolation, we will think about two key properties: integrity and confidentiality.
 
-\subsection{Integrity}
-For our first property, we would like to prevent one domain from modifying the state of another domain. To formalize this, let's consider two domains running on a single host, an adversary domain $A$ and a victim domain $V$. We would like to guarantee that $A$ cannot change the execution of $V$. We can define something in terms of the \emph{state} of eac domain, $S_A$ and $S_V$. For any pair of starting states $(S_A, S_V)$, after running $A$, we would like the new pair of states to be $(S_A', S_V)$.
+\subsection{(Weak) Integrity}
+One property that we would like an isolation scheme
+to provide is \emph{integrity}:
+one domain cannot modifying the state of another
+domain. To formalize this, let's consider two
+domains running on a single host, an adversary
+domain $A$ and a victim domain $V$. We would like
+to guarantee that $A$ cannot change the execution
+of $V$. We can define something in terms of the
+\emph{state} of each domain, $S_A$ and $S_V$. For
+any pair of starting states $(S_A, S_V)$, after
+running $A$, we would like the new pair of states
+to be $(S_A', S_V)$:
+\[ (S_A, S_V) \xrightarrow{\text{run} A} (S_A', S_V) \]
 
-\subsection{Confidentiality}
-We would also like to prevent an adversary domain from reading a secret from the victim domain. We can formalize this by considering two worlds, each with a \emph{different} victim state. After running $A$ in each of these worlds, we would like the resulting $S_A'$ to be identical:
+\subsection{(Weak) Confidentiality}
+We would also like \emph{confidentiality}: an adversarial domain should
+not be able to read a data from any other domain.
+We can formalize this by considering two worlds,
+each with a \emph{different} victim state.
+After running $A$ in each of these worlds, we would like
+the resulting $S_A'$ to be identical.
+That is, for all pairs of victim states $S_V^1, S_V^2$,
+running $(S_A, S_V^1)$ results in the same adversarial
+state as running $(S_A, S_V^2)$:
 \[ (S_A, S_V^1) \xrightarrow{\text{run} A} (S_A', -) \]
 \[ (S_A, S_V^2) \xrightarrow{\text{run} A} (S_A', -) \]
 This definition of confidentiality is often called \textquote{non-leakage}.
 
-In each of these definitions, you will notice that only the adversary domain runs. In a real system, both the adversary and the victim domain will run. What if the execution of $V$ itself leaks some information about a secret? To truly capture this reality, we need a somewhat more complex definition.
+\subsection{Non-interference: Strong confidentiality and integrity}
+In our definitions of confidentiality and integrity so far, 
+only the adversary domain runs.
+In a real system, both the adversary and the victim domain will run concurrently.
+Ideally, we would like to ensure that our confidentiality and integrity
+properties hold under interleaved execution of the adversary and victim.
 
-\subsection{Stronger Confidentiality (execution confidentiality)}
-To achieve this, we can include an interleaving of $A$ and $V$ in one world---we would like for the resulting $S_A'$ to be identical whether or not $V$ runs.
+To achieve this stronger notion of security, we
+can include an interleaving of $A$ and $V$ in one
+world---we would like for the resulting $S_A'$ to
+be identical whether or not $V$ runs.
 
 \[ (S_A, S_V) \xrightarrow[A, V, V, A, A]{\text{run}\, A, V} (S_A', -) \]
 \[ (S_A, S_V) \xrightarrow[A, A, \ldots, A]{\text{run only}\, A} (S_A', -) \]
 
-This definition is often called something along the lines of \textquote{non-interference}. We can similarly stengthen our definition of integrity by requiring that $S_V'$ is identical after running $V$ whether or not $A$ is run.
+This definition is often called \emph{non-interference}. We can similarly strengthen our definition of integrity by requiring that $S_V'$ is identical after running $V$ whether or not $A$ is run.
+\[ (S_A, S_V) \xrightarrow[A, V, V, A, A]{\text{run}\, A, V} (-, S'_V) \]
+\[ (S_A, S_V) \xrightarrow[A, A, \ldots, A]{\text{run only}\, V} (-, S'_V) \]
 
-\subsection{Non-Interference is Hard}
-In the \textquote{simple} cases, the state we needed to consider was well-defined: $S_A$ would be, for example, the files that $A$ has access to and $S_V$ would be the same for the victim. When we consider the execution of both domains, we need to consider not only $S_A$ and $S_V$, but also the \emph{execution state}---any information that is stored in the system and could affect the execution of a domain must be considered.
+\subsection{Non-interference is difficult to achieve}
+
+To achieve a non-interference style of isolation, 
+an adversarial process $A$ must not be able to 
+determine whether there is a victim $V$ process running
+alongside it concurrently.
+The challenge, though, is that whenever the adversary
+and victim \emph{share limited resources}---such as CPU, RAM,
+network bandwidth, hard disk space, etc.---it is almost
+always possible for the adversary to determine whether
+there is a victim process running concurrently.
+\marginnote{The information leakage across isolation boundaries
+as a results of resource contention is one type
+of \emph{side channel} or \emph{covert channel}.
+There is a vast literature on how to construct
+and exploit various types of side channels that
+leak information from a victim to an adversary.
+}
 
 \paragraph{Example: Memory Allocation.} A real system will have some bound on the amount of memory available to it. After this memory is used, the system will be unable to allocate any additional memory. Consider a system with 16GB of memory and a victim process that allocates memory based on the value of some secret:
 
@@ -40,7 +106,40 @@ An adversary could repeatedly try to allocate memory until the system tells them
 
 \paragraph{Example: Execution Time.} Consider another victim that runs some computation that takes a variable amount of time to finish depending on the value of a secret. By keeping track of how long the adversary takes to finish, the adversary can learn how much execution time the victim running on the same system takes to finish. Using this information, the adversary may be able to learn information about the secret. This type of information transfer are often called \textquote{timing channels}, and can be quite tricky to work with.
 
-Avoiding these types of information transfer requires hard partitions of hardware resources, but this is not a good fit for most of the instances where we want to multiplex hardware between different domains.
+\medskip
+
+There are effectively three ways to deal with the fact
+that non-interference is generally impossible to 
+achieve with shared limited resources:
+\begin{itemize}
+\item \textbf{Strictly partition resources to prevent contention.}
+      Each isolation domain could run on a separate physical machine,
+      or we can provision the resources on a machine are partitioned
+      in such a way that there is never contention for resources
+      between isolation domains.
+
+\item \textbf{Prevent isolation domains from detecting resource contention.}
+      Another (more practical) approach is to restrict the types
+      of programs that can runs in such a way that prevents
+      the programs in the system from detecting contention in 
+      shared resources.
+      For example, if all programs in an isolated system are deterministic
+      functions with no access to the outside world---no system calls,
+      no networking, etc.---then programs may not be able to \emph{detect}
+      resource contention when it exists.
+      In most implementations of isolation (e.g., virtual machines in
+      a cloud environment), isolation domains absolutely need access to the
+      outside world, so this approach is rarely useful.
+
+\item \textbf{Give up on non-interference.}
+      Most isolation mechanisms opt for this solution.
+      Rather than trying to achieve strict non-interference,
+      we aim for some ``good enough'' notion of isolation.
+      Linux, for example, does not attempt to achieve
+      strict non-interference between processes running
+      on the same physical machine.
+
+\end{itemize}
 
 \section{Implementing Isolation}
 In principal, achieving isolation involves three main steps:
