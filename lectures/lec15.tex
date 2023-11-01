@@ -142,30 +142,217 @@ achieve with shared limited resources:
 \end{itemize}
 
 \section{Implementing Isolation}
-In principal, achieving isolation involves three main steps:
+In principle, implementing isolation in a system involves three main steps:
 \begin{enumerate}
-	\item Identify the state for each domain
-	\item Identify operations that access state
-	\item Ensure that these operations can read/write only the relevant domain's state.
+	\item identify the state for each domain,
+	\item identify operations that access state, and
+	\item ensure that state-modifying operations 
+        can only read/write the state within
+        an isolation domain.
 \end{enumerate}
 
-However, performance and isolation are at odds with each other: for good performance, we would like the isolated environment to run as if it is running directly on the hardware, but for isolation we need to perform some checks to make sure that it does not access state that does not belong to it.
+The challenge is performance.
+An isolation mechanism will have to perform checks to
+ensure that components in one isolate cannot influence
+another.
+The game in isolation is to provide strong isolation 
+at the minimum possible cost.
 
-\subsection{Virtual Machine Isolation}
-If we are running several virtual machines on one physical machine, the state of each VM is the VM's virtualized memory and the VM's virtualized CPU (i.e., the registers). We want the VM to run as if it had its own physical CPU, but to do so with many VMs on a single CPU. For performance, we would like to run instructions from the VM directly on the host CPU---but we need to make sure, for example, that the VM does not access memory belonging to another VM. To achieve isolation and good performance, systems today use several effective techniques.
+We will start by considering simpler isolation mechanisms
+and then look at more sophisticated ones.
 
-\subsubsection{Naming / Translation}
-The memory of each of the VMs necessarily lives in the machine's physical memory. To prevent one VM from accessing another's memory, the construct of virtual memory, provided by hardware page table machinery, provides isolation: each VM will have its own page table that is responsible for translating memory addresses to their physical locations in memory. Using this translation, Virtual Machine Monitors can guarantee that a resident VM will not be able to access memory belonging to another VM.
+\subsection{Emulation}
 
-\subsubsection{Time-Multiplexing}
-Another effective strategy, particular for small bits of state such as the CPU registers, is to save the values when switching from one VM and restore them when switching back to that VM. This guarantees that each VM sees only their own registers.
+One simple way to implement isolation is to have
+an interpreter that executes isolated programs
+(e.g., x86 programs).
+The interpreter inspects each opcode in the program
+one at a time, and then implements the operations
+on the isolated state that the opcode indicates.
+While processing each opcode, the interpreter
+enforces checks on the isolated program to 
+ensure that it can only modify its local state.
 
-\subsubsection{Trap and Emulate}
-The fallback plan is to explicitly run software checks and emulate hardware behavior in software, if necessary. For example, a VM cannot be allowed to touch the control registers, such as the page table control register, of the real processor. Hardware will typically support configuring certain instructions to \textquote{trap}, allowing the VMM software to execute the instruction with the necesary security checks.
+Some JavaScript engines (``runtimes'') in web browsers use emulation
+for isolation. 
+The Python interpreter is another example of emulation-based isolation.
+The runtime for these languages is
+designed such that the code can access only memory
+that belongs to the domain.
 
-Processes and things like docker containers look a lot like virtual machines, and use many of the same techniques for isolation.
+\paragraph{Benefits}
+Emulation can be simple to implement and provides ``good enough''
+isolation for many applications.
 
-\subsection{Language Runtime Isolation}
-A very different technique for isolation is language-level isolation. For instance, in your web browser, JavaScript allows websites to run code that you have absolutely no reason to trust on your computer while ensuring that it cannot modify or read the state of the rest of your computer. These languages involve a \emph{runtime} that is responsible for translating the source code---in JavaScript's case, statements or an abstract syntax tree, and in WebAssembly's case, opcodes like \ttt{i32.add}.
+\paragraph{Downsides}
+Emulation can be slow: to execute each logical opcode in the
+emulated program, the emulator may have to run a large
+number of physical instructions.
+Emulation can be inflexible: 
+emulated programs may not be able to take advantage
+of special-purpose hardware, unless the emulator
+explicitly grants access to these devices to emulated
+programs.
 
-The runtime for these languages is designed such that the code can access only memory that belongs to the domain. WebAssembly is designed to make this translation cheap.
+
+\subsection{Time Multiplexing}
+
+Another effective isolation strategy is
+to only allow the code from one isolation
+domain to run on the hardware at once.
+When the isolation mechanism switches from 
+one isolation domain to another, it writes
+the state of the hardware (e.g., registers, RAM)
+to storage, clears the state of the hardware
+(e.g., zeros the contents of memory), and 
+loads the next program to run into the machine.
+
+For example, gaming consoles implement this
+form of isolation: one game runs at a time
+and has almost full control of the hardware
+during this time.
+The state of the running game cannot tamper with
+the state of a non-running game.
+
+The security of this isolation scheme requires
+the isolation mechanism to protect the stored
+state of each isolation domain, and to somehow
+protect the code that switches between them.
+
+\paragraph{Benefits}
+Time multiplexing is relatively simple to
+implement, and it can give programs in 
+each isolation domain almost full control
+of the hardware (e.g., graphics hardware
+in game consoles)..
+
+\paragraph{Downsides}
+There can be a high cost of switching 
+execution between between isolation domains.
+Since the isolation mechanism clears the
+state of the hardware during context switches, 
+storing and restoring the state can be costly.
+
+\subsection{Translation (Naming)}
+Translation is another common isolation mechanism 
+in computer systems.
+In a system using translation for isolation, 
+an isolated program may not access hardware resources
+(such as memory or files)
+directly.
+Isolated programs can only access resources 
+via pointers controlled
+by the isolation mechanism.
+By construction, each process in an isolation domain can
+only name resources inside of its isolated context.
+
+The canonical example of naming/translation for
+isolation is \emph{virtual memory}.
+In a system using virtual memory, the isolated
+domains cannot read/write physical memory directly---they
+can only read/write to virtual memory addresses..
+
+To prevent one isolated program from accessing another's memory, 
+the isolation mechanism ensures that the valid virtual addresses
+in each domain point to a separate portion of physical memory.
+Modern CPUs have special support for implementing virtual 
+memory to make the virtual-address translation as fast as possible.
+
+Other examples of naming/translation isolation in computer
+systems are: file descriptors in Linux 
+and virtual LANs in networking.
+
+\subsection{Example: Isolation in Virtual Machines}
+When we run several virtual machines on one
+physical machine, we want each virtual machine to run as if
+it had its own physical CPU, memory, and devices, but we
+want to run all of these virtual machines on a single
+physical machine.
+For performance, we
+would like to run instructions from the VM
+directly on the host CPU---but we need to make
+sure, for example, that the VM does not access
+memory belonging to another VM. To achieve
+isolation and good performance, systems today use
+several effective techniques.
+
+Here is how a virtual-machine monitor handles the three questions that 
+an isolation mechanism must answer:
+
+\begin{enumerate}
+  \item \textbf{What is the isolation domain's state?}
+        A few important pieces are:
+        \begin{itemize}
+          \item the contents of memory,
+          \item the values in the CPU registers,
+          \item the data on disk.
+        \end{itemize}
+
+\item \textbf{What operations can a program perform on isolated state?}
+        Virtual-machine monitors need to handle: 
+        \begin{itemize}
+          \item CPU instructions that modify register states ,
+          \item CPU instructions that modify memory, and
+          \item operations to read and write devices.
+        \end{itemize}
+
+
+\item \textbf{How does the virtual-machine monitor ensure isolation?}
+        \begin{itemize}
+          \item To handle updates to the register state, the monitor
+                uses \emph{time multiplexing}: one virtual machine
+                runs on the CPU at a time and controls the
+                CPU's registers.
+          \item To handle accesses to memory, the monitor uses
+                \emph{naming/translation} via virtual memory.
+          \item To handle device operations, the monitor uses 
+                \emph{emulation}.
+                When a virtual machine executes instructions that
+                would cause device I/O, the CPU jumps into some dedicated
+                code in the monitor that emulates these device operations.
+                This is slow, but since device I/O is usually costly
+                anyways, the overhead is isolation is tolerable.
+        \end{itemize}
+  
+\end{enumerate}
+
+
+\subsection{Software interposition}
+
+A final isolation technique that we will discuss
+is \emph{software interposition}.
+Say that an isolated program wants to run the following code:
+\begin{lstlisting}
+var a = b[c];
+var f = ....;
+f();
+\end{lstlisting}
+
+When using software isolation, a compiler can insert checks
+into this isolated program to make sure that the memory access
+\texttt{b[c]} does not access out-of-bounds memory:
+\begin{lstlisting}
+if c >= b.size: error;
+load b+c -> a             (***)
+\end{lstlisting}
+After inserting these checks,
+the isolated code can run directly on hardware,
+since the checks ensure that the isolated code cannot touch 
+any state outside of its isolated context.
+
+A central challenge of using software interposition is handling
+function calls.
+When calling the function \texttt{f} in the code snippet above,
+the hardware might execute an instruction like:
+\begin{lstlisting}
+jump *f
+\end{lstlisting}
+which would execute the code at the location stored in 
+memory location \texttt{*f}.
+
+If an isolated program can set the value in \texttt{*f}
+to the location \texttt{(***)} in the snippet above,
+the isolated program can skip the safety checks on the 
+memory accesses.
+
+
