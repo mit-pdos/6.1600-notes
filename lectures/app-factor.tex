@@ -1,0 +1,90 @@
+\chapter{Factoring integers}
+\label{sec:fact:bg}
+
+The problem of integer factorization was central to 20th-century cryptography.
+Breaking the one-wayness of the RSA trapdoor one-way function (\cref{chap:rsa}), for example,
+is no harder than factoring integers.
+In this chapter, we will see a couple of surprisingly powerful algorithms for factoring integers.
+
+We will only consider factoring numbers of the form $N=pq$, for distinct odd primes $p$ and $q$.
+(The general case is not too much more challenging.)
+Throughout, let $n = \lceil \log_2 N \rceil$ be the bitlength of the number to factor.
+
+\section{Background}
+
+\paragraph{Trial division.}
+We can factor $N$ by trying to divide $N$ by each of the primes of size $\leq \sqrt N$
+and checking whether the result is an integer.
+If so, we have found a factor of $N$.
+Since at least one of the two factors of $N$ is in $\{1, \dots, \sqrt N\}$, this
+algorithm (``trial division'') runs in time roughly $\sqrt{N} = 2^{n/2}$.
+
+Trial division is an \emph{exponential time} algorithm, since it runs in time $2^{\Omega(n)}$,
+where the bitlength $n$ is the size of the number to be factored.
+The best known factoring algorithms run in \emph{sub-exponential time} $2^{O(n^c)}$,
+for some constant $c < 1$.
+
+
+\paragraph{Euclid's algorithm.}
+An important subroutine in almost all factoring algorithms is Euclid's polynomial-time algorithm
+for computing the greatest common divisor of two integers $x$ and $y$.\marginnote{In this
+discussion, we draw on Arjen Lenstra's very nice survey on factoring~\cite{lenstra2000integer}.}
+
+The principle of Euclid's algorithm is that
+\[ \gcd(x, y) = \gcd(x, y \bmod x) \qquad \text{and} \qquad \gcd(x, 0) = x.\]
+So, for example, if we want to compute $\gcd(46, 12)$, we can compute it as:
+\[ \gcd(46,12) = \gcd(12, 10) = \gcd(10, 2) = 2. \]
+
+\paragraph{Difference of squares.}
+The second key idea is that, if we can find two numbers $x,y \in \Z$ whose
+squares are congruent modulo $N$, we can use these numbers to factor $N$:
+\begin{align*}
+x^2 &= y^2 &\pmod N \\
+x^2 - y^2 &= 0 &\pmod N\\
+(x+y)(x-y) &= 0 &\pmod N\\
+\end{align*}
+
+If $x = \pm y$, then this relation is not helpful to us.\marginnote{It is
+not necessarily obvious that the useful pairs $(x,y)$ will ever exist.
+The key idea is that, modulo $N=pq$, ever number in $\Z^*_N$ either has
+four square roots or has none. If an element in $\Z^*_N$
+ has four square roots then the roots
+are of the form $r,-r, s, -s$. In this case, a pair $(\pm r, \pm s)$ yields the
+sort of relation that we need to factor.}
+But if $x \neq \pm y$, then we know that
+$x+y \neq 0 \bmod N$ and $x-y \neq 0 \bmod N$.
+So we have:
+\[ (x+y)(x-y) = kN \quad \in \Z,\]
+for some positive integer $k \in \Z$.
+Then $x+y$ must be a multiple of one of the factors of $N$ (but not both),
+and $\gcd(x+y, N)$ reveals a factor of $N$. 
+
+The goal of many factoring algorithms---including the one we will see today---%
+is finding these integers $x$ and $y$ whose squares are congruent modulo $N$.
+
+\section{Dixon's algorithm}
+
+Dixon's algorithm is one of the simplest sub-exponential-time factoring algorithms.
+It gives a fast method for finding two numbers whose squares are congruent modulo $N$.
+Once we have these squares, we can use them to factor as in \cref{sec:fact:bg}
+
+
+\paragraph{Input:} An integer $N = pq$ for odd primes $p$ and $q$. A parameter $B \in \N$,
+which we refer to as ``the size of the factor base.''
+
+\paragraph{Output:} The factors $(p,q)$ of $N$.
+
+
+\begin{enumerate}
+\item \textbf{Collect linear relations.}
+      Maintain a set $V$ of vectors over $\Z^B$.
+      \begin{itemize}
+          \item Sample $r \getsr \Z^*_N$.
+          \item Compute $s \gets (r^2 \bmod N)$.
+          \item Attempt to write $s$ as a product of the first $B$ primes:
+                \[ s = 2^{e_2} 3^{e_3} 5^{e_5} \dots \]
+          \item If 
+      \end{itemize}
+
+\end{enumerate}
+
