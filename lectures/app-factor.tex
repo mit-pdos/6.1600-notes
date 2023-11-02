@@ -68,6 +68,31 @@ Dixon's algorithm is one of the simplest sub-exponential-time factoring algorith
 It gives a fast method for finding two numbers whose squares are congruent modulo $N$.
 Once we have these squares, we can use them to factor as in \cref{sec:fact:bg}
 
+\subsection{The idea}
+
+The principle of Dixon's algorithm is that we will pick 
+many random numbers $r \in \Z^*_N$ and square them modulo 
+the integer $N$ we would like to factor.
+
+Say that we are somehow able to find numbers $r, r'$ such that
+\begin{align*}
+  r^2 &= 2 \cdot 3^2 \cdot 5 &\pmod N\\
+  r'^2 &= 2 \cdot 5 &\pmod N,\\
+\intertext{then we know that:}
+(rr')^2 &= 2^2 \cdot 3^2 \cdot 5^2 &\pmod N\\
+(rr')^2 &= (2 \cdot 3 \cdot 5)^2 &\pmod N
+\end{align*}
+and now we have two numbers whose squares
+are congruent modulo $N$:
+\[ x = r r' \qquad \text{ and }\qquad y = 2 \cdot 3 \cdot 5.\]
+If we are lucky, this is the useful type of congruence that
+we can use to factor $N$ (i.e., $r r' \neq \pm 2 \cdot 2 \cdot 5 \bmod N$).
+
+The principle of Dixon's algorithm is to generate many such $r$s
+and then use linear algebra to find a subset of them whose product
+modulo $N$ is a perfect square. 
+
+\subsection{The algorithm}
 
 \paragraph{Input:} An integer $N = pq$ for odd primes $p$ and $q$. A parameter $B \in \N$,
 which we refer to as ``the size of the factor base.''
@@ -77,14 +102,121 @@ which we refer to as ``the size of the factor base.''
 
 \begin{enumerate}
 \item \textbf{Collect linear relations.}
-      Maintain a set $V$ of vectors over $\Z^B$.
+      Maintain a list $L$ of pairs of 
+      (a) an element in $\Z^*_N$ and (b) vectors over $\Z_2^B$.
+      Repeat until $L$ contains $B+1$ pairs:
       \begin{itemize}
           \item Sample $r \getsr \Z^*_N$.
           \item Compute $s \gets (r^2 \bmod N)$.
           \item Attempt to write $s$ as a product of the first $B$ primes:
-                \[ s = 2^{e_2} 3^{e_3} 5^{e_5} \dots \]
-          \item If 
+            \[ s = 2^{e_2} 3^{e_3} 5^{e_5} \dots \]\marginnote{If
+            a number completely splits into prime factors $\leq B$,
+          we say that the number is ``$B$-smooth.''}
+          \item If successful, add the pair $(r, (e_2, e_3, e_5, \dots))$
+                to the list~$L$.
+
+          
       \end{itemize}
 
+\item \textbf{Solve linear system.}
+        Let $L = \{ (r_1, \vec v_1), (r_2, \vec v_2), \dots \}$.
+        Find a non-zero combination of the vectors in $L$
+        that sums to zero modulo $2$.
+        That is, find $S \subseteq [B+1]$ such that
+\[ \sum_{i \in S} \vec v_i = (0, 0, 0, \cdots, 0) \qquad \in \Z_2^B. \]
+    \marginnote{We can find the set $S$ using Gaussian elimination
+    in roughly $B^3$ time.
+    Since the set of vectors will be extremely sparse, there
+    are faster methods that implementers use in practice.}
+Letting 
+\[ (e_2, e_3, e_5, \dots) \gets \sum_{i \in S} \vec v_i,\]
+        we then have a difference of squares:
+    \[ \left(\sum_{i \in S} r_i \right)^2 = (2^{(\frac{e_2}{2})} \cdot 3^{(\frac{e_3}{3})} \cdot 5^{(\frac{e_5}{2})} \cdots )^2 \qquad \pmod N.\]
+
+  \item \textbf{Use Euclid's algorithm to try to factor $N$.}
+    We can take:
+\begin{align*}
+  x &= \left(\sum_{i \in S} r_i \right)\\
+  y&= 2^{(\frac{e_2}{2})} \cdot 3^{(\frac{e_3}{3})} \cdot 5^{(\frac{e_5}{2})} \cdots )
+\end{align*}
+     and compute $\gcd(x+y, N)$.
+     With probability roughly $1/2$, over the random choice of the $r$s, this will
+     yield a factor of $N$.
 \end{enumerate}
+
+\subsection{The analysis.}
+
+The costs of the three steps of the algorithms are:
+\begin{enumerate}
+  \item Each iteration of the loop requires us to try to 
+        factor a number into primes $\leq B$.
+        We can factor in this way by trial division 
+        using time roughly $B$.\marginnote{I'm ignoring any $\log B$ factors,
+        which do matter very much in practice.}
+        
+        The question then is how many trials it will
+        take for us to find a single smooth number.
+        For a smoothness bound $B$, let's say for
+        now that it takes $T(B)$ trials---we will look into 
+        the precise value of $T(B)$ in a moment..
+
+  \item Solving the linear system using Gaussian elimination 
+    takes roughly $B^3$ time.
+  \item Run Euclid's algorithm---the time required here is 
+        negligible compared to the time of the first two steps.
+        This step runs in time $\poly(\log N) = \poly(n)$.
+\end{enumerate}
+
+Putting everything together, we have that 
+factoring an $n$-bit number with a factor base of
+size $B$ takes time: 
+\begin{align}
+B \cdot T(B) + B^3 + \poly(n). \label{eq:time}
+\end{align}
+
+
+\paragraph{Smoothness probabilities.}
+The key question that we need to answer to complete
+the analysis is
+\begin{quote}
+``If we pick an integer uniformly at random from $\{1, \dots, N\}$,
+  what is the probability that the integer will be $B$-smooth?''
+\end{quote}
+
+The convention is to denote the number of $B$-smooth 
+numbers in $\{1, \dots, N\}$ as $\Psi(N,B)$.
+When $B$ is ``not too small,'' we have:\marginnote{For many
+more details on these estimates, take a look at Granville's
+very nice survey on smooth numbers.~\cite{granville2008smooth}
+}
+\[ \Psi(N, B) \approx N \cdot u^{-u + o(1)}\qquad \text{for } u = \frac{\log N}{\log B}.\]
+
+The probability of a random number modulo $N$ being $B$-smooth is
+then $\Psi(N,B)/N$ and the expected number of tries it will
+take for us to find a smooth number is:
+\[ T(B) = 1/\Psi(N,B).\]
+
+Now we can plug this estimate into the expression (\ref{eq:time})
+for the running time of Dixon's algorithm and we can solve
+for the value of $B$ that minimizes the running time.
+In particular, to minimize the running time we want:
+\begin{align*}
+  B \approx T(B) \approx N / \Psi(N,B) = u^u,
+\end{align*}
+for $u = (\log N)/(\log B)$.
+
+\begin{align*}
+  B &= u^u\\
+  \log B &= u \log u\\
+  \log B &= \frac{\log N}{\log B} \log \frac{\log N}{\log B}\\
+  \log^2 B &\approx \log N \log \log N\\
+\log B &\approx \sqrt{\log N \log \log N}\\
+B &\approx \exp(\sqrt{\log N \log \log N}).\\
+\end{align*}
+
+If we plug this value of $B$ into Dixon's algorithm,
+we get a running time of 
+\[ \exp(O(\sqrt{ \log N \log \log N}) = 2^{O(\sqrt{ n \log n })}.\]
+
+
 
