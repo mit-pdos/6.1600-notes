@@ -282,6 +282,9 @@ know of essentially two ways to find roots of polynomials modulo $N$:
       (We will say more on this in a moment.)
       Since the best algorithms for factoring run in time roughly $2^{\sqrt[3]{\log N}} = 2^{\sqrt[3]{\lambda}}$,
       this approach is infeasible at present without knowing the factorization of $N$.
+      \marginnote{In \cref{sec:fact} we present a factoring algorithm that runs
+      in sub-exponential time $2^{\sqrt{\log N \log \log N}}$.
+}
 
 \item \textbf{Find a root over the integers} and reduce it modulo $N$.\marginnote{Actually,
       it suffices to find a root over the rational numbers, but the distinction isn't important here.}

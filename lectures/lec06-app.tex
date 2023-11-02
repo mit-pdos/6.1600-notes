@@ -1,5 +1,5 @@
 \chapter{Factoring integers}
-\label{sec:fact:bg}
+\label{sec:fact}
 
 The problem of integer factorization was central to 20th-century cryptography.
 Breaking the one-wayness of the RSA trapdoor one-way function (\cref{chap:rsa}), for example,
@@ -11,6 +11,7 @@ We will only consider factoring numbers of the form $N=pq$, for distinct odd pri
 Throughout, let $n = \lceil \log_2 N \rceil$ be the bitlength of the number to factor.
 
 \section{Background}
+\label{sec:fact:bg}
 
 \paragraph{Trial division.}
 We can factor $N$ by trying to divide $N$ by each of the primes of size $\leq \sqrt N$
