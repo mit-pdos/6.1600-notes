@@ -195,7 +195,13 @@ very nice survey on smooth numbers.~\cite{granville2008smooth}
 The probability of a random number modulo $N$ being $B$-smooth is
 then $\Psi(N,B)/N$ and the expected number of tries it will
 take for us to find a smooth number is:
-\[ T(B) = 1/\Psi(N,B).\]
+\[ T(B) = 1/\Psi(N,B).\]\marginnote{We are
+being slightly imprecise---we actually need to know
+the number of squares (quadratic residues) modulo $N$
+that are smooth. But heuristically, we can assume that
+quadratic residues behave like random integers modulo $N$
+for the purposes of smoothness.}
+
 
 Now we can plug this estimate into the expression (\ref{eq:time})
 for the running time of Dixon's algorithm and we can solve
