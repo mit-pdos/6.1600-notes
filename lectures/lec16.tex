@@ -239,28 +239,76 @@ freshness: once signed, a package is always valid.
 
 
 \paragraph{Repository Signs Packages.}
-For systems with a central repository, another plan is for the repository to sign packages. This again allows the distribution itself to be untrusted---a repository could use a CDN to distribute packages without trusting that CDN to preserve the package contents.
+For systems with a central repository, another
+plan is for the repository to sign packages. This
+again allows the user to fetch the signed packages
+from untrustworthy sources---%
+from a content-distribution network, for example.
 
-Many Linux package managers, such as \ttt{apt}, \ttt{pacman}, and \ttt{rpm}, use a plan like this.
+In addition to signing the packages, the repository
+typically signs a timestamped manifest of the latest package versions.
+This allows a user to check that they are not only 
+getting the right software but also that they are
+getting the most up-to-date software.
+
+Many Linux package managers, such 
+as \ttt{apt}, \ttt{pacman}, and \ttt{rpm}, use 
+signatures to integrity-protect packages.
+
+
 
 \paragraph{Third-Party Validator Signs Packages.}
 Yet another option that does not require a single central repository is to have a trusted validator sign packages. This involves sending the source code and package to a third party, who will then perform some inspection of the package and, if it deems a package to be worthy, provide some signature over that package that verifies that the validator thinks the package is trustworthy.
 
-This plan is used widely in practice. On Android, there is no requirement to install apps from the Google Play Store, but Google provides a service that inspects packages and attaches these signatures if the package passes. Similarly, Windows uses a validation plan for its device drivers. 
+A number of software platforms use this strategy for protecting binaries.
+On Android, there is no requirement to install apps from the Google Play Store, but Google provides a service that inspects packages and attaches these signatures if the package passes. Similarly, Windows uses a validation plan for its device drivers. 
 
 \paragraph{Binary Transparency.}
 One different plan to help involves an audit log that keeps track of all published binaries.
 
 This helps prevent in particular targeted attacks---for example, if some adversary has a specific target in mind and compromised the distribution of the Linux kernel, they would likely be immediately noticed if they introduced a backdoor into Linux for the whole world. However, if they were able to introduce a backdoor and distribute that backdoored version only to their target, the adversary would be much more likely to evade detection. If clients check their received binary against the publicly available one before installing it, this personalized attacks can be avoided---if the attacker wants to change the binary for someone, they will need to change it for everyone.
 
-\section{Booting the System}
-In order to actually run an application, we rely on large amounts of software running on our computer, from the applications themselves to the operating system that supports them. If the operating system itself is compromised, for example, the modified OS could undermine all of the defenses we just discussed. One plan to help take care of this involves a hardcoded root of trust baked into the CPU hardware itself and a hardcoded boot ROM that cannot be updated (hence ROM, for Read Only Memory). Booting then involves several steps:
+\section{Booting the System: Secure Boot}
+In order to actually run an application, we rely on large amounts of software running on our computer, from the applications themselves to the operating system that supports them.
+If the operating system itself is compromised, for example, the modified OS could undermine all of the defenses we just discussed.
+``Secure Boot'' is one strategy for getting some partial protection against these attacks.
+
+Devices using secure boot have a small amount of read-only memory (ROM) that contain
+a small piece of code that runs on boot.
+This boot-ROM code has a signature-verification key baked into it. There is no
+way to change this key---it is a fixed part of the hardware
+Booting then involves several steps:
 \begin{enumerate}
-	\item On boot, the CPU will begin running the hardcoded Boot ROM code, which knows a hardcoded $\vk_\text{ROM}$.
-	\item the Boot ROM will load the code for another layer called the \emph{boot loader}. The boot ROM will then verify that the boot loader code was signed by $\vk_\text{ROM}$. If the signature is valid, the boot ROM code will jump to begin executing the boot loader.
-	\item The boot loader will load the code for the operating system and verify that it was signed by $\vk_\text{bootloader}$. If the signature checks out, the bootloader will redirect control to the operating system.
+	\item On boot, the CPU will begin running the hardcoded Boot ROM code, 
+        which has a signature-verification key $\vk_\text{ROM}$ hardcoded into it.
+      \item the Boot ROM will load the code for another layer called the \emph{boot loader}. The boot ROM will then verify that the boot loader code carries a correct signature that verifies under $\vk_\text{ROM}$. If the signature is valid, the boot ROM code will begin executing the boot loader. The bootloader has another signature-verification key ($\vk_\text{bootloader})$) baked into it.
+	\item The boot loader will load the code for the operating system and verify it using $\vk_\text{bootloader}$. If the signature is valid, the bootloader will redirect control to the operating system.
 \end{enumerate}
 
-This way, the system can verify that only boot loaders that the hardware manufacturer trusts are executed, and those boot loaders can verify that only trusted operating systems are executed.
+This way, the system can verify that only boot loaders 
+approved by the hardware manufacturer can run on the machine.
+These boot loaders then can verify that only trusted operating systems are executed.
 
-This plan is used in many systems, from iPhone and Android to chromebooks and UEFI secure boot on PCs.
+Many systems use secure boot: iPhone, Android, chromebooks, game consoles, 
+and UEFI secure boot on PCs.
+
+In some cases (e.g., UEFI secure boot) secure boot is a mechanism to protect
+against malware that tampers with the operating-system code.
+While the malware may be able to compromise the running machine, after
+rebooting the machine, the user has some assurance that it is running
+an uncompromised operating system.
+
+In other cases (e.g., game consoles) secure boot is a mechanism to\marginnote{
+ A number of researchers have used PlayStation 3 consoles for brute-force
+ password-cracking and cryptanalysis (e.g., factoring).
+ Game consoles often have a large number of CPU/GPU cores,
+ which make them appealing hardware for applications that
+benefit from massive parallelism. 
+}
+prevent the device owner from installing a non-standard operating
+system on the device. Game-console vendors often sell the console
+hardware at a loss, and they make their money back by selling game software.
+They have a strong incentive then to prevent users from buying
+game consoles and using them for non-game purposes.
+
+
