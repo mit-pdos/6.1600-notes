@@ -27,21 +27,36 @@ Much of what we have discussed so far has been cryptography schemes that rely on
 
 All of these require \textquote{accumulating} randomness from the environment. A common hardware bug on embedded devices is to generate keys when the randomness source has not accumulated enough random measurements from the environment. For example, if a network card generates a cryptographic key right after boot, this key may be predictable if an attacker is able to accurately guess at the values of the randomness source.
 
-To help with this, many devices include specialized hardware that uses some special circuit to generate randomness by measuring randomness inherent to the universe.\marginnote{On Intel CPUs, this takes the form of the \ttt{RORAND} instruction}. Of course, developers must then use this randomness---a common error is to use insufficient randomness, such as the time, instead of this hardware randomness.
+To help with this, many devices include specialized hardware that uses some special circuit to generate randomness by measuring randomness inherent to the universe.\marginnote{On Intel CPUs, this takes the form of the \ttt{RDRAND} instruction}. Of course, developers must then use this randomness---a common error is to use insufficient randomness, such as the time, instead of this hardware randomness.
 
 % TODO: linux /dev/random
 
 \section{Attacks without Physical Access}
 Perhaps the most concerning attacks are those that do not require physical access to a machine.
 
-\subsection{Operating System Bugs}
-Operating systems arevery large pieces of software, typically containing millions of lines of code. The operating system handles huge ranges of tasks from adjusting your display brightness to generating encryption keys. Since the operating system is so large, it is bound to have bugs. If the operating system is all treated equally, a bug in some complex piece like a parser or display driver could be exploited to access memory used by a smaller and more carefully coded piece responsible for storing secrets. To help improve this security, many operating systems are split into two parts:
-\begin{itemize}
-	\item A large \textquote{insecure} part with no access to secret data.
-	\item A small \textquote{secure} part that can access secrets.
-\end{itemize}
-
-Processors can provide isolation between these parts, prohibiting the insecure part from accessing the secure part's memory and allowing only limited interaction between the insecure and secure parts\marginnote{Arm TrustZone is one implementation of this model.}. With a model like this, we can achieve some level of security even if an attacker breaks the user-kernel isolation and gets access to the insecure part.
+% \subsection{Operating System Bugs}
+% 
+% Operating systems arevery large pieces of software, typically containing
+% millions of lines of code. The operating system handles huge ranges of
+% tasks from adjusting your display brightness to generating encryption
+% keys. Since the operating system is so large, it is bound to have bugs. If
+% the operating system is all treated equally, a bug in some complex piece
+% like a parser or display driver could be exploited to access memory
+% used by a smaller and more carefully coded piece responsible for storing
+% secrets. To help improve this security, many operating systems are split
+% into two parts:
+% 
+% \begin{itemize}
+% 	\item A large \textquote{insecure} part with no access to secret data.
+% 	\item A small \textquote{secure} part that can access secrets.
+% \end{itemize}
+% 
+% Processors can provide isolation between these parts, prohibiting the
+% insecure part from accessing the secure part's memory and allowing only
+% limited interaction between the insecure and secure parts\marginnote{Arm
+% TrustZone is one implementation of this model.}. With a model like this,
+% we can achieve some level of security even if an attacker breaks the
+% user-kernel isolation and gets access to the insecure part.
 
 \subsection{Cache Timing Attacks}
 One major goal of operating systems is to provide isolation between processes. Even if an attacker is able to run some software on the same machine as our signing process, we would like to guarantee that an attacker can not read, for example, the signing key used by our signing process. However, the attacker and victim code both run on the same CPU, and the victim may leave traces of secrets in the state of the CPU.
