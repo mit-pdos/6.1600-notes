@@ -292,25 +292,73 @@ def xfer(src, dst, amt):
 
 By executing two of these \ttt{xfer} requests in parallel, an attacker can cause unexpected behavior. For example, if an attacker tries to send money from a single source to two destinations at once, the check \ttt{s < amt} may pass in both executions, and both destinations will then be updated to have money. However, the source will only be deducted once, since \ttt{s} is stored before any money is transferred.
 
+The fix is to make sure that there is some kind of locking or concurrency-control
+strategy in place.
+The important high-level bit is to be thinking carefully about how concurrent
+execution can affect your software, in cases when multiple threads of
+execution can access the same data at the same time.
+
+
+\subsection{File system races / Time-of-check-time-of-use (TOCTOU) bugs}
+
+When deadline with files, symbolic links can cause all sorts of chaos.
+A piece of code might want to check that it is deadline with a regular
+file---rather than a symbolic link---before opening it.
+A bad way to implement would be like this:
+\begin{lstlisting}[language=c]
+// WRONG
+if(lstat(path, &st) < 0) error();
+if(!S_ISREG(st.st_node)) error();
+// ***
+int f = open(path, O_RDWR);
+...
+\end{lstlisting}
+The problem is that if an attacker can replace the file when
+the code is at line \ttt{***}, the attacker could swap out
+the regular file with a symbolic link that points to somewhere else.
+
+\marginnote{The \ttt{openat()} API call gives a way to open a
+file while ensuring that the file is of a particular type.}
+The way to defend against this bug is to change the interface.
+Newer versions of the POSIX file-system APIs enable checking
+for this type of property in a way that defats race conditions.
+
+
 \section{Resource Usage}
 Other bugs allow attackers to consume many resources on a system, denying service to honest users.
 
-\subsection{Hash Tables}
-Hash tables typically use a hash function designed to be very fast when deciding which bin to place an input in. These hash functions are typically not collision-resistant in the cryptographic sense. Hash tables work well when inputs get distributed evenly across all of the bins. However, if multiple inputs get mapped to the same hash value, the performance of a hash table deviates from the constant-time idea we have of a hash table---hash tables typically revert to using a linked list of all the values for a given hash value.
+For example, 
+hash tables typically use a hash function designed to be very fast when deciding which bin to place an input in. These hash functions are typically not collision-resistant in the cryptographic sense. Hash tables work well when inputs get distributed evenly across all of the bins. However, if multiple inputs get mapped to the same hash value, the performance of a hash table deviates from the constant-time idea we have of a hash table---hash tables typically revert to using a linked list of all the values for a given hash value.
 
 If an attacker is able to predict which bin their input will end up in, they can maliciously craft inputs that create a huge linked list, resulting in very poor performance for the hash table.
 
+The way to defend against this type of attack 
+is to use a \emph{keyed} hash function---essentially a pseudorandom function---where
+the implementation does not reveal the secret key to the attacker (over the network, etc.).
+
 \section{Dealing with Software Bugs}
-Software bugs are difficult to tackle, but there are several things to keep in mind:
+As we have seen, there are many types of bugs so there are many ways
+to defend against them.
+Here are some general rules:
 
-\paragraph{Clear Specification.} One way to avoid design-level bugs is to have a clear and complete specification.
+\paragraph{Clear Specification.} One way to avoid design-level bugs is to have a clear and complete specification about what your program is supposed to do.
+In particular, for things such as encoders and decoders, a precise specification
+can make it easier to check that you have handled all of the important corner cases.
 
-\paragraph{Design.} A simpler design is easier to understand, and thus bugs are easier to find.
+\paragraph{Design.} A simpler design is easier to understand, 
+and thus bugs are easier to find. 
 
 \paragraph{Limit Bug Impact.} 
+Some techniques that we will
+discuss, such as privilege separation, allow us to protect
+security even when software bugs arise.
 
 \paragraph{Find and Prevent Bugs at Development Time.}
+Techniques such as fuzzing can find bugs before they hit
+production systems.
 
 \paragraph{Catch an Mitigate Bugs at Runtime}
 
 \paragraph{Deploy Bug Fixes Quickly}
+A big advance in browser security came from mechanisms
+for pushing out software updates quickly. 
