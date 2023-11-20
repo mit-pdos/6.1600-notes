@@ -1,15 +1,22 @@
 \chapter{Software Security}
 
-So far, we have discussed many conceptual techiques to secure systems. 
-Of course, to use these techniques, we must use
-them. A huge number of security issues come from
+Software vulnerabilities are at the root of 
+some of the most serious security failures
+in real-world software.\marginnote{In terms of
+practical consequences on deployed computer systems,
+software issues are perhaps second only
+to phishing attacks.}
+A huge number of security issues come from
 software-implementation bugs.
 A rule of thumb to keep in mind is that, for reasonably
 carefully-written code, there will be around one
 bug for every 1000 lines of code. Many of these
 bugs may seem minor, but surprisingly, almost any
 kind of bug can be used in a security exploit and
-lead to compromise---even bugs in code that may
+lead to compromise---even bugs in code that may\marginnote{A common
+strategy to exploit seemingly benign software bugs is to
+string together a number of benign bugs into an exploit that
+does something very bad from a security perspective.}
 not seem security-critical. One principle to remember
 is then:
 \begin{quote}
@@ -22,10 +29,20 @@ Many bugs can lead to security exploits, but some
 of the most common types of exploited bugs include
 memory corruption bugs (buffer overrun, use after free, etc.), 
 encoding and decoding errors,
-and missing checks.
+cryptographic implementation bugs,
+race conditions
+and resource-consumption bugs.
 
 \section{Memory Corruption}
-Consider the following C code:
+
+Memory-corruption bugs show up in languages, such as C and C++, that
+do not guarantee any sort of memory- or type-safety properites.
+The two most common types of memory-corruption bugs 
+are: (1) buffer overflows and (2) use-after-free bugs.
+
+\subsection{Buffer overflow}
+As an example of a memory-corruption bug, 
+consider the following C code:
 
 \begin{lstlisting}[language=c]
 void f() {
@@ -35,13 +52,17 @@ void f() {
 }
 \end{lstlisting}
 
-This type of code would be relatively common several years ago, and still likely
-shows up today. This code snippet writes input bytes to the buffer until the input ends. When
-the input ends, \ttt{gets} will write a zero byte to the next location in
-\ttt{buf}. In C, arrays are passed as pointers to the start of the array, so all
-that \ttt{gets} receives is the address to start writing.
+This code allocates an array of 128 bytes and then uses \ttt{gets} to
+read a string from standard input into the buffer.
+The \ttt{gets} routine will read the input from until it reaches the
+end of the string (indicated in C with a zero byte), then it will
+write the corresponding string into the buffer.
+Arrays in C have no length information attached to them, so the \ttt{gets}
+code will happily accept an input strength of any length---possibly much larger
+than 127 bytes.
 
-So, what if the input is longer than 128 bytes? The \ttt{gets} function simply writes until
+So, what happens if the input is 
+longer than 128 bytes? The \ttt{gets} function simply writes until
 it finds a NULL character (\ttt{`\0`}) in the input. 
 So if the input string is too long, \ttt{gets} will simply write past
 the end of the memory allocated for \ttt{buf}. 
@@ -49,18 +70,59 @@ If an attacker gives an input that is longer than 128 bytes,
 the attacker will be able to write bytes of its choice into the 
 memory after \ttt{buf}.
 
+In C, the \ttt{buf} array will be allocated on the call stack, which will be
+laid out in memory like this:
+\begin{verbatim}
+... rest of stack ...
+---------------
+return address of f's caller
+---------------
+buf[127]
+...
+buf[2]
+buf[1]
+buf[0]
+---------------
+\end{verbatim}
+
+\marginnote{You might think that the fact that this problem is caused
+in part by having the stack in C grow down, so that running off the end 
+of the buffer can cause the attacker to overwrite the return address.
+It turns out that similar attacks are possible even on architectures
+in which the stack grows up. The fundamental problem is that the 
+attacker can scribble over data in the stack.}
+Once the \ttt{f} function ends execution, the program will jump to the
+return address sitting after at the end of there buffer.
+So if an attacker can write data past the end of the \ttt{buf} array, 
+the attacker can overwrite the return address of \ttt{f} on the stack
+and the attack can cause the program to jump to and begin executing
+code at an arbitrary location in memory.
+
+One simple mitigation is to 
+modify the compiler to refuse to compile programs that use 
+routines such as \ttt{gets}.
+We discuss other mitigations below.
+
 % TODO: return address examples
 % TODO: stack diagrams---f's frame and gets's frame
 
 To avoid this kind of \emph{buffer overlow} bug, we need to somehow ensure that
 \ttt{gets} only writes within the bounds of the buffer. 
 
-\subsection{Bounds Checking}
-To do this, we can insert a check before writing. Consider the following slightly more complex code, which receives $n$ records that are each 16 bytes long and writes them into the buffer:
+\paragraph{Mitigation: Runtime checks}
+Modern compilers can try to check in real time whether a memory access goes
+past the end of the buffer and will crash the program if so. 
+These defenses are imperfect but prevent the most naive type of bug.
+
+\paragraph{Mitigation: Bounds Checking}
+Another mitigation is to ensure that the input is not too large before reading it in.
+To do this, we can insert a check before writing. 
+
+Consider the following slightly more complex code, which receives $n$ records that are each 16 bytes long and writes them into the buffer:
 
 \begin{lstlisting}[language=c]
 void f() {
-	char buf[sz];
+	char buf[256];
 	uint32_t n = get_input();
 	for (uint32_t i=0; i < n; i++) {
 		// read record i into 
@@ -69,7 +131,7 @@ void f() {
 }
 \end{lstlisting}
 
-This code will write beyond the end of the buffer if \ttt{n*16} is greater than \ttt{sz}. We then may consider adding a check like the following:
+This code will write beyond the end of the buffer if \ttt{n*16} is greater than \ttt{256}. We then may consider adding a check like the following:
 \begin{lstlisting}[language=c]
 #define sz 256
 
@@ -87,11 +149,48 @@ void f() {
 \end{lstlisting}
 
 However, consider an adversary that inputs data such that \ttt{n = 2^30}. If we
-were computing on paper, our check would work just fine: $2^{30} \cdot 16 = 2^34$,
-which is certainly greater than \ttt{sz}. However, integers in C are stored in
-32 bits, and $2^{34}$ will not fit! It turns out that if you try to compute
+were computing on paper, our check would work just fine: $2^{30} \cdot 16 = 2^{34}$,
+which is certainly greater than \ttt{sz}. However, \ttt{uint32_t} is a 32-bit value
+and $2^{34}$ will not fit into the 32 bits allocated for that integer---the computation
+will \emph{overflow}.
+It turns out that if you try to compute
 \ttt{n*16} in C when \ttt{n} is $2^{30}$, the answer is zero! Thus, our check
 will pass but our code will still write beyond the end of the buffer. 
+
+To prevent this type of overflow, the program can explicitly check
+for overflow---it's tricky to do, but important when accepting user-provided input.
+
+\subsection{Use after free}
+Another common type of bug is a use-after-free bug,
+in which a programmer frees a chunk of heap memory and then
+reads or writes it after freeing it.
+
+In C this happens when a programmer uses \ttt{malloc} to allocate
+some memory, then calls \ttt{free} to free it, and then accesses it.
+An example piece of code with this bug is here:
+\begin{lstlisting}[language=c]
+void f() {
+  char *req = malloc(1024);
+  int err = read(0, req, 1024);
+  if (err) free(req);
+                            // ***
+  if (err) printf("Error %d: %s\n", err, req);
+}
+\end{lstlisting}
+If some other thread in the program calls \ttt{malloc} when
+the code is a point \ttt{***}, the other thread of execution
+may use the array \ttt{req} for something else.
+Then the \ttt{printf} line could print out some other contents
+of memory---possibly exposing cryptographic keys or other
+sensitive data.
+
+These bugs are very difficult to track down since it is difficult
+for a compiler to figure out which memory a piece of code should
+or should not have access to.
+One way to defend against these bugs is to use a programming language,
+such as Rust, that explicitly associates a ``lifetime'' with each piece
+of memory and can prevent code from accessing free'd memory.
+
 
 % TODO: protecting against this
 % TODO: memory-safe languages
@@ -116,7 +215,7 @@ the same query might look like:
 The problem with using string interpolation is that an adversarial user
 can supply a phone number like
 \begin{quote}
-	\ttt{phone = '123"; DROP TABLE users; "'}.
+	\ttt{123"; DROP TABLE users; "}
 \end{quote}
 The SQL engine will then receive the query:
 \begin{quote}
@@ -124,9 +223,16 @@ The SQL engine will then receive the query:
 \end{quote}
 which will have the effect of deleting the \ttt{users} table.
 
-To build SQL queries safely from user input, it is important to \emph{escape}
-special characters like quotes.
-Modern libraries for interacting with databases perform this type of escaping
+The principled way to solve this problem is to have a strategy for
+\emph{unambiguously encoding} data.
+In SQL, if you have a quote character \ttt{"} in a data string, the programmer
+writes it as \ttt{\"}. This is called ``escaping'' a string.
+A SQL library can automatically escape characters such as quotes,
+but escaping is not as easy as replacing each quote with its escaped
+equivalent---you need to worry about escaping the escape character ``\ttt{\\}''
+and all sorts of other subtleties.
+
+Modern libraries for interacting with databases perform escaping
 automatically to avoid these ``SQL injection'' attacks.
 
 
