@@ -341,4 +341,33 @@ mit.edu             nytimes.com
 \end{figure}
 
 \section{Example: Payment Systems}
+Processing credit-card transactions in web applications is risky:
+if a vendor suffers a compromise, the credit-card network may fine
+them or kick them off the network.
+To avoid ever having to handle credit-card data, most websites 
+use an external payment-processing service that handles credit-card information.
+When the user makes a purchase, the vendor redirects the user to the 
+payment-processing service, who collects the user's credit-card data.
+After payment, the payment-processing service redirects the user
+back to the vendor's website.
+
 Many applications employ privilege separation between their normal application code and the code that handles credit card numbers and other sensitive payment information. This separation will likely allow the app to initiate a charge for a certain amount. The interface here is again very important.
+
+\begin{figure}
+\begin{verbatim}
+   --------> Web app -----> Order DB
+   |            ^
+   |            |
+Client    Payment data 
+   |            |
+   |            |
+   --------> Payment -----> Visa/MC
+             service   
+                | 
+                v
+        [ Credit card #s ]
+\end{verbatim}
+\caption{Web browsers may isolate the execution of each origin's 
+  code in a separate process. They further isolate complicated
+  and bug-prone codecs and GPU code in separate processes.}
+\end{figure}
