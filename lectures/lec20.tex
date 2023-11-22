@@ -1,5 +1,6 @@
 \chapter{Privilege Separation}
 
+
 The last chapter left off on a somewhat
 unsatisfying note: our software is bound to have
 bugs and those bugs are likely to be exploitable.
@@ -305,6 +306,39 @@ Code loaded from \texttt{googleusercontent.com} cannot access cookies
 or data for \texttt{google.com}. In this way, even if an attacker can somehow
 run JavaScript in your browser, it cannot easily steal your Google cookies.
 
+\section{Example: Web browser}
+
+Web browsers today are extraordinarily complicated pieces of software.
+The sensitive data that a browser is trying to protect are things, such as
+user cookies, cached data, browser history, and other user data.
+The browser may spawn new processes to handle rendering for each site
+from each distinct domain/origin.
+In this way, if an attacker from one origin can exploit a bug in the
+JavaScript engine, the attacker may still not be able to compromise
+sensitive user data from other domains/origins.
+GPU code, which is extremely complicated and bug-prone, may run in 
+yet another process.
+Today, compromising a browser entirely often requires finding and exploiting
+a collection of bugs in multiple components.
+\begin{figure}
+\begin{verbatim}
+ codec                codec
+   ^                    ^
+   |                    |
+   v                    v
+mit.edu             nytimes.com
+   |                    |
+   |                    | 
+   ---- Browser core <------> UI <---> GPU
+            |
+            v
+     [   Cookies   ]
+     [ Cached data ]
+\end{verbatim}
+\caption{Web browsers may isolate the execution of each origin's 
+  code in a separate process. They further isolate complicated
+  and bug-prone codecs and GPU code in separate processes.}
+\end{figure}
 
 \section{Example: Payment Systems}
 Many applications employ privilege separation between their normal application code and the code that handles credit card numbers and other sensitive payment information. This separation will likely allow the app to initiate a charge for a certain amount. The interface here is again very important.
