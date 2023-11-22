@@ -351,8 +351,6 @@ payment-processing service, who collects the user's credit-card data.
 After payment, the payment-processing service redirects the user
 back to the vendor's website.
 
-Many applications employ privilege separation between their normal application code and the code that handles credit card numbers and other sensitive payment information. This separation will likely allow the app to initiate a charge for a certain amount. The interface here is again very important.
-
 \begin{figure}
 \begin{verbatim}
    --------> Web app -----> Order DB
@@ -367,7 +365,6 @@ Client    Payment data
                 v
         [ Credit card #s ]
 \end{verbatim}
-\caption{Web browsers may isolate the execution of each origin's 
-  code in a separate process. They further isolate complicated
-  and bug-prone codecs and GPU code in separate processes.}
+\caption{Online vendors often use a separate payment processor
+    that handles the user's credit-card data.}
 \end{figure}
