@@ -1,14 +1,34 @@
 \chapter{Privilege Separation}
 
-The last chapter left off on a somewhat unsatisfying note: our software is bound to have bugs and those bugs are likely to be exploitable. Today, we will try to limit the impact that these bugs can have by \emph{planning for compromise} and aiming to limit the damage that each component can cause if an attacker compromises it.
+The last chapter left off on a somewhat
+unsatisfying note: our software is bound to have
+bugs and those bugs are likely to be exploitable.
+Today, we will try to limit the impact that these
+bugs can have by \emph{planning for compromise}
+and aiming to limit the damage that each component
+can cause if an attacker compromises it.
 
-The philosophy that we will employ is called the \emph{Principle of Least Privilege}. By limiting the access that each component of our software has to do sensitive actions, we can prevent the compromise of our whole system when a single piece is attacked.
+The philosophy that we will employ is called the \emph{Principle of Least Privilege}. 
+The idea is to give each component in the system the least privileges needed to do 
+its job.\marginnote{In real systems, it is often costly to implement least privilege in
+the strictest sense possible. You should think of the principle of least privileges as
+a difficult-to-achieve design goal, rather than a rule that every component of every
+system must satisfy.}
+By limiting the access that each component of our software has to do sensitive actions, we can prevent the compromise of our whole system when a single piece is attacked.
+
 To summarize our strategy:
-
 \begin{quote}
   \textbf{Principle of Least Privilege:}
 	Each component should have the smallest set of privileges necessary to do its job.	
 \end{quote}
+
+
+As a concrete example, a web server might have some networking code, it might
+talk to a database server, and it might use some cryptographic keys.
+One way to architect the system with least privilege would be to split the
+server into multiple distinct processes---one that receives network requests,
+one that interfaces with the database, and one that uses the cryptographic keys.
+These components then would speak to each other using narrow, restrictive APIs.
 
 In some sense, a system that perfectly implements the principle of least privilege 
 gives one with the ``best security we could ask for,'' in the face of component compromise.
@@ -20,43 +40,271 @@ for a number of reasons:
 \paragraph{Challenge: Splitting Boundaries.} 
 A large piece of software has many components that often have many points of interaction.
 To effectively implement least privilege, we need to find
-boundaries on which we can separate our software. 
+boundaries at which we can separate our software. 
 \marginnote{If we don't split up a large piece of software
 into components, the software just consists of one \"uber-component.
 An attacker who breaks into this one component can hijack the entire system.
 }
 A few common ways to partition a system or application are:
 \begin{itemize}
-	\item By user -- standard in operating systems
-	\item By feature -- common on the server side of large business applications
-  \item Splitting off buggy code -- e.g., sandboxing video codecs in a web browser (\cref{sec:split:codec})
-	\item Exposed vs. Internal code -- e.g., Google's front-end HTTP servers are separate from core application logic
-	\item Isolating sensitive keys -- e.g., hardware security modules
+  \item \textbf{Isolating by user:} In an operating system, different users of the systems
+                      have different privileges. This way, if an attacker compromises
+                      one user's account it does not compromise the entire system.
+
+\item \textbf{Splitting by feature:} In large business applications, different features
+        (e.g., search, user management, mail) run as isolated components.
+        This way, a bug in one component does not necessarily affect the entire system.
+\item \textbf{Splitting off buggy code:} The Firefox web browser uses special sandboxes to compartmentalizes bug-prone video codec code (\cref{sec:split:codec}).
+  This way, if a malicious website is able to exploit the codec code, it is not
+    so easy for the attacker to compromise the system.
+\item \textbf{Separating exposed versus internal code:} Google's front-end HTTP servers 
+    are isolated from the servers that run core application logic.
+    This way, an attacker on the network is one step removed from the
+    servers with access to Google's internal resources (databases, etc.).
+
+  \item \textbf{Isolating sensitive data or keys:} Certificate authorities (CAs) use hardware security modules to isolate the cryptographic keys from all other code in the system. Laptops and servers sometimes have separate cryptographic co-processors for this purpose as well. 
+
 \end{itemize}
 
 \paragraph{Challenge: Interface/API.}
-If we chop our monolithic app into different domains, we also need to clearly define an API that the different domains can use to interact. This API must allow us to preserve the functionality of the system while avoiding any bypasses of the permission system. As designers of this isolation, we must also be concerned with the performance overhead of the separation system and with the complexity overhead that the system adds---it is possible for the addition of this isolation to add new bugs and exploits.
+If we chop our monolithic app into different
+domains, we also need to clearly define an API
+that the different domains can use to interact. 
+This API must allow us to preserve the
+functionality of the system while making it difficult
+for an attacker that compromises one component from
+compromising an adjacent one.
 
-\section{Examples}
-\subsection{Logging}
-It is often desirable in a system to have a reliable log of everything that happens: even if the system becomes compromised, this allows administrators to recover much more effectively by being able to see the actions that the attackers took. This log gives a clear isolation boundary: the app's functionality is almost entirely separate from the log, and the app's interface to the log can be very simple: the app should be allowed to append to the log and read from the log---the app should likely \emph{not} be allowed to remove entries from the log. This way, bugs outside of the logger will not be able to lead to the deletion of log entries.
+Some strategies for interfacing between different components
+of a system might be
+\begin{itemize}
+\item remote procedure calls (RPCs) over a network,
+\item message queues,
+\item shared memory,
+\item shared database, or
+\item shared files or directories.
+\end{itemize}
 
-\subsection{Cryptography Keys}
-Many domains require the use of public-key cryptography to generate a signature over some data: certificate authorities need to generate signed certificates for their clients, cryptocurrency wallets need to sign transactions, and WebAuthn requires an authenticator to sign a challenge from the relying party. In all of these applications, the worst-case scenario is an attacker with access to our private key. This also leads to a somewhat natural division of our application: we can create a cryptography component whose only API is \ttt{sign(msg)} and \ttt{get_public_key}. It should be impossible for an attacker to take advantage of a bug in the rest of our app to learn the private key.
+In designing interfaces between isolated components,
+we tend to worry about:
+\begin{itemize}
+  \item \textbf{Functionality:} Does the isolation plan allow the application to work as it should?
+  \item \textbf{Security:} Does the isolation strategy prevent the compromise of one component from affecting others?
+  \item \textbf{Performance:} How much performance overhead does the isolation mechanism add?
+  \item \textbf{Complexity:} How much code does the isolation mechanism require?
+If the compartmentalization strategy requires a large
+amount of code, this code might introduce new vulnerabilities.
+    
+\end{itemize}
 
-However, this design does not guarantee everything that we might like: an attacker who compromises our app can still call \ttt{sign()} as much as they like to sign any message they like. However, having the key isolated to this crypto component allows us to add checks inside the crypto component to, for example, reject messages of the wrong type\marginnote{Although in many cases the things we are worried about an attacker asking for signatures of will pass this type check: for example, for a CA, this would still allow an attacker to generate a certificate for their malicious website.}. If our service is a certificate authority, we could set up our crypto component to verify that each message is an actual signature before signing it.
+\section{Example: Logging}
+Most systems use logging to keep track of the actions that an application has performed.
+That way, if an attacker compromises the application, system administrators can 
+look at the log to see what happened and how to mitigate it.
+For a logging system to be useful, it must be difficult for an attacker who compromises
+the application to erase the log.
 
+It is very natural to separate out the log into a separate component:
+the app's functionality is almost entirely
+separate from the log, and the app's interface to
+the log can be very simple.
+The app should be allowed to append to the log and
+read from the log---the app should 
+\emph{not} be allowed to remove entries from the
+log. This way, compromise of the application or log server
+will not be enough to erase the log.
+\begin{figure}
+\begin{verbatim}
+Application  ----- Log entries -----> Log server
+  server                                  |
+     |                                    |   Append/Read API
+     |                                    |   (No delete)
+     |                                    v
+     -------- No access -----> X         Log
+\end{verbatim}
+\caption{One way to architect a logging system.
+  An attacker that compromises the application and/or log
+  server may not be able to erase the logs.}
+\end{figure}
+
+\section{Example: Cryptography Keys}
+Many applications use cryptographic keys for authentication: certificate authorities need to generate signed certificates for their clients, cryptocurrency wallets need to sign transactions, and WebAuthn requires an authenticator to sign a challenge from the relying party. 
+In all of these applications, we worry a lot about an attacker stealing the application's secret signing key.
+Towards the goal of protecting cryptographic secrets, we often
+isolate the code that uses cryptographic keys into a separate software (or even hardware)
+component.
+In particular, we might create a cryptography component whose 
+only API is \ttt{sign(msg)} and \ttt{get_public_key()}.
+In this way, even if an attacker compromises the application, it cannot
+easily extract the secret key.
+
+This design does not completely protect us against the compromise of the application.
+In particular, an attacker who compromises our app can still call \ttt{sign()} as much as they like to sign any message they like. 
+At the same time, having the key isolated to this crypto component allows us to add checks inside the crypto component to, for example, reject messages of the wrong type\marginnote{Although in many cases the things we are worried about an attacker asking for signatures of will pass this type check: for example, for a CA, this would still allow an attacker to generate a certificate for their malicious website.}. If our service is a certificate authority, we could set up our crypto component to verify that each message is an actual signature before signing it.
+
+\begin{figure}
+\begin{verbatim}
+Application  <----- Requests -----> Key manager
+     |                                    ^
+     |                                    |  Sign API
+     |                                    |  (No extraction 
+     |                                    |     of key)
+     |                                    v
+     -------- No access -----> X     Signing key
+\end{verbatim}
+\caption{A common architecture for isolating cryptographic
+keys from an application.}
+\end{figure}
 This division also allows our crypto code to do some meaningful logging: imagine that the crypto module saves every signature it creates to a log. Compromise of the main app would allow an attacker to generate arbitrary signatures, but administrators could then see every signature that was generated during the compromise. This would be very helpful in recovery.
 
-\subsection{Media Codecs in Web Browsers}\label{sec:split:codec}
-Media codecs for things like JPEG decoding are notoriously bug-prone due to their complexity. This codec libraries have been the cause of many web browser exploits because of this. If we were able to isolate these codecs, we could prevent these bugs from allowing an attacker to access data other than the media file being decoded.
+\section{Example: Media Codecs in Web Browsers}\label{sec:split:codec}
+Media codecs (e.g., for JPEG decoding) are notoriously complex and bug-prone:
+codec libraries have been at the source of many web-browser exploits. 
+If we were able to isolate these codecs, we could
+make it less likely that a codec bug allows an attacker to
+access data other than the media file being decoded.
 
-However, these codecs require a much more sophisticated interface than the simple logging and signing examples we have seen so far. Videos are progressively decoded as data arrives, for example, and even image decoders progressively decode images, improving resolution as more data arrives. Supporting this functionality without adding vulnerabilities or excessive latency presents many challenges.
+\begin{figure}
+\begin{verbatim}
+Browser tab  ----- Encoded data-----> JPG/Media codec
+             <------- Bitmap -------- 
+\end{verbatim}
+\caption{The Firefox browser isolates media codecs
+in a separate sandbox.}\label{fig:codec}
+\end{figure}
 
-Firefox in particular has a coherent plan for isolating these risky codecs by taking advantage of the language-level isolation provided by WebAssembly.
+Isolating codecs may not always be as trivial as \cref{fig:codec} makes it seem.
+In many cases, codecs require a sophisticated interface to the browser tab: the
+codec library may progressively decode videos as data arrives, for example. 
+Even image decoders progressively decode images, improving resolution as more data arrives. Supporting this functionality without adding vulnerabilities or excessive 
+latency requires careful API design.
 
-\subsection{NTP Server}
-The Network Time Protocol, or NTP, is used by operating systems to fetch the current time from servers on the internet and update the current time to match. Setting the time requires root privilege on Unix-like systems, but NTP also requires network accesses that can be complicated and bug-prone. To prevent an attacker who finds a bug in these network protocols from gaining root privilege on our machine, many systems separate the two into a process that handles talking to the NTP server on the network and a privileged process that accepts the time from this other process and sets it. This way, an attacker who find a bug in the network code can only set the time---they cannot perform arbitrary actions as root.
+Firefox isolates these risky codecs using
+the language-level isolation that the WebAssembly language provides.
 
-\subsection{Payment Systems}
+\section{Example: Server for Network Time Protocol (NTP)}
+Operating systems use the network-time protocol
+to fetch the current time from time servers on 
+the Internet, and to update the current
+time to match. 
+Setting the time requires root
+privilege on Unix-like systems, but NTP also
+requires network accesses; 
+the networking code can be complicated
+and bug-prone. To prevent an attacker who finds
+a bug in these network protocols from gaining root
+privilege on our machine, many systems separate
+the two into a process that handles talking to the
+NTP server on the network and a privileged process
+that accepts the time from this other process and
+sets it. This way, an attacker who find a bug in
+the network code can only set the time---they
+cannot perform arbitrary actions as root.
+In addition, the time service may impose some
+policy on time changes (e.g,. that time can never
+go backwards). 
+
+\begin{figure}
+\begin{verbatim}
+Launcher --------> Network <---> Web
+   |               Service                 
+   |                  |
+   |                  | "adjust clock"
+   |                  v
+   |-------------> Time Service [Policy enforcement]
+\end{verbatim}
+\caption{Modern operating systems implement 
+a network-time protocol (NTP) client as separate processes.
+  This way, an attacker who compromises the client over
+  the network cannot arbitrarily corrupt the system time.}\label{fig:ntp}
+\end{figure}
+
+\section{Example: OpenSSH Server}
+A secure shell (SSH) server has access to many sensitive resources:
+network port 22, a host secret key, the system's password file, and
+all users' data.
+When it starts, the SSH server runs a ``monitor'' process that listens
+for connections on port 22. When the monitor receives a connection,
+the first thing it does is to spawn a new per-connection worker process
+that communicates over the network.
+The worker client has no access to the host key or password database---the
+worker process can only ask the monitor for help in authenticating.
+The monitor-worker API supports a few operations:
+\begin{itemize}
+\item a \emph{signing} operation, that instructs the monitor to sign a protocol
+        transcript, 
+      \item a \emph{password-authentication} operation, that instructs
+the monitor to check a password (this can be rate limited to prevent
+    password guessing), and 
+      \item a \emph{start-session} operation, that instructs the monitor
+        to create a new process with a shell for the user.
+\end{itemize}
+
+\begin{figure}
+\begin{verbatim}
+[ Host key  ]
+[ Passwords ]
+[ Port 22   ]
+    |
+    v
+ Monitor --- Spawns per client --> Worker <--- Client1
+    |                              Worker <--- Client2
+    |                               ...
+    --------> Session <----------> Worker <--- ClientN
+              process
+
+\end{verbatim}
+\caption{The OpenSSH server is split into multiple process to mitigate the compromise of the network-facing code.}
+\end{figure}
+
+While this architecture adds quite a bit of complexity to the OpenSSH
+server, it has paid off in terms of mitigating the impact of vulnerabilities
+in client-facing code.
+
+
+\section{Example: Web applications}
+Companies will often implement Web applications (e.g., a photo-sharing website)
+as a number of separate services, running on separate physical machines.
+Client connections come into a front-end server that terminates the TLS connection
+and proxies client data to a front-end application server.
+The front-end server then routes requests to one or more application
+services, each of which may have access to different databases.
+For example, the login service may have access to the password database,
+while the profile service may not.
+
+\begin{figure}
+\begin{verbatim}
+           [ TLS Key ]
+               |                 
+               v                  
+Client ----> HTTPS  ---> Front-end 
+             server       service
+                            ^
+                            |---> Login   <--> Password DB
+                            |     service   
+                            |
+                            |---> Profile <--> User DB
+                            |     service
+                            |
+                            |---> Photo   <--> Photo DB
+                                  service
+\end{verbatim}
+\caption{Large Web services tend to isolate different application
+  features into different services, often on different physical machines.
+  The system gates access to these services via minimal front-end client-facing
+  servers.}
+\end{figure}
+
+\section{Example: Web client}
+When you open a PDF attachment in Gmail , you might
+worry that the PDF could exploit some bug in your browser that could steal
+your sensitive Google data.
+To make this kind of attack more difficult, Gmail serves attachments
+and other suspect files from a separate domain (``origin')): \texttt{googleusercontent.com}.
+Code loaded from \texttt{googleusercontent.com} cannot access cookies
+or data for \texttt{google.com}. In this way, even if an attacker can somehow
+run JavaScript in your browser, it cannot easily steal your Google cookies.
+
+
+\section{Example: Payment Systems}
 Many applications employ privilege separation between their normal application code and the code that handles credit card numbers and other sensitive payment information. This separation will likely allow the app to initiate a charge for a certain amount. The interface here is again very important.
