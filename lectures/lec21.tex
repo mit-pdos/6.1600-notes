@@ -286,6 +286,7 @@ in = {i0, i1, i2, i3, i4, ...};
                                         \           /
                                                     | ...continue ...
                                                     | ...execution...
+                                                    \
 \end{verbatim}
 
 \paragraph{Benefits.}
@@ -301,8 +302,21 @@ type (e.g., out-of-bounds read).
 \paragraph{Drawbacks.}
 Symbolic-execution engines can be very slow to run and often work
 poorly on very large pieces of code. 
-As the length of an execution grows, the symbolic-execution engine
+As the length of an execution grows, the symbolic-execution engine\marginnote{
+To address these drawbacks in symbolic executions, one approach is to 
+write a \emph{scheduler} that guides the search that the symbolic execution
+makes through the program state.
+A second approach is to define \emph{loop invariants} or \emph{function invariants}
+that aim simplify the job that the SAT-solver must perform by giving it more
+information about the program's expected behavior.
+}
 accumulates more and more symbolic variables (representing values in memory)
 and the number of constraints on each symbolic variables grows as well.
+When there are many variables and many constraints, the SAT solver may
+not be able to determine---in a reasonable amount of time---whether 
+there is or is not a satisfying assignment to the variables.
+For these reasons, symbolic execution can work well for small snippets of code;
+in large programs (such as a web browser), symbolic execution may 
+not be able to progress very deep into the program.
 
 
