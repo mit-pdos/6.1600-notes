@@ -1,3 +1,170 @@
 \chapter{Bug Finding}
 
-% TODO: this chapter
+We are going to continue our treatment of security and bugs
+with a discussion of how to find bugs.
+As we already have seen, bugs are a big deal in terms of security
+problems.
+We have discussed how to architect a system using privilege separation
+so that bugs do not matter so much.
+But even with a very good privilege-separated design, we still want to 
+make sure that our system is as bug-free as possible.
+
+The topic of this chapter is then: \emph{How do we find bugs?}
+
+\paragraph{Step 1: Define what is a bug.}
+Before we even begin talking about how to find bugs, we need
+to answer the question: \emph{What is a bug?} 
+There are a number of application-independent
+ways to determine when we have hit a bug:
+\begin{itemize}
+\item the program crashes,
+\item the program makes an out-of-bounds memory access, or
+\item the program jumps to an unknown or undefined point in the program.
+\end{itemize}
+More difficult types of bug to detect are ones that
+we can only detect with knowledge of what the application is supposed to do:
+\begin{itemize}
+\item the program's output is incorrect, or
+\item the program allows an attacker to access data it should not be able to access.
+\end{itemize}
+
+\paragraph{Step 2: Find bugs.}
+To find a bug, we just need to identify a possible
+execution of the program that leads to one of the buggy outcomes
+we defined in Step~1.
+The reason this is difficult is:
+\begin{itemize}
+\item there are typically exponentially many possible inputs to the program and it may be difficult to find one the triggers the bug,
+\item concurrent systems exhibit non-deterministic behavior, and
+\item inputs from the environment (time, network state, etc.) can change the behavior of the program.
+\end{itemize}
+
+\section{Bug finding: A concrete example}
+
+To frame our discussion of bugs, we will consider one
+specific example of a C program that parses a binary
+packet that has the format depicted in \cref{fig:packet}.
+\begin{figure}
+\begin{verbatim}
+------------------------------------------
+| header | len | id | id | id | ... | id |
+------------------------------------------
+\end{verbatim}
+\caption{An example packet format.}\label{fig:packet}
+\end{figure}
+The packet starts with a header byte and a length byte
+and then has a list of IDs.
+
+\begin{figure}
+\begin{lstlisting}[language=c,numbers=left]
+// Parse header
+char in[64];
+int hdr = in[0];
+if (hdr != s) returnl;
+int n = in[1];
+if (n > 64) return;
+
+// Read ID fields
+int ctr[32];
+char *next = &in[2];
+for (int i=0; i < n; i++) {
+  ctr[*next]++;
+  next++;
+}
+\end{lstlisting}
+\caption{An example of some buggy parsing code.}\label{fig:buggy}
+\end{figure}
+
+
+\section{Manual testing}
+
+When we manually test code, we consider a \emph{specific execution} 
+of the program and predefine an \emph{expected result}.
+For the example of \cref{fig:buggy}, we might tests to check
+that the following two inputs give the following behavior:
+\begin{lstlisting}[language=c]
+in = {6};         // Should have no effect.
+in = {5, 1, 2};   // Should cause ctr[2] == 1
+\end{lstlisting}
+
+\paragraph{Benefits.}
+The main advantage of manual testing is that
+tests can be targeted and can exercise application-specific logic.
+If you have a precise correctness condition that your program
+should ensure, it is often easiest to test it with manual testing.
+
+An additional advantage is that manual tests are useful in \emph{regression testing}:
+If you find a bug in your program today, you can write a manual test that
+tests that the buggy condition does not occur. As you update your program 
+later on, this regression test can determine whether the same bug occurs again.
+
+\paragraph{Downsides.}
+The downsides of manual tests are that they are expensive to write, 
+the test cases can themselves be buggy (especially when the program is complicated),
+it requires a lot of program-specific understanding, 
+and it is difficult to write enough tests to cover a large fraction of the
+program's behavior.
+
+\section{Fuzzing}
+
+Fuzzing is the process of running a program on a very large
+number of \emph{randomly generated inputs}.
+As soon as a random input causes the program to crash, we
+know that we have detected a bug.
+When using a fuzzer to test a piece of code, we will typically
+ask the compiler to instrument the code with extra instructions
+to test whether the code behaved improperly.\marginnote{With
+the GCC compiler, you can compile your code with the \texttt{-fsanitize=address}
+flag to insert extra checks for memory-access errors.}
+In C, for example, we will instruct the compiler to check
+for out-of-bounds memory accesses.
+
+Fuzzers may have to test a large number of inputs before finding
+one that triggers a bug.
+In the code of \cref{fig:buggy}, if a well-formed packet has \texttt{n=64},
+the program will write off the end of the \texttt{in} array.
+(The check in Line~6 should test whether \texttt{n >= 64} instead of \texttt{n > 64}.)
+For a fuzzer to hit this bug, it will need to choose a random input
+value of the form:
+\begin{lstlisting}[language=c]
+in = {5, 64, ... 64 arbitrary values ...};
+\end{lstlisting}
+
+The probability that a uniform randomly bitstring of the appropriate length
+hits this bug is $2^{-8} \cdot 2^{-8} = 2^{-16}$, which is quite small.
+
+\paragraph{Coverage-guided fuzzing.}
+Real fuzzers do not just feed uniform random bitstrings to programs
+that they are trying to fuzz. \marginnote{Most random bitstrings will probably 
+not cause the program to exercise a large fraction of the program's code,
+since the program will reject them early most of the time.}
+Instead, real fuzzers try to pick inputs in a way that maximizes
+the fuzzer's \emph{code coverage}: the fraction of the lines of 
+the program's code that the fuzzed programs have executed.
+
+To implement this strategy, the fuzzer maintains a corpus of bitstrings.
+Each time the fuzzer runs the program, it picks an input from the
+corpus and randomly mutates it in some way (e.g., by changing or adding a byte).
+If running the new string on the program causes the program to execute
+some new lines of code (i.e., the coverage increases), the fuzzer adds
+the newly mutated string to the corpus.
+
+While this strategy does not have a robust theory to support it, 
+coverage-guided fuzzing works shockingly well in practice.
+Many major software projects use fuzzing extensively to find bugs.
+
+
+\paragraph{Benefits.}
+A major benefit of fuzzers is that they are almost completely automated---they
+require very little input from the programmer. Since programmer time is more
+expensive than machine time, finding bugs using fuzzers is often much cheaper
+than finding bugs via manual test cases.
+Since fuzzers execute the program on billions of inputs, they will 
+often find tricky bugs that a human might never find.
+
+\paragraph{Drawbacks.}
+A drawback of fuzzers is that they cannot find application-specific bugs:
+they are essentially limited to only finding violated assertions in a program.
+So while fuzzers are a useful tool for finding bugs, they are typically only 
+useful in conjunction with manual tests.
+
