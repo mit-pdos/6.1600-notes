@@ -111,6 +111,7 @@ Fuzzing is the process of running a program on a very large
 number of \emph{randomly generated inputs}.
 As soon as a random input causes the program to crash, we
 know that we have detected a bug.
+
 When using a fuzzer to test a piece of code, we will typically
 ask the compiler to instrument the code with extra instructions
 to test whether the code behaved improperly.\marginnote{With
@@ -118,6 +119,10 @@ the GCC compiler, you can compile your code with the \texttt{-fsanitize=address}
 flag to insert extra checks for memory-access errors.}
 In C, for example, we will instruct the compiler to check
 for out-of-bounds memory accesses.
+
+To test for application bugs with a fuzzer, we can instrument our
+code with assertions that will crash the program if the program 
+ever violates certain programmer-specified invariants.
 
 Fuzzers may have to test a large number of inputs before finding
 one that triggers a bug.
@@ -153,6 +158,13 @@ While this strategy does not have a robust theory to support it,
 coverage-guided fuzzing works shockingly well in practice.
 Many major software projects use fuzzing extensively to find bugs.
 
+A coverage-guided fuzzer run on \cref{fig:buggy} might find the
+following input that causes the program to crash with an 
+out-of-bounds write:
+\begin{lstlisting}[language=c]
+in = {5, 1, 100};
+\end{lstlisting}
+
 
 \paragraph{Benefits.}
 A major benefit of fuzzers is that they are almost completely automated---they
@@ -167,4 +179,130 @@ A drawback of fuzzers is that they cannot find application-specific bugs:
 they are essentially limited to only finding violated assertions in a program.
 So while fuzzers are a useful tool for finding bugs, they are typically only 
 useful in conjunction with manual tests.
+
+\paragraph{Generalizations of fuzzing.}
+The first fuzzers used random bitstrings as their initial pool of inputs.
+More recent fuzzers have application-specific logic for handling 
+HTML, JSON, or other file formats---these fuzzers are better at
+catching higher-level logic errors.
+Some languages, such as Go, have support for fuzzing in their
+test infrastructure.
+
+\section{Symbolic execution}
+
+A weakness of fuzzing is that a fuzzer may not be able to trigger bugs that\marginnote{For example, if a parser first checks a CRC32 checksum on a packet, a fuzzer will almost never find an input that causes the program to run past the checksum check.
+Another example of difficult-to-fuzz code might be some HTML parsing code that checks that
+every \texttt{<} symbol is followed by an \texttt{>} symbol.}
+hide behind \texttt{if} conditions that are very very rarely true.
+Symbolic execution is a testing strategy that can find bugs in these
+difficult-to-fuzz programs.
+
+The idea of symbolic execution is that we will run the program. But instead
+of running the program on actual concrete input values, we will run
+the program on \emph{symbolic variables} that represent arbitrary values.
+For example, we might want to use symbolic execution to run the following
+simple snippet of code:
+\begin{lstlisting}[language=c]
+c = a + b;
+e = d + c;
+f = a * d;
+\end{lstlisting}
+
+When executing this code, the state of memory might look like this,
+where we replace the value of the variable \texttt{d} with a variable $X$:
+\begin{verbatim}
+--------------------------------------------------
+...    |  5  |  7  |  12  |  X  |     |     |  ... 
+--------------------------------------------------
+          a     b      c     d     e     f
+\end{verbatim}
+
+The major headache when using symbolic execution is \emph{control flow}.
+For example, we might have code that looks like this:
+\begin{lstlisting}[language=c]
+if (e == f) {
+  BUG();
+} else {
+  // Something else
+}
+\end{lstlisting}
+If running with the symbolic variable $\texttt{d} = X$, then 
+we will have the condition:
+\verb|(d+c == a*d)|, which simplifies to:
+\verb|(X+12 == 5*X)|.
+
+\marginnote{An important
+thing to know is that there is \emph{no guarantee} that a SAT solver
+will actually be able to find an input that causes the program
+to execute one branch or another.
+The reason is that we know of no efficient algorithm for finding
+an assignment of the variables for an arbitrary condition
+that causes the condition to be true.
+(This problem is NP complete.)
+At the same time, for finding branch conditions in
+``reasonable'' programs,
+SAT solves work surprisingly well.}
+To handle this sort of case, we can use a program called
+a \emph{SAT Solver} to search for inputs that cause the condition
+to be true.
+For example, a SAT solver run on the branch condition 
+\verb|(X+12 == 5*X)| will likely find the value \verb|X==3|
+that causes the condition to be true.
+Then the symbolic-execution engine can continue executing
+the program down the \verb|true| branch of the program
+with the constraint \verb|X==3| on the symbolic variable $X$.
+In parallel, the engine can search for values of \verb|X|
+that cause the program to go down the \verb|false| branch
+of the program.
+A SAT solver might find \verb|X==908234| as one input
+that causes the program to traverse the \verb|false| branch.
+
+Running a symbolic-execution engine on the code of \cref{fig:buggy}
+might produce the following output:
+\begin{verbatim}
+ERROR: buggy.c:10 memory error 
+ERROR: buggy.c:12 memory error 
+\end{verbatim}
+
+The symbolic-execution engine may consider the following tree 
+of program executions, branching on each condition:
+\begin{verbatim}
+// Input data
+in = {i0, i1, i2, i3, i4, ...};
+
+[i0 == 5]
+  /
+  | FALSE -> return
+  | TRUE  -> [i1 > 64]
+  \           /
+              | TRUE  -> return
+              | FALSE -> [0 < i1]
+              \           /
+                          | FALSE -> return
+                          | TRUE  -> [i2 < 0 || i2 >= 32]
+                          \             /
+                                        | TRUE  -> BUG!
+                                        | FALSE -> [1 < i1]
+                                        \           /
+                                                    | ...continue ...
+                                                    | ...execution...
+\end{verbatim}
+
+\paragraph{Benefits.}
+Symbolic execution can find tricky bugs involving complicated
+branch conditions that fuzzers and manual tests may not find.
+In addition, symbolic execution may be able to find bugs
+that do not crash the program.
+In addition, a symbolic-execution engine can in principle
+consider \emph{all possible inputs} to a program and can 
+give a guarantee that the program has no bugs of a certain
+type (e.g., out-of-bounds read).
+
+\paragraph{Drawbacks.}
+Symbolic-execution engines can be very slow to run and often work
+poorly on very large pieces of code. 
+As the length of an execution grows, the symbolic-execution engine
+accumulates more and more symbolic variables (representing values in memory)
+and the number of constraints on each symbolic variables grows as well.
+
 
