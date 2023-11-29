@@ -1,33 +1,213 @@
 \chapter{Runtime Defenses}
-So far, we have discussed ways to achieve security in the presence of the reality that code has bugs by separating our system into components with limited privilege and by attempting to find bugs in our code. However, we will still be left with some bugs. In this chapter, we will aim to monitor execution of the system to detect and buggy behavior and halt in its presence.
 
-There is no cut-and-dry method to achieve this. However, we can think about certain attacks that we might care about and construct defenses to make those attacks harder.
+We have considered a number of ways to improve software security.
+First, we explored \emph{privilege separation} as a way to architect
+a system so that bugs do not lead to catastrophic security failures.
+Next, we looked at \emph{bug finding}---techniques to find and eliminate
+bugs in source code before we use the code in production. 
+Now, we will discuss \emph{runtime defenses}: how to detect buggy behavior
+as it occurs in a piece of production software so that we can halt
+the program when a bug occurs.
 
-\section{Buffer Overflow Defenses}
+There are a number of reasons why it is difficult to build runtime
+defenses. We must:
+\begin{itemize}
+\item determine the classes of bugs that we want to find,
+\item identify which components of the system that we want to monitor, 
+\item figure out how to avoid \emph{false positives} (erroneously halting a program 
+      when there is no bug), and
+\item try to implement these runtime defenses with minimal overhead,
+      since we will apply these defenses to production code.
+\end{itemize}
 
+\section{Defenses against buffer overflows}
 We have discussed the pervasive buffer overflow attack, which takes advantage of a missing bounds check to overwrite memory beyond the bounds of an array, often modifying the current function's return address to cause the attacked system to run attacker-specified code which is placed in the buffer itself.
 
-\subsection{Non-Executable Stack}
-Programming languages like C use a region of memory called the stack to store function variables. The input buffer in the buffer overflow attack is typically placed in this stack memory region. However, program code is typically in a separate region of memory. CPUs also allow us to add permissions to different memory regions: we can mark each as read (R), write (W), and/or execute (X). To minimize the possible effects of a buffer overlow attack, one approach is to prevent running code from the stack at all by marking the stack as RW only.
+An example of C code that is vulnerable to a buffer-overflow attack is this:
+\begin{lstlisting}[language=c,numbers=left]
+void f() {
+  char buf[128];
+  gets(buf);
+}
+\end{lstlisting}
 
-This seems to eliminate a major piece of an effective buffer overflow attack: the attacker can no longer supply code of their choice and point to it with the return address. However, modern attackers have worked around this with something called return-oriented programming: with the ability to supply their own code removed, attackers must find code that already exists to do what they like. This may be full existing functions, but more likely attackers will set the return address to point into the middle of some function and execute just a fragment that does something useful. It turns out that with more work, it is possible to perform many attacks using only code that already exists on the system.
+The call-stack layout for this program will look like this:
+
+\begin{verbatim}
+        |                 |
+        |-----------------|
+        | Return address  |
+        |-----------------|
+        | buf[127]        |
+        | ....            |
+        | buf[1]          |
+        | buf[0]          |
+        |-----------------|
+        |                 |
+        |                 |
+        |     ....        |
+        |-----------------|
+\end{verbatim}
+
+The \verb|gets| function in C will read from \verb|stdin| until 
+it finds a NULL (\verb|\0|) character in the input string.
+If the string has length $>127$, the \verb|gets| function could
+copy adversarially generated input byte onto the stack, overwriting
+the return address of the function \verb|f|.
+
+There are three steps involved in executing a buffer-overflow attack:
+\begin{enumerate}
+\item write past the end of a buffer, 
+\item cause the victim process to jump to an adversary-controlled address, and
+\item cause the victim process to run adversarial code.
+\end{enumerate}
+
+Runtime defenses against buffer overflows can try to disrupt each of 
+these three steps.
+
+\subsection{Non-Executable Stack}\label{sec:overflow:nx}
+A first defense against buffer-overflow attacks is to prevent
+the CPU from executing code on the C call stack.
+In traditional buffer-overflow attacks, an attacker will somehow place
+some adversarial code on the stack (e.g., in the buffer \verb|buf| in the 
+example above) and then cause the victim process to jump to that code
+on the stack.
+
+However, C usually puts normal program code in a separate region of memory---not on the stack.
+Modern CPUs allow us to add permissions to different memory regions: 
+the OS can mark each region as read (R), write (W), and/or execute (X).
+To make buffer-overflow attacks more difficult,
+we can prevent the CPU from running code from the stack at all 
+by marking the stack as RW only.\marginnote{This is sometimes called an NX defense---for ``no execute.''}
+
+Marking the stack as non-executable seems to eliminate a major piece of an effective buffer overflow attack: the attacker can no longer supply code of their choice and point to it with the return address. However, modern attackers have worked around this with something called \emph{return-oriented programming}: with the ability to supply their own code removed, attackers must find code that already exists to do what they like.
+This may be full existing functions, but more likely attackers will set the return address to point into the middle of some function and execute just a fragment that does something useful. It turns out that with more work, it is possible to perform many attacks using only code that already exists in a victim process. 
 
 \subsection{Stack Canary}
-To try to remove the adversary's ability to overwrite the return address in the presence of a buffer overflow, another defense is to insert a \emph{stack canary} in every stack frame between the function variables and the return address. At the start of each function an operation is inserted to write this canary to some value. At the end of the function before returning, a check on the canary value will be inserted: if the canary has changed, something must have overwritten it and the program should exit to avoid running unknown code. 
+To try to remove the adversary's ability to overwrite the return address in the presence of a buffer overflow, another defense is to insert a \emph{stack canary} in every stack frame between the function variables and the return address.
+A stack canary is typically a secret random value, chosen when the program starts running. 
+\marginnote{A buffer-overflow attack does not directly allow the attacker to read arbitrary memory, so the attacker has no direct way to read the canary before overflowing the buffer.}
 
-This is effective because in a buffer overflow scenario, the attacker needs to write memory sequentially until the address they care about writing is reached: if the canary is between the function variables and the return address, the attacker must overwrite the canary to modify the return address. However, this is not a perfect defense: if the attacker writes the same value to the canary as was already there, it will go undetected. Therefore, the canary value must be hard for the attacker to guess.\marginnote{A buffer overflow attack does not directly allow the attacker to read arbitrary memory, so the attacker needs to guess the value}. Using a random value seems promising, and in order to avoid the performance overhead of picking a new random value on every function invocation, a canary value is often picked at program startup and stored outside of the stack to prevent a buffer overflow from overwriting the reference canary value.
+\marginnote{A clever non-random canary includes 
+a collection of the string-terminating characters,
+such as \texttt{\\0\\n\\r}. Many C functions that read strings
+from input, such as \texttt{gets} will stop reading once
+they reach one of these values, so it could be difficult
+for an attacker to feed in an overflowing string that
+includes these characters.}
+At the start of each function,
+the compiler inserts instruction that write this canary to some value. 
+At the end of the function before returning, the compiler also 
+adds some code that checks that the canary value has not changed.
+If the canary has changed, the attacker must have overflowed a buffer and the
+program should exit to avoid running unknown code. 
 
-This defense is still not perfect---for example, it does not prevent an attacker from overwriting function pointers. However, it does make a successful attack significantly harder.
+\begin{verbatim}
+        |                 |
+        |-----------------|
+        | Return address  |
+        |-----------------|
+        | Stack canary    |
+        |-----------------|
+        | buf[127]        |
+        | ....            |
+        | buf[1]          |
+        | buf[0]          |
+        |-----------------|
+        |                 |
+        |                 |
+        |     ....        |
+        |-----------------|
+\end{verbatim}
+This is effective because in a buffer-overflow scenario, the attacker needs to write memory sequentially until the address they care about writing is reached: if the canary is between the function variables and the return address, the attacker must overwrite the canary to modify the return address. However, this is not a perfect defense: if the attacker writes the same value to the canary as was already there, it will go undetected. Therefore, the canary value must be hard for the attacker to guess.
+
+This defense is still not perfect---for example,
+it does not prevent an attacker from overwriting
+function pointers. However, it does make
+a successful attack significantly harder.
+
+There are a few ways to subvert canaries:
+\begin{itemize}
+\item An attacker can corrupt \emph{data} on the stack, even if it does not
+      corrupt the return address. This could be very bad for the program's behavior.
+\item An attacker might find a way to read the canary from memory (e.g.,
+      if there is some other bug in the program) and then execute the traditional
+      buffer-overflow attack to overwrite the return pointer.
+\item In a forking web server, the child process may have the same canary value
+      as the parent process. An attacker can potentially exploit this 
+      to learn the canary (See \cite{bittau2014hacking}).
+\end{itemize}
 
 \subsection{Address Space Layout Randomization (ASLR)}
-Another approach for these buffer overflow-style attacks is to make it hard for the adversary to guess a useful address to jump to. To do this, many modern systems randomize the locations of code, stack, and heap memory regions when a process starts. With this defense in place, an attacker needs to learn the location of the code memory region in order to do any meaninful return-oriented programming attack.
+Another approach to defend against buffer overflow-style
+attacks is to make it more difficult for the adversary to
+guess a useful address to jump to.
+To do this, many modern systems randomize the locations of
+code, stack, and heap memory regions when a process starts.
+With this defense in place, an
+attacker needs to learn the location of the code
+memory region in order to mount a 
+return-oriented programming attack (\cref{sec:overflow:nx}).
+\marginnote{Implementing ASLR requires compiler support.
+Most modern compilers do.}
+
+A weakness of 
+ASLR schemes is that they typically shift the location of an entire 
+region of memory: the entire heap, stack, and code sections 
+move around in memory, but the layout within each section
+is typically fixed at compile time.
+Thus if the adversary can learn the location in memory 
+of the code for a single function, it can mount
+an effective return-oriented programming attack.
+
 
 \subsection{Bounds Checking with Fat Pointers}
-All of the defenses so far have attempted only to minimize the damage of a buffer overflow after it has been exploited. However, we could prevent a more comprehensive suite of attacks if we could make sure that our code never reads or writes a pointer that is outside the bounds of a given buffer. Memory-safe languages like Go, Rust, or Python have this bounds checking built in, but attempting to retrofit a C compiler to achieve this bounds-checking presents additional challenges.
+All of the defenses so far have attempted only to minimize the damage of a buffer overflow after an attacker has exploited it. However, we could prevent a more comprehensive suite of attacks if we could make sure that our code never reads or writes a pointer that is outside the bounds of a given buffer. Memory-safe languages such as Go, Rust, and Python have this bounds checking built in.
+For older languages, such as C, we can try to retrofit the C compiler 
+to achieve this bounds checking.
+As we now discuss, implementing bounds checking in C is challenging.
 
-In the Fat Pointers technique, pointers are augmented to include the base and the limit of the buffer the pointer belongs to. This base and limit are initialized on an allocation, and on a dereference a check is inserted to guarantee that the current value of the pointer is within the region specified by the base and limit. Pointer arithmetic preserves the base and limit but modifies the pointer itself as before, allowing the pointer to possibly go out of bounds.
+One way to implement bounds checking in C is a technique called \emph{fat pointers}.
+When using fat pointers, the compiler changes the representation of a
+pointer to include not only an address, but also the \emph{base} and the 
+\emph{limit} of the buffer the pointer points to.
+This base and limit are initialized on an allocation, and the compiler inserts bounds checks on each pointer dereference to guarantee that the dereferenced value is within the array bounds that the base and limit specify.
+ Pointer arithmetic preserves the base and limit but modifies the pointer itself as before, allowing the pointer to possibly go out of bounds.
 
-Unlike a nonexecutable stack, stack canaries, and ASLR, fat pointers are not widely used. This is largely because the modified \textquote{fat} pointers are too incompatible with existing C code. C code sometimes casts pointers to integers and back again, causing issues for our new 24-byte pointers, and the modified pointer size can modify memory layout in ways that the code does not expect.
+For example, if a programmer allocates an array of 128 bytes
+using \texttt{void* ptr = malloc(128)}, the compiler will
+associate values \texttt{base = ptr} and \texttt{limit = ptr+128}
+with the pointer \texttt{ptr}.
+If we then assign \texttt{ptr3 = ptr + 3}, then the new
+pointer \texttt{ptr3} will have the same base and limit 
+as \texttt{ptr}:
+\begin{verbatim}
+              |                 |
+   limit -->  |-----------------|
+              | buf[127]        |
+              | ....            |
+              | buf[4]          |
+   ptr3  -->  | buf[3]          |
+              | buf[2]          |
+              | buf[1]          |
+ptr,base -->  | buf[0]          |
+              |-----------------|
+              |                 |
+              |                 |
+              |     ....        |
+              |-----------------|
+\end{verbatim}
+When the program deferences \texttt{ptr3}, the compiler will insert
+checks to ensure that $\texttt{base} \leq \texttt{ptr3} < \texttt{limit}$
+and crash the program otherwise.
+
+Unlike a nonexecutable stack, stack canaries, and ASLR, fat pointers are not widely used. This is largely because the modified \textquote{fat} pointers 
+can break the functionality of existing C code.
+In particular, a fat pointer on a 64-bit architecture will typically take more than
+64 bits to represent.
+If the programmer cast a pointer to an \texttt{int} and back again, 
+the behavior of the program could change when using fat pointers 
+versus when using unmodified 64-bit pointers.
 
 \subsection{Control Flow Integrity (CFI)}
 Another approach is to target jumps specifically: we know that there is a certain set of valid jumps in our program: code should only be jumping to return points in functions and function starts. If we could detect when a function returns by jumping to some target outside of this set, we can prevent many attacks where an attacker causes the program to jump to code that can be used maliciously. Checking these jump targets is called \emph{Control Flow Integrity}.
