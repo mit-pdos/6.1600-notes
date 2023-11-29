@@ -260,7 +260,7 @@ These defenses do very little to prevent against \emph{use-after-free} bugs,
 in which a program \texttt{free}s allocated memory and then inadvertently
 reads or writes the \texttt{free}d pointer.
 
-\section{Defenses against Input-Sanitization Bugs}
+\section{Taint Tracking to Defend against Input-Sanitization Bugs}
 We have discussed SQL injection and cross-site scripting, which allow an attacker to run code by adding special characters, such as ``\ttt{"}'' or ``\ttt{>},'' into their input.
 
 Unlike buffer-overflow bugs, input-sanitization bugs arise not because a bug at one
@@ -268,7 +268,7 @@ particular point in the program---they are more due to a systematic failure to
 consider certain types of inputs.
 As a result, the defenses are more systematic as well.
 
-\subsection{Taint Tracking}
+\subsection{Taint tracking in libraries}
 A common approach to check for sanitization failures at runtime
 is called \emph{taint tracking}.
 In taint tracking, some infrastructure in the program (e.g., a SQL library) marks any data
@@ -296,3 +296,30 @@ SQL injection}\label{fig:taint}
 \end{figure}
 
 Many browsers implement taint tracking to prevent cross-site scripting using \emph{Trusted Types}: for JavaScript calls that update the displayed HTML, such as \ttt{innerHTML = foo}, browsers may restrict the type of \ttt{foo} to ensure that the code explicity converts its type to something like \ttt{TrustedHTML}. This does not guarantee that the sanitization was done correctly, but does ensure that the programmer acknowledged the risk in their code.
+
+\subsection{Taint tracking in language runtimes}
+Some programming languages associate a \emph{taint bit} with every string
+in the program.
+The application developer can set or clear the taint bit manually.
+In addition, the language runtime will automatically set the taint
+bit on strings that certain functions (e.g., those that read from
+user input) return.
+An application developer then can implement some taint-checking policy
+to systematically prevent against escaping bugs.
+For example, if there is one function that makes a SQL query to the database,
+the application could check the taint bit is cleared on any query string that
+a developer passes to this function.
+
+
+\subsection{Taint tracking in operating systems}
+Operating systems also use taint tracking, often to flag 
+suspicious files---typically those that the user downloaded
+from the Internet.
+MacOS, for example, will set a taint bit on any executable that
+the user downloaded from the Internet.
+The OS will maintain this taint bit when the user copies or moves
+a tainted file.
+If the user ever tries to execute a tainted file, the OS will
+raise a warning to the user before executing it. 
+
+
