@@ -201,6 +201,23 @@ When the program deferences \texttt{ptr3}, the compiler will insert
 checks to ensure that $\texttt{base} \leq \texttt{ptr3} < \texttt{limit}$
 and crash the program otherwise.
 
+One limitation of fat pointers is that they only check 
+overflowing an \emph{allocated region of memory}---not overflows
+\emph{within} a region of memory.
+For example, if we use \texttt{malloc} to allocate a C \texttt{struct},
+overflowing the \texttt{buf} member of the struct could allow the
+attacker to overwrite the values of other elements of the struct:
+\begin{lstlisting}[language=c]
+          struct {
+            int x;
+            char buf[16];
+            void (*f)();
+          }
+\end{lstlisting}
+If there are function pointers in the \texttt{struct}, the result
+of this within-region overflow could be as bad as overflowing the return
+address.
+
 Unlike a nonexecutable stack, stack canaries, and ASLR, fat pointers are not widely used. This is largely because the modified \textquote{fat} pointers 
 can break the functionality of existing C code.
 In particular, a fat pointer on a 64-bit architecture will typically take more than
@@ -208,16 +225,74 @@ In particular, a fat pointer on a 64-bit architecture will typically take more t
 If the programmer cast a pointer to an \texttt{int} and back again, 
 the behavior of the program could change when using fat pointers 
 versus when using unmodified 64-bit pointers.
+In addition, a C program may implicitly require that a pointer
+takes exactly 64 bits to represent (e.g., as a field within a \texttt{struct});
+a compiler using fat pointers will break such programs.
 
-\subsection{Control Flow Integrity (CFI)}
-Another approach is to target jumps specifically: we know that there is a certain set of valid jumps in our program: code should only be jumping to return points in functions and function starts. If we could detect when a function returns by jumping to some target outside of this set, we can prevent many attacks where an attacker causes the program to jump to code that can be used maliciously. Checking these jump targets is called \emph{Control Flow Integrity}.
+\subsection{Control-Flow Integrity (CFI)}
 
-To implement CFI, we need to add several checks on different kinds of jumps. For direct jumps, we know at compile time that these jumps are valid since there is nothing that the attacker can control. No checks are needed. For computed jumps, that use some variable in the jump target, we need to check that the return address is a valid jump target. To do this, compilers that implement CFI create a bitmap that maps a hash of each address to a bit that indicates whether that address is a valid jump target. This allows achieving good performance, but there is still necessarily an overhead. Many compilers provide CFI as a compilation flag.
+The goal of techniques for \emph{control-flow integrity} is to limit the set
+of addresses that a program will jump to when returning.
+In this way, a victim process may be able to detect when it is about to jump
+to a return address that an adversary modified with a buffer overflow.
+Implementing CFI requires compiler support---many modern compilers 
+support some form of CFI.
 
-\section{Input Sanitization Defenses}
-We have discussed SQL injection and cross-site scripting, which allowed an attacker to insert code by adding meaningful characters like \ttt{"} or \ttt{>}into their input. To protect against this, user inputs should be \emph{sanitized}, a process that takes these special characters and \emph{escapes} them, converting them to some other sequence so that they are treated as plain text. 
+To implement CFI, we need to add several checks on different kinds of jumps.
+\begin{itemize}
+  \item For direct jumps (e.g,. ``\texttt{call gets}'', we know at compile time that these jumps are valid since there is nothing that the attacker can control. There is no need to implement any CFI checks on these jumps.
+\item For indirect jumps 
+  that use some variable in the jump target
+  (e.g., function pointers, function returns), 
+  the compiler inserts checks to insure that the return address is a valid jump target.
+    To do this, the compiler inserts into the program a data structure that
+    maintains a set of all valid indirect-jump targets.\marginnote{Often 
+    a compiler will implement this data structure using some
+sort of simple Bloom filter.}
+  Checking whether a jump point is valid takes a bit of extra computation---and
+      thus imposes some runtime cost---it may tolerable in practice.
+\end{itemize}
+
+\subsection{Unsolved program: Use-after-free bugs}
+The defenses in this section have made buffer overflows extremely challenging to
+exploit in modern code on modern systems.
+These defenses do very little to prevent against \emph{use-after-free} bugs,
+in which a program \texttt{free}s allocated memory and then inadvertently
+reads or writes the \texttt{free}d pointer.
+
+\section{Defenses against Input-Sanitization Bugs}
+We have discussed SQL injection and cross-site scripting, which allow an attacker to run code by adding special characters, such as ``\ttt{"}'' or ``\ttt{>},'' into their input.
+
+Unlike buffer-overflow bugs, input-sanitization bugs arise not because a bug at one
+particular point in the program---they are more due to a systematic failure to 
+consider certain types of inputs.
+As a result, the defenses are more systematic as well.
 
 \subsection{Taint Tracking}
-To check for failures in this sanitization at runtime, a common approach is called \emph{taint tracking}. Input is marked as \emph{tainted} at sources of user input. At functions that perform this escaping, this taint label is removed. Sensitive functions such as the HTML renderer are marked as \emph{sinks}, and any time a sink is run a check will be inserted to ensure that the input data is not tainted. If the data is tainted, some part of the input must not have been sanitized since it came from the user, and the program should halt to avoid an exploit.
+A common approach to check for sanitization failures at runtime
+is called \emph{taint tracking}.
+In taint tracking, some infrastructure in the program (e.g., a SQL library) marks any data
+coming from user input as \emph{tainted}.
+At functions that perform escaping, the infrastructure removes the taint label.
+The infrastructure marks sensitive functions, such as the HTML renderer, are marked as \emph{sinks}. 
+Any time the program runs sink code, the taint-tracking infrastructure checks
+that the data headed into the sink is not tainted.
+If the data is tainted, some part of the input must not have been sanitized since it came from the user, and the infrastructure will halt the program to avoid an exploit.
+See \cref{fig:taint} for an example.
 
-This is implemented in many browsers to prevent cross-site scripting using \emph{Trusted Types}: for JavaScript calls that update the displayed HTML, such as \ttt{innerHTML = foo}, browsers may restrict the type of \ttt{foo} to ensure that the code explicity converts its type to something like \ttt{TrustedHTML}. This does not guarantee that the sanitization was done correctly, but does ensure that the programmer acknowledged the risk in their code.
+\begin{figure}
+\begin{lstlisting}[language=python]
+name = read_from_user()     # name is tainted
+first,last = name.split()   # first,last are tained
+# query is tainted
+query = "SELECT * FROM USERS WHERE last_name = '" + last "'"
+query_database(query)       # will cause an exception
+
+qesc = escape(query)        # qesc is not tainted
+query_database(qesc)        # will succeed
+\end{lstlisting}
+  \caption{A hypothetical Python example of how taint-tracking might prevent
+SQL injection}\label{fig:taint}
+\end{figure}
+
+Many browsers implement taint tracking to prevent cross-site scripting using \emph{Trusted Types}: for JavaScript calls that update the displayed HTML, such as \ttt{innerHTML = foo}, browsers may restrict the type of \ttt{foo} to ensure that the code explicity converts its type to something like \ttt{TrustedHTML}. This does not guarantee that the sanitization was done correctly, but does ensure that the programmer acknowledged the risk in their code.
