@@ -1,48 +1,215 @@
-\chapter{Privacy with Utility}
+\chapter{Privacy and zero-knowledge proofs}
 
-So far, we have discussed several cryptography primitives, from hash functions to encryption schemes, and explored many applications of those primitives to systems security. These primitives have provided security, but in a very all-or-nothing sense: in order to provide broadly applicable security, our definitions required that a certain party (with the key) could either completely decrypt the message, learning the message contents, or cannot do anything with the message at all. 
+So far, we have discussed several cryptography primitives, from hash
+functions to encryption schemes, and explored many applications of those
+primitives to systems security.  These primitives have provided security,
+but in a very all-or-nothing sense: in order to provide broadly applicable
+security, our definitions required that a certain party (with the key)
+could either completely decrypt the message, learning the message
+contents, or cannot do anything with the message at all.
 
-In some cases, however, it may be useful to loosen these restrictions, adding features to our encryption schemes.
+\section{Zero-knowledge proofs}
 
-\section{Functional Encryption}
-One feature that turns out to be useful is the ability for some party to compute a certain function of a message without learning the message itself.
+Zero-knowledge proofs allow one party (called a prover) to convince
+another party (called a verifier) that something is true, without
+revealing any information.  More formally, a prover might have some
+value $x$, and claims that $y=f(x)$ for some publicly known function
+$f$ and public value $y$.  The proof takes the form of an interaction
+between the prover and the verifier, after which the verifier either
+accepts the proof or rejects it.  This is an \emph{interactive proof},
+which is quite different from the idea of a \emph{classical proof}
+that you might write down on paper in a math class.
 
-\paragraph{Example: Email Encryption.} Email is a common form of communication, and it seems like it would be desirable for it to be end-to-end encrypted so that only the sender and recipient can learn the message contents. However, email is not end-to-end encrypted. This is because end-to-end encryption prevents many kind of important functionality---for example, if we applied ElGamal encryption to our emails, our email server would not be able to inspect incoming emails to filter spam---all emails would look totally random to the server! In order to hide our messages from the server while still allowing the server to classify messages as spam, we need a new type of encryption scheme called \emph{functional encryption}.
+We expect such a proof to have two properties:
 
-\begin{definition}[Functional Encryption]
-A functional encryption scheme is one that allows, for all functions $f$, generating $\sk_f$ such that it is possible to efficiently determine $f(m)$ given $\Enc(m)$ and $\sk_f$, but nothing else.
-\end{definition}
+\begin{itemize}
+\item First, the proof should be \emph{sound}: if the verifier accepts the
+  proof, it should be convinced that the prover really does ``know'' $x$.
 
-It turns out that problem of functional encryption is equivalent to the problem of \emph{program obfuscation}.
-\subsection{Program Obfuscation}
-Imagine we are providing bug fixes, including security fixes, to a piece of proprietary software. We would ideally like to avoid disclosing the security bugs in the old version of the software, but if we distribute our program anyone can inspect the changes and see what they are fixing. Ideally, we would have a way of distributing software that does something without revealing what the software does. We would like some \emph{obfuscator} $\calO$ such that for a given program $C$, $\calO(C)$ is \textquote{unintelligible} but provides identical input-output behavior.
+\item Second, the proof should be \emph{zero-knowledge}: the verifier should
+  ``learn nothing'' about $x$ as a result of participating in the proof.
+\end{itemize}
 
-Current approaches to this problem are heuristic-based, involving things like adding useless code that were intended to make it difficult to reverse-engineer the changes. More recently, research has defined a very weak form of obfuscation called \emph{indistinguishability obfuscation} and shown that this notion of indistinguishability obfuscation is equivalent to functional encryption. Indistinguishability Obfuscation does not provide obfuscation itself, but provides that for any two programs $C_1$ and $C_2$ with the same input-output behavior, the obfuscator $\calO$ provides that $\calO(C_1) \cong \calO(C_2)$---that it is not possible to distinguish between the obfuscations of two functions with the same input-output behavior.
+How can we define the notion of knowledge?  That is, what does it mean for
+the prover to really know $x$?  A na\"ive definition might say that $x$
+is stored somewhere in the prover's memory, but that might be too strong:
+a prover might ``know'' $x$ without storing it literally in its memory,
+perhaps storing an alternate representation.  A more general definition
+is to think of knowledge in terms of extractability: a prover knows $x$
+if there exists an efficient algoritm that can deduce the value of $x$
+by observing the state of the prover.
 
-It turns out that we could generate many of the primitives that we have discussed so far just from this notion of indistinguishability obfuscation.
+A related notion we need to pin down is what it means for the verifier to
+learn nothing.  A good way to define this, it turns out, is to think of
+``learning nothing'' in terms of the verifier being able to simulate its
+interaction with the prover without actually talking to the real prover.
+Specifically, if the verifier can produce a transcript of its hypothetical
+interaction with the prover, without actually communicating with the
+prover, we say the verifier learned nothing about $x$.
+
+Perhaps surprisingly, we can show (though not in this lecture)
+that any proof at all can be converted into a zero-knowledge proof.
+In fact, interactive proofs can be used to efficiently prove anything
+in $\mathsf{PSPACE}$, which is believed to be much larger than NP.
+
+We can think of using zero-knowledge proofs in authentication.  The value
+$x$ known to the prover is the user's secret key, and the public value of
+$y$ is the user's public key.  The authentication protocols we've seen
+so far, such as challenge-response protocols using MACs or signatures,
+are not quite zero-knowledge: the server learns the signature of a
+server-chosen challenge value under the client's (prover's) secret key,
+and they could not produce a simulated transcript that has a valid
+signature without actually interacting with the real prover.
 
 
-\section{Zero-Knowledge Proofs}
-We have said broadly that our goal with encryption and other primitives is that the adversary \textquote{learns nothing} about the statement. However, this has clearly not been the case so far: the adversary learns the encryption of the message or the hash of the message. 
+\section{Discrete log problem and Schnorr signatures}
 
-For a zero-knowledge proof, we would like to have a way of proving that a statement is true without revealing any information beyond the fact that the statement is true.
+As an example of zero-knowledge proofs, we will use the discrete log
+problem: given a group $\calG$, a generator $g$ of order $q$ for $\calG$
+(where $q$ is a big prime), and some value $g^x\in \calG$, what is the
+value of $x\in \Zq$?  We have already seen the discrete log problem in
+the context of Diffie-Hellman key exchange and elliptic-curve signatures.
 
-As a real-world example, consider that Alice has two balls and would like to prove to Bob that the two balls are different without revealing \emph{how} they are different. To do this, Alice can give the balls to Bob and tell Bob to put them behind his back and decide whether to switch the two balls or not switch the two balls. Bob should then give the balls to Alice, and Alice will tell Bob whether the balls were switched or not. If Alice is right many times, Bob can be quite sure that the balls are indeed different, since Alice can reliably distinguish them.
+Imagine a prover that knows $x\in \Z_q$, where $x$ might be chosen randomly,
+and a verifier that knows $X = g^x\in \calG$.  How can the prover convince
+the verifier it knows the $x$ corresponding to $X$?  One protocol for doing
+this, called Schnorr's protocol, is as follows:
 
-This does not sound at all like a typical proof that you might write down on paper. Indeed, zero-knowledge proofs are \emph{impossible} using \textquote{classical proofs}. However, zero-knowledge proofs are possible using \emph{interactive proofs}.
+\begin{itemize}
 
-\begin{definition}[Interactive Proof]
-An interactive proof consists of two parties: a \textquote{prover} $P$ and a \textquote{verifier} $V$. If $P$ knows the \textquote{proof} of the statement, then $P$ is accurate with probability 1. If the statement is false, then $V$ accepts the proof with probability less than $\tfrac{1}{2}$.
-\end{definition}
+\item Prover picks a random $r\in \Z_q$, and sends $R=g^r\in \calG$ to the verifier.
 
-Perhaps surprisingly, we can show that any proof at all can be converted into a zero-knowledge proof.
+\item The verifier picks a challenge bit $c$ at random, either 0 or 1,
+  and sends the challenge to the prover.
 
-As another example, consider proving that a graph is 3-colorable. The input is a graph $G$, and $P$ aims to prove to $V$ without revealing any information that it is possible to assign colors 1, 2, or 3 to each vertex such that no two adjacent vertices have the same color. This is easy to prove in the non-zero-knowledge case: $P$ could simply provide a coloring of $G$, which $V$ can easily verify. However, this reveals information about the coloring.
+\item The prover sends back a response $z$, chosen as follows: if $c=0$,
+  the prover sets $z$ to $r$, and if $c=1$, the prover sets $z$ to $r+x\in \Z_q$.
+  Mathematically, $z=r+cx\in \Z_q$.
 
-To prove that the graph is 3-colorable without revealing information about $G$, the verifier will first permute the colors $\{1, 2, 3\}$. $P$ will then provide $n$ commitments to $V$---statements that \emph{commit} $P$ to a given color for each vertex without revealing those colors to $V$.\marginnote{One way to construction this kind of commitment is, given a color $c$, generate some randomness $r$. Then, reveal $H(c || r)$ using a collision-resistant hash function. To verify the commitment, reveal the color and the randomness: the other party can then recompute the hash for themselves to check that the values are the ones that produces the original commitment.}
+\item The verifier checks that $g^z=RX\in \calG$.  If equal, the verifier accepts,
+  otherwise the verifier rejects.
 
-$V$ then picks an edge $(i, j)$ from the set of edges in $G$ and sends that pair to $P$. $P$ then verifies their commitments of the colors of $i$ and $j$ to $V$ by revealing the colors. $V$ accepts the response if the two colors are distinct and the corresponding commitments are valid. If $G$ is \emph{not} three-colorable, this will fail will probability at lease $\frac{1}{\abs{E}}$. Thus, this can be repeated to achieve the desired probability.
+\end{itemize}
 
-The statement of 3-colorability is NP-complete, meaning that any NP statement can be converted to 3-colorability. That is, it is possible to write a reduction from any statement with a polynomially-sized witness to 3-colorability such that the existence of a 3-coloring of the corresponding graph proves that the original statement is true. Therefore, this shows that we can generate a zero-knowledge proof for any statement in NP!
+This protocol critically depends on $c$ not being known to the prover
+in advance.  If the prover knew $c$ in advance, the prover could pick
+$z$ at random, and just compute $R$ as $(g^r)(X^c)^{-1}\in \calG$.
+The protocol also depends on the verifier not asking for answers to
+both values of $c$: otherwise, the verifier can learn $x$ by subtracting
+the responses for the two values of $c$.  However, running the protocol
+just once does not reveal information about $x$: even if $c=1$, adding
+a random value $r$ to $x$ modulo $q$ makes $z$ effectively random as well.
 
-In fact, interactive proofs can be used to efficiently prove anything in $\mathsf{PSPACE}$, which is believed to be much larger than NP.
+In any given interaction of the protocol, the prover could falsely
+convince the verifier that it knows $x$, using the attack we just
+described, but by repeating this protocol $\lambda$ times, the verifier
+can reduce the probability of an unsound proof (called the ``soundness
+error'') to $2^{-\lambda}$.
+
+We will now flesh out this argument---that Schnorr's protocol is a
+zero-knowledge proof---in more detail.  This will amount to showing that
+the protocol protects the two parties in the protocol (the prover and
+the verifier) from each other.  A verifier can be sure that the protocol
+is sound, regardless of what adversarial prover it interacts with: if
+the verifier accepts, the prover really knew $x$.  A prover can also be
+sure that the protocol is zero-knowledge, regardless of what adversarial
+verifier it interacts with: if the prover participates in the protocol
+with an arbitrary verifier, it can be sure that the verifier did not
+learn anything about its secret $x$.
+
+
+\subsection{Soundness using an extractor}
+
+To show that Schnorr's protocol is a zero-knowledge proof, we need to
+first convince ourselves that the protocol is \emph{sound}: that is,
+if the verifier accepts, the prover really knows $x$.  We can prove
+soundnes by showing that, if there is a (possibly adversarial) prover
+$P$ that can convince our verifier $V$ using Schnorr's protocol, there
+exists an efficient extractor $E$ that can return $x$ based on $P$'s
+interaction with $V$, with some high probability (say, $\ge 1/2$).
+
+The extractor $E$ for Schnorr's protocol can be constructed as follows:
+
+\begin{itemize}
+
+\item $E$ runs $P$ to get some initial transcript with challenge 0.
+  The transcript consists of $\langle R, c=0, z\rangle$.
+
+\item Rewind the state of the prover to just after the point when it
+  sent $R$ to $V$.
+
+\item Run $P$ again to get the transcript $\langle R, c=1, z'\rangle$.
+
+\item Output $z'-z$ as the discrete log $x$.
+
+\end{itemize}
+
+By our assumption---namely, that $P$ can convince our verifier $V$---both
+runs of $P$ by the extractor must convince $V$ to accept (otherwise,
+$P$ would not convince $V$ in at least one of the two $c$ choices).
+That means that both $g^z=R$ and that $g^{z'}=RX$.  Thus, $g^{z'-z}=X$,
+which is exactly the definition of what it means for something ($z'-z$
+in particular) to be the discrete log of $X$.
+
+Here we have glossed over the details of what happens if the prover
+convinces the verifier with some non-negligible probability that is
+nonetheless less than 1.
+
+
+\subsection{Zero-knowledge using a simulator}
+
+The second part of showing that Schnorr's protocol is zero-knowledge
+requires us to show that the verifier learns nothing as a result.
+To do this, we construct a \emph{simulator} $S$.  The simulator's job
+is to convince an arbitrary verifier $V$ to accept, without actually
+knowing $x$, thereby producing a transcript that looks indistinguishable
+from $V$ interacting with the real prover $P$.
+
+We can construct this simulator $S$ as follows:
+
+\begin{itemize}
+
+\item Run the cheating strategy of $P$ with $V$, where $P$ guesses
+  the challenge upfront.
+
+\item If the guess turns out to be correct, output the transcript.
+  This happens with probability $1/2$.
+
+\item If the guess was wrong, retry.  This happens with probability $1/2$
+  as well.
+
+\end{itemize}
+
+Both the extractor and simulator constructions rely crucially on being
+able to rewind the prover or verifier and try again.  This enables us
+to convince ourselves that the protocol is sound and zero-knowledge,
+but in a real-world interaction, the verifier cannot rewind the prover
+and the prover cannot rewind the verifier.
+
+
+\section{Fiat-Shamir heuristic and Schnorr signatures}
+
+One challenge with zero-knowledge proofs is that they are interactive,
+requiring the prover and verifier to send messages back and forth
+in order for the verifier to be convinced of the proof.  A clever
+trick, called the Fiat-Shamir heuristic, allows us to turn interactive
+zero-knowledge proofs into non-interactive proofs.  The idea is that,
+whenever the protocol expects the verifier to send a challenge to the
+prover, the challenge should just be the hash of the transcript so far
+in protocol's execution.  The prover can then execute the zero-knowledge
+protocol against a synthetic verifier (the hash function), and produce
+a transcript.  The prover can now send this transcript to the verifier,
+and if the verifier can confirm that indeed all of the challenges were
+correctly computed using a collision-resistant hash function (like
+SHA-256), it's sound to accept this transcript as a proof.
+
+We can use this Fiat-Shamir heuristic to construct a (regular,
+non-interactive) signature scheme from an (interactive) zero-knowledge
+proof of the discrete log problem.  This requires a slight modification
+of the protocol we described above, where instead of sending a
+single challenge bit $c$, the verifier sends a 256-bit vector of bits
+$\overrightarrow{c}$.  This also requires a slight modification to the
+zero-knowledge definition, requiring an honest verifier, which we won't
+discuss the details of.  The elliptic-curve signatures used in practice
+today are effectively variants of this Schnorr signature scheme.
+
