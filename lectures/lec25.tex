@@ -1,74 +1,304 @@
 \chapter{Differential Privacy}
 
+In many of the systems we have seen so far%
+---encryption, iOS security, etc---we try to prevent
+an adversary from learning \emph{any information} about
+our sensitive data.
+Today we will be talking about how to deal with situations
+in which we \emph{want} to leak some information about
+sensitive user data, but we want to do it in a ``privacy-preserving''
+way.
+
+For example:
+\begin{itemize}
+  \item the U.S.~Census collects sensitive demographic information about U.S.~citizens
+    and then publishes aggregate statistics about it,
+  \item Internet Service Providers may want to publish aggregate statistics about
+        network traffic,
+  \item Google may want to publish anonymized data about user search queries, or
+  \item public-health officials may want to publish metrics about a population's
+        health at large without revealing any individual user's health status.
+\end{itemize}
+
+In each of these settings, we many $n$~users, 
+where each user $i$ has some data $x_i$.
+There is a central party that has collected\marginnote{The techniques we
+describe here also apply when there is only a single user and
+the user wants to publish some function about their private data.}
+$(x_1, \dots, x_n)$ and wants to publish
+an aggregate statistic $f(x_1, \dots, x_n)$
+in a way that ``protects the privacy'' of
+each user's data.
+\begin{verbatim}
+  user x_1 -----
+               |
+  user x_2 -----
+               |
+   ...        ...                        
+               |                         Publish
+  user x_n ---------> Database ---> f(x_1, ..., x_n)
+\end{verbatim}
+
+\begin{itemize}
+\item[Q1.] What functions of private data can we publish without
+        compromising user privacy? How do we even define ``privacy'' 
+        in this context?
+      \item[Q2.] Once we have a definition of privacy, how do we achieve it
+        in practice?
+\end{itemize}
+Differential privacy gives us \emph{one possible} answer to the 
+question Q1 here---it is a \emph{definition} of privacy that has an number
+of appealing properties.
+For reasons we will discuss, it is not a perfect definition of privacy,
+but it is essentially the best one we have.
+
+Once we buy the privacy definition that differential privacy gives us,
+there is a rich literature that explains mechanisms for achieving
+differential privacy (i.e., the answer to question Q2).
+
+
+\section{A bad idea: Attempt to anonymize the data}
+A common \textbf{bad} strategy for attempting to release data
+with privacy protections is to try to \emph{anonymize} 
+the data. 
+For example, if a hospital wants to release medical-records data,
+they could publish the records with the names redacted.
+One surprise---that has bitten many companies and governments---is
+that it is shockingly easy to re-identify data in datasets that
+are supposedly anonymized.
+
+
+\paragraph{Example: Re-identification by Linking (Sweeney 1997)}
+For example, in Massachusetts, the Group Insurance Commission released a dataset that they believed to be anonymized. This dataset contained health data, 
+including patient ethnicity, ZIP code, birth date,
+sex, date of visit, diagnosis, procedure, and
+medication given.
+
+In 1997, Latanya Sweeney demonstrated that this anonymization strategy completely failed.
+In particular, she purchased (for \$20!) the public voter-registration data 
+from the government of
+Cambridge, MA. This second dataset included voter name, address, ZIP code, birth date, and gender.
+Crucially, this other database included each voter's zip code, birth date, and gender!
+Using the voter-registration dataset---which linked names to zip codes and birth dates---and the medical data set---which linked zip codes and birth dates to medical conditions---Sweeney
+was able to determine which people had which medical conditions.
+That is, Sweeney was able to completely
+de-anonymize the GIC dataset and reveal private
+medical information for everyone up to the
+governor of Massachusetts.
+
+\paragraph{Netflix Competition}
+In 2006, Netflix aimed to improve their movie recommendation system. To do this, they 
+planned to have researchers compete to come up with the best movie-recommendation algorithms.
+For the purposes of running the competition, Netflix published a supposedly anonymized dataset that included a randomized user id, movie id, rating, and date. Netflix released a portion of the dataset, and the research group that could produce a model that best predicted ratings for the unreleased set of movies would win a million dollars. 
+
+One group of researchers was able to link individual records in the Netflix database to records from the public IMDb database. This allowed them to de-anonymize the data from Netflix even though the database contained no identifying information whatsoever!
+
+\paragraph{The bottom line.}
+Anonymizing data sets simply does not work.
+
+
+\section{A flawed idea: $k$-Anonymity}
+
+The $k$-anonymity approach to privacy is to think of a dataset release as
+being sufficiently private if there are at least $k$ users' data in the dataset
+that are identical.
+For example, if there are $k=10$ people in a medical-records database with 
+the same birth date, zip code, and medical condition, 
+we might be okay with publishing the dataset with those three fields
+only when there are at least $k=10$ users whose medical records
+are identical on those three fields.
+
+The flawed intuition here is that even if there is still some leakage, maybe
+it is not so bad.
+For example, even if you can link the voter-registration database to the 
+medical-records database, you might hope that it will be difficult to
+figure out exactly which user has exactly which medical condition.
+
+There are a few issues with the $k$-anonymity approach to privacy:
+\begin{itemize}
+  \item It is not robust to \emph{side information}.
+        For example, if an attacker knows a few people with 
+        a given medical condition, it can use a process of elimination
+        to de-anonymize the dataset still.
+  \item The anonymized dataset may still leak \emph{some private information}.
+        For example, say that every student in a class of 100 got the same grade.
+        The teacher might be happy publishing the grades of all students (without names)
+        since this release satisfies $k=100$-anonymity.
+        The problem is that the anonymized release reveals the \emph{grade of every student
+        in the class}---definitely not exactly what we would expect from a privacy-preserving
+        release.
+\end{itemize}
+
+\iffalse
+
 Taking advantage of our growing capability to collect all kinds of data, computation allows us to learn from this data and use it to make predictions. For example, machine learning algorithms are trained on huge datasets and then used to predict features of new input data. 
 
 In order for these predictions to be meaningfully useful, the data they base their predictions on must be based in reality. If researchers are designing a system to predict whether a patient has a certain disease, they need real patient data to base their model on. However, this data is very sensitive: the US has all kinds of laws protecting medical data with strict requirements. Ideally, we would like to use the data itself without the ability to tell who the data corresponds to. This way, we can alleviate privacy concerns.
 
 However, this problem of using data while protecting the privacy of the individuals that the data comes from proves to be very hard.
+\fi
 
-\section{Approach 1: Anonymize the Data}
-An obvious solution may seem to be to remove explicit identifiers like name, address, and phone number. This way, it won't be possible to just glance at the data and see who a record corresponds to. However, this approach does not work since these datasets do not exist in isolation. 
-
-\paragraph{Example: Re-identification by Linking (Sweeney 1997)}
-An example of this has to do with health data. In Massachusetts, the Group Insurance Commission released a dataset that they believed to be anonymous. This dataset consists of health data including patient ethnicity, ZIP code, birth date, sex, date of visit, diagnosis, procedure, and medication.
-
-In 1997, Sweeney purchased (for \$20!) another public dataset from Cambridge, MA: the voter registration list. This dataset included voter name, address, ZIP code, birth date, and gender.
-
-Importantly, this other database included each voter's zip code, birth date, and gender! From linking the data in these two datasets, Sweeney was able to completely de-anonymize the GIC dataset and reveal private medical information for everyone up to the governor of Massachusetts.
-
-\paragraph{Netflix Competition}
-In 2006, Netflix aimed to improve their movie recommendation system. To do this, they aimed to have researchers do the work for them: they published an \textquote{anonymized} dataset that included a randomized user id, movie id, rating, and date. They released a portion of the dataset, and the group that could produce a model that best predicted ratings for the unreleased set of movies would win a million dollars. 
-
-One group of researchers was able to link individual records in the Netflix database to records from the public IMDb database. This allowed them to de-anonymize the data from Netflix even though the database contained no identifying information whatsoever!
-
-Attempts to publish only part of a dataset to make the entries anonymous simply does not work due to the availability of other data that may be correlated. 
-
-\section{Approach 2: Publish Only Statistics}
+\section{A flawed idea: Publish only aggregate statistics}
 Another approach we might consider is to publish only summary statistics with the aim that these summary statistics compress the data so much that it is impossible to learn anything meaningful about an individual from them. However, we have to be careful: even a few statistics can reveal sensitive information.
 
 For example, consider a company that released the average salary of its employees regularly. If the company releases this average before and after the resignation of one individual, anyone who knows that that individual resigned can learn his salary.
 
 So, releasing only statistics does not cleanly protect privacy either. 
 
-\section{Differential Privacy}
-In order to achieve some measure of privacy, we need to define what privacy means: a natural definition may be something like \textquote{an algorithm is private if before and after it runs, no one learns anything about a given individual in the dataset}. However, a definition like this removes all utility from the algorithm: it does not meaningfully compromise the privacy of an individual to reveal that smoking cigarettes causes cancer for them, since it does for every human. However, this first definition attempt would prevent this.
+\section{A new definition: Differential privacy}
+\label{sec:dp:defn}
 
-Since we are interested in protecting the privacy of \emph{individuals} while learning about the whole group, it should be satisfactory if it is impossible to tell whether a given individual was included in the dataset or not. To formalize this, we will require that a pair of datasets that differ in only a single row---that is, one contains a row and the other does not---are \emph{close}. We can define this as follows:
+Differential privacy is a very mathematically clean definition of privacy that addresses
+many of the concerns of the flawed ideas above.
+It is not perfect---for reasons we will see---but many regard it as 
+the best formal definition of privacy we have.
 
+Say that $(x_1, \dots, x_n)$ is a dataset of $n$ users' data.
+Differential privacy, roughly, says that a it is safe to release
+an algorithm $A(x_1, \dots, x_n)$---called a \emph{mechanism} in
+the language of differential privacy---applied to the dataset if
+the value of the algorithm $A$'s output is roughly the same if we
+release any user $i$'s data $x_i$ with some other data value
+$x^*_i$:
+\[ A(x_1, \dots, x_n) \approx A(x_1, \dots, x_{i-1}, x^*_i, x_{i+1}, \dots, x_n). \]
+In other words, dataset-release mechanism provides differential privacy 
+if its output looks roughly the same, whether or not a particular user's 
+data is included in the original dataset.
+
+In picture form, the situation looks like this:
+\begin{verbatim}
+                      Dataset -----> A(Dataset)
+                         |              ^
+      Drop Alice's data  |              |  Should be "roughly equal"
+                         v              v
+                      Dataset' ----> A(Dataset')
+\end{verbatim}
+
+To formalize this, we will require that a pair of datasets that differ in only a single row---that is, one contains a row and the other does not---are \emph{close}. 
+The formal definition is as follows:\marginnote{Notice that a mechanism $A$ that outputs nothing 
+trivially satisfies differential privacy. For a mechanism to be useful,
+it should add as little noise as possible to maintain a given level of differential privacy.}
 \begin{definition}[$\epsilon$-differential privacy]
-	An algorithm $A$ is $\epsilon$-differentially private if, for all neighboring datasets $x$ and $x'$ that differ in only one row, for all subsets $S$ of outputs of $A$:
-	\[ \text{Pr}[A(x) \in S] - \text{Pr}[A(x') \in S] \leq \epsilon  \]
-	or, equivalently,
-	\[ \text{Pr}[A(x) \in S] \leq e^\epsilon \text{Pr}[A(x') \in S] \]
-	Note that $e^\epsilon \approx 1+\epsilon$. This is approximately saying that whether or not a given row is included in the dataset, the probability of the output being detectably different is less than $\epsilon$.
+	An mechanism $A$ provides $\epsilon$-differentially private if, for all neighboring datasets $x$ and $x'$ that differ in only one row, for all subsets $S$ of outputs of $A$:
+	\[ \text{Pr}[A(x) \in S] \leq e^\epsilon \cdot \text{Pr}[A(x') \in S]. \]
+  \marginnote{We have that $e^\epsilon \approx 1+\epsilon$ when $\epsilon$ is very small.} This is approximately saying that whether or not a given row is included in the dataset, the probability of the output being detectably different is less than $\epsilon$.
+\end{definition}
+\marginnote{In the differential-privacy literature, this parameter $\epsilon$
+is often called the ``privacy budget.''}
+Notice that the definition of differential privacy is parameterized by 
+a real number $\epsilon$ that specifies how close the two outputs of
+the mechanism $A$ must be on neighboring datasets.\marginnote{One of the
+delicate points in practice is figuring out what actual value of
+$\epsilon$ a system should aim to achieve.}
+The smaller $\epsilon$ is, the stronger the privacy guarantee is.
+
+In order for a non-trivial mechanism to provide differential privacy, the algorithm must be randomized. Take our salary example from before: if we want to reveal an average salary of all employees, achieving differential privacy requires adding \emph{noise} in order to make sure that the output of the 
+release algorithm looks roughly the same whether or not a particular employee's 
+salary is included in the computation.
+
+\paragraph{Differential privacy is closed under post-processing.}
+A really convenient property of the differential-privacy view
+of privacy is that the definition is \emph{closed under post processing}.
+That is, if a mechanism $A$ is $\epsilon$-differentially private,
+then for \emph{every} function $B$, the composed mechanism $B(A(\cdot))$
+is also $\epsilon$-differentially private. 
+
+\paragraph{Differential privacy is composes nicely.}
+In many applications, we want to publish many functions of the same
+dataset.
+An very powerful property of the definition of differential
+privacy is that it can nicely handle this situation.
+In particular, say that a mechanism $A_1$ is a mechanism that
+satisfies $\epsilon_1$-differential privacy.
+Say that a mechanism $A_2$ is a mechanism that\marginnote{There
+are more sophisticated composition theorems that give tighter
+bounds on the differential privacy parameter of the composed 
+mechanism when the number of mechanisms you are composing is large.}
+satisfies $\epsilon_2$-differential privacy.
+Then the mechanism $B(x) = (A_1(x) \| A_2(x))$
+that publishes the output of both mechanisms is
+$(\epsilon_1 + \epsilon_2)$-differentially private.
+
+The value of $\epsilon$ increases with each statistic
+we publish---which nicely captures our intuition that
+the more statistics you release about a dataset,
+the more information you are leaking about it.
+
+\section{Achieving differential privacy: Adding noise}
+A common approach to achieving differential is
+exactly this: adding random noise to the data in
+order to add uncertainty about the real data. The
+first instance of this was by Warner in 1965, who
+proposed using random noise to allow individuals
+to answer sensitive survey questions (i.e.,
+revealing some private data) while also giving
+them some privacy protection.
+Warner's approach is called \emph{randomized response}.
+
+To give an example of randomized response:
+consider a professor that wants to
+learn the fraction of students who cheated on
+a test. Obviously no student wants to admit 
+that they cheated on an exam.
+Using Warner's approach, the professor
+could ask students to answer honestly with
+probably 2/3, but to lie with probability 1/3.
+This allows a student who did cheat to claim that
+they were lying, as per the directions. However,
+with many students, the noise should average out,
+and the professor can still learn approximately
+how many students cheated on the test.
+
+We can apply this same approach if we want to make
+a certain algorithm differentially private.
+Instead of publishing a dataset (or a function of a dataset)
+directly, we can publish a \emph{noisy version of it}.
+Much of the technical complexity in differential
+privacy goes into trying to design exactly how to
+choose the noise in a way that maintains as much of
+the ``signal'' of the underlying dataset as possible.
+
+\section{The Laplace mechanism}
+The \emph{Laplace mechanism} gives a very general 
+way to take an aggregate statistic $f$ and modify 
+it to have $\epsilon$-differential privacy
+for any choice of $\epsilon$.
+
+First, we need to define the
+\emph{global sensitivity} of the function $f$. This
+aims to capture the maximal change in $f$ that
+results from changing one of the function's $n$
+inputs.
+Intuitively, the higher the sensitivity of
+a function is, the more each user's data
+can affect the functions output
+and therefore the more noise we will have
+to add to achieve differential privacy.
+
+\begin{definition}[Global Sensitivity]\marginnote{The definition of
+sensitivity and the Laplace mechanism generalize nicely to
+  functions that output multiple real numbers.}
+	The global sensitivity of a function $f \colon \calD^n \to \R$,
+  for some domain $\calD$, is:
+	\[ GS_f = \max_{\text{neighbors}~x, x' \in \calD^n} \| f(x) - f(x') \|. \]
+	Here, \textquote{neighbors} inputs in $\calD^n$ 
+  that differ in only a single coordinate.
 \end{definition}
 
-In order to achieve this, the algorithm must be randomized. Take our salary example from before: if we want to reveal an average salary of all employees, achieving differential privacy requires adding \emph{noise} in order to bring the probability of detection down to $\epsilon$.
-
-\subsection{Adding Noise}
-A common approach to achieving DP is exactly this: adding random noise to the data in order to add uncertainty about the real data. The first instance of this was by Warner in 1965, who proposed using random noise to allow individuals to be truthful.
-
-For example, consider a professor that wants to learn the fraction of students who cheated on a test. Obviously asking students to directly answer whether they cheated or not would result in students lying and saying that they did not cheat. Instead, using Warner's approach, the professor could ask students to answer honestly with probably 2/3, but to lie with probability 1/3. This allows a student who did cheat to claim that they were lying, as per the directions. However, with many students, the noise should average out, and the professor can still learn approximately how many students cheated on the test.
-
-We can apply this same approach if we want to make a certain algorithm differentially private. Instead of publishing $A(x)$ directly, we can publish $A(x) + \text{noise}$.
-
-\subsubsection{Choosing Noise Level}
-In order to determine how much noise needs to be added to the function to achieve a given $\epsilon$, we need to consider the function we are computing. For example, if our function returns a constant no matter what the data is, no noise is necessary. However, if the function returns one individual's record exactly, the record needs to be completely randomized so a large amount of noise is necessary. For an aggregate statistic like an average, something in the middle is required. 
-
-To formalize this, we will use a notion called \emph{global sensitivity} of the function. This aims to capture the maximal change in $f$ that results from changing one of the function's $n$ inputs.
-
-\begin{definition}[Global Sensitivity]
-	The global sensitivity of a funcion $f$ is given by:
-	\[ GS_f = \max_{\text{neighbors} x, x'} \| f(x) - f(x') \|_1 \]
-	Where \textquote{neighbors} are sets of inputs that differ in only a single value.
-\end{definition}
-
-This gives us a sense of how much noise is necessary: if the function changes by a large amount when a single input changes, a large amount of noise is necessary, but if it changes only slightly then less noise is required.
-
-In order to specify exactly how much noise to add, the Laplace distribution is used. The laplace distribution is:
+We will also need to define the zero-mean real-valued Laplace distribution,
+which is parameterized by a value $b \in \R$.
+The probability distribution function is:
 \[ h(y) = \frac{1}{2b} e^{-\frac{\abs{y}}{b}} \]
 
-For a function $f$, if $A$ adds noise to $f$ from the Laplace distribution with $b \geq \frac{GS_f}{\epsilon}$, then $A$ is $\epsilon$-DP.
+Now, the Laplace mechanism for achieving a differential privacy release
+of the function $f(x_1, \dots, x_n)$ is:
+\begin{enumerate}
+  \item Compute the true statistic $y \gets f(x_1, \dots, x_n)$.
+  \item Let $b \gets \frac{GS_f}{\epsilon}$ be the global sensitivity of $f$.
+  \item Sample a random noise value $\nu$ from the Laplace distribution
+        with mean $0$ and parameter $b$.
+  \item Output the noised statistic $y + b$.
+\end{enumerate}
 
 % \begin{proof}
 % 	For $A$ to be epsilon-private, we want that:
@@ -77,5 +307,54 @@ For a function $f$, if $A$ adds noise to $f$ from the Laplace distribution with 
 % 	% TODO: make this clearer
 % 	\[ \frac{\text{Pr}[A(x) = v]}{\text{Pr}[A(x') = v] = \frac{e^{-\frac{\abs{v - f(x)}}{b}}}{e^{-frac{\abs{v-f(x')}}{b}}  \leq e^\epsilon} \]
 % \end{proof}
+
+\paragraph{Handling non-numerical data.}
+The Laplace mechanism gives a very clean way to provide differential
+privacy for releasing real-valued aggregate statistics about
+a dataset---where the aggregate statistic is just a number.
+But in many applications, we need to publish \emph{strings},
+such as names or zip codes or birth dates.
+
+One way to handle strings is to convert them into numerical 
+statistics and them apply differential privacy.
+For example, we could publish (1) the number of users
+with name ``Alice,'' (2) the number of users with 
+name ``Bob,'' and so on.
+Then we are back to working in a world of numerical statistics
+and we can against use the Laplace mechanism.
+
+\section{Challenges with differential privacy}
+
+As we discussed in \cref{sec:dp:defn}, the more statistics you publish
+about a database, the larger the differential-privacy parameter $\epsilon$ grows.
+A consequence is that if you want to publish many statistics about a dataset,
+you will have to add a huge amount of noise to the statistics you publish
+to achieve $\epsilon$-differential privacy any reasonable value of~$\epsilon$.
+This is a major headache in practice.
+
+A second issue is that the designer of the system has to choose
+what value of $\epsilon$ to use. What value is good enough?
+The theory of differential privacy cannot tell you---it's
+really a subjective question.
+
+Yet a third issue is that in many applications, a company has
+to publish an aggregate statistic every day or week.
+Since the $\epsilon$ values ``add up,'' after a short amount
+of time the effective $\epsilon$ value can end up being
+so large as to render the differential privacy guarantee
+meaningless.
+
+\iffalse
+\section{The exponential mechanism}
+
+For certain statistics, there are much better mechanisms than 
+the Laplace mechanism.
+For example, say that we want to publish the most popular name
+in a dataset.
+Doing this with the Laplace mechanism to
+
+A different way of achieving differential privacy 
+
+\fi
 
 
