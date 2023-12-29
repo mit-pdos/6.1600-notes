@@ -8,208 +8,304 @@ security, our definitions required that a certain party (with the key)
 could either completely decrypt the message, learning the message
 contents, or cannot do anything with the message at all.
 
-\section{Zero-knowledge proofs}
+\section{Zero-knowledge proofs of knowledge}
 
 Zero-knowledge proofs allow one party (called a prover) to convince
-another party (called a verifier) that something is true, without
-revealing any information.  More formally, a prover might have some
-value $x$, and claims that $y=f(x)$ for some publicly known function
-$f$ and public value $y$.  The proof takes the form of an interaction
-between the prover and the verifier, after which the verifier either
-accepts the proof or rejects it.  This is an \emph{interactive proof},
-which is quite different from the idea of a \emph{classical proof}
-that you might write down on paper in a math class.
+another party (called a verifier) that the prover ``knows'' some secret,
+without revealing anything else about the secret.
+More formally, say that both parties hold a function $f$, and a value $y = f(x)$.
+The prover may want to convince the verifier that it ``knows'' an $x$ such that
+$y=f(x)$.
+We call such a prover-verifier interaction a \emph{proof system}.
+If the prover reveals no information about $x$, apart from the fact that $y=f(x)$,
+to the verifier, we say that the proof system is a \emph{zero-knowledge proof of knowledge}.
 
-We expect such a proof to have two properties:
+The proof takes the form of an interaction
+between the prover and the verifier, in which
+the two parties exchange a sequence of messages.
+At the end of the interaction, the verifier either
+accepts the proof or rejects it.
+This is an \emph{interactive proof}: the prover and
+verifier may exchange many messages.
+In contrast, in a classical (non-interactive) proof,\marginnote{Probably
+all of the proofs you have seen in your life up until this point,
+including the ones in your math textbooks, are classical proofs.}
+the prover writes down a proof and sends it to the verifier in a single message.
 
+In our example, both parties hold a function $f$ and a value $y$.
+The prover wants to convince the verifier that it knows a value $x$ such that $y=f(x)$.\marginnote{The
+literature usually refers to the secret value $x$ as the \emph{witness}.}
+To be a zero-knowledge proof of knowledge,
+the proof system must have three properties.
+We state this informally:
+\label{sec:zkdefn}
 \begin{itemize}
-\item First, the proof should be \emph{sound}: if the verifier accepts the
-  proof, it should be convinced that the prover really does ``know'' $x$.
+\item \emph{Completeness.} If the prover ``knows'' $x$,
+      it will always convince an honest verifier to accept.
 
-\item Second, the proof should be \emph{zero-knowledge}: the verifier should
-  ``learn nothing'' about $x$ as a result of participating in the proof.
+\item \emph{Soundness.} If the verifier accepts the
+      proof, then prover must really ``know'' $x$.
+      The soundness property is about protecting
+      an honest verifier from a cheating prover:
+      if the prover does not know $x$, then no matter
+      how it cheats it will not be able to convince
+      the verifier that it does.
+
+\item \emph{Zero-knowledge.} The verifier 
+      ``learns nothing'' about $x$, apart from the fact that $y=f(x)$,
+      as a result of interacting with the prover.
+      The zero-knowledge property is about protecting
+      the prover from a malicious verifier: if the prover
+      is honest, then no matter how the verifier misbehaves,
+      it should learn nothing about the prover's secret witness $x$.
 \end{itemize}
+\hcg{Insert formal definitions here?}
 
-How can we define the notion of knowledge?  That is, what does it mean for
-the prover to really know $x$?  A na\"ive definition might say that $x$
+One important question here is: How do we define the notion of knowledge?  
+That is, what does it mean for the prover to really ``know'' $x$?
+A na\"ive definition might say that $x$
 is stored somewhere in the prover's memory, but that might be too strong:
 a prover might ``know'' $x$ without storing it literally in its memory,
-perhaps storing an alternate representation.  A more general definition
-is to think of knowledge in terms of extractability: a prover knows $x$
-if there exists an efficient algoritm that can deduce the value of $x$
-by observing the state of the prover.
+perhaps storing it in base64-encoded form.
+A more meaningful definition of knowledge, which is the one we will use,
+thinks of knowledge in terms of extractability.
+That is, we say that a prover knows $x$ if there is an efficient 
+algorithm that extracts $x$ by interacting with the prover and 
+observing the prover's internal state.
 
-A related notion we need to pin down is what it means for the verifier to
-learn nothing.  A good way to define this, it turns out, is to think of
+We also must pin down what it means for the verifier to
+learn nothing through an interaction with the prover.
+A good way to define this, it turns out, is to think of
 ``learning nothing'' in terms of the verifier being able to simulate its
 interaction with the prover without actually talking to the real prover.
 Specifically, if the verifier can produce a transcript of its hypothetical
-interaction with the prover, without actually communicating with the
-prover, we say the verifier learned nothing about $x$.
+interaction with the prover---that is cryptographically indistinguishable 
+from a real transcript---without actually communicating with the
+prover, we say the verifier has learned nothing about $x$.
+\marginnote{
+  There is a rich theory of zero-knowledge proof systems that we
+  will not be able to cover here.
+  One surprising fact is that there exist zero-knowledge proofs of knowledge
+  for \emph{any} choice of the public function $f$, provided that it is
+  an efficiently computable function.
+}
 
-Perhaps surprisingly, we can show (though not in this lecture)
-that any proof at all can be converted into a zero-knowledge proof.
-In fact, interactive proofs can be used to efficiently prove anything
-in $\mathsf{PSPACE}$, which is believed to be much larger than NP.
+One immediate application of zero-knowledge proofs of knowledge is to authentication.
+The prover's witness $x$ becomes the user's secret key,
+the verifier's $y$ is the user's public key, and the
+function $f$ is a public parameter of the authentication scheme.
+The authentication protocols we've seen so far, such as challenge-response protocols using MACs or signatures,
+do not quite satisfy the notions of soundness and zero-knowledge we use here.
+For example, in a MAC-based challenge-response protocol, 
+the server learns the MAC of a
+server-chosen challenge value under the client's (prover's) secret key.
+Provided that the MAC is secure, the verifier could not 
+produce a simulated transcript that is identical to a
+real one without actually interacting with the real prover.
 
-We can think of using zero-knowledge proofs in authentication.  The value
-$x$ known to the prover is the user's secret key, and the public value of
-$y$ is the user's public key.  The authentication protocols we've seen
-so far, such as challenge-response protocols using MACs or signatures,
-are not quite zero-knowledge: the server learns the signature of a
-server-chosen challenge value under the client's (prover's) secret key,
-and they could not produce a simulated transcript that has a valid
-signature without actually interacting with the real prover.
+\section{Discrete-log problem and Schnorr signatures}
 
+As an example of a zero-knowledge proof of knowledge, we will show
+how a prover can convince a verifier that it knows a discrete
+log, without revealing it. 
 
-\section{Discrete log problem and Schnorr signatures}
-
-As an example of zero-knowledge proofs, we will use the discrete log
-problem: given a group $\calG$, a generator $g$ of order $q$ for $\calG$
-(where $q$ is a big prime), and some value $g^x\in \calG$, what is the
-value of $x\in \Zq$?  We have already seen the discrete log problem in
+\section{Reminder: The discrete-log problem}
+We recall the discrete-log problem.
+The problem is parameterized by 
+a group $\G$ of prime order $q$,
+generated by a value $g \in \G$.\marginnote{In cryptographic settings, $q$ is a big prime.}
+Then, given a group element $y = g^x \in \G$, for $x \getsr \Z_q$,
+the discrete-log problem is to find the value of $x\in \Zq$.
+We have already seen the discrete-log problem in
 the context of Diffie-Hellman key exchange and elliptic-curve signatures.
 
-Imagine a prover that knows $x\in \Z_q$, where $x$ might be chosen randomly,
-and a verifier that knows $X = g^x\in \calG$.  How can the prover convince
-the verifier it knows the $x$ corresponding to $X$?  One protocol for doing
-this, called Schnorr's protocol, is as follows:
 
+\section{Schnorr's protocol for proving knowledge of discrete logs}
+
+In Schnorr's protocol, the prover and verifier both hold the
+generator $g \in \G$ and the group order $q$.
+In addition the prover holds a secret value $x \in \Z_q$, the verifier
+holds a public value $y \in \G$.
+The prover must convince the verifier that it knows the discrete log of $y$
+base $g$: that is, that it knows $x$ such that $y=g^x \in \G$.
+The prover wants to prove this to the verifier this without revealing
+anything about else about its secret value $x$.
+
+The protocol goes as follows:
 \begin{itemize}
 
-\item Prover picks a random $r\in \Z_q$, and sends $R=g^r\in \calG$ to the verifier.
+\item The prover picks a random $r\in \Z_q$, and sends $R=g^r\in \G$ to the verifier.
 
 \item The verifier picks a challenge bit $c$ at random, either 0 or 1,
-  and sends the challenge to the prover.
+      and sends the challenge to the prover.
 
-\item The prover sends back a response $z$, chosen as follows: if $c=0$,
-  the prover sets $z$ to $r$, and if $c=1$, the prover sets $z$ to $r+x\in \Z_q$.
+\item The prover sends back a response $z \in \Z_q$, chosen as follows: \marginnote{In
+  the true Schnorr protocol, the verifier samples $c \getsr \Z_q$, as we
+    discuss in \cref{sec:hvzk}}
+  \begin{itemize}
+    \item If $c=0$, the prover sets $z \gets r \in \Z_q$.
+    \item If $c=1$, the prover sets $z \gets r+x\in \Z_q$.
+  \end{itemize}
   Mathematically, $z=r+cx\in \Z_q$.
 
-\item The verifier checks that $g^z=RX\in \calG$.  If equal, the verifier accepts,
+\item The verifier checks that $g^z=R y^{c}\in \G$.  If equal, the verifier accepts,
   otherwise the verifier rejects.
 
 \end{itemize}
 
-This protocol critically depends on $c$ not being known to the prover
+Why is interaction necessary here?
+It turns out that this protocol critically depends on the prover 
+not knowing the challenge bit $c$
 in advance.  If the prover knew $c$ in advance, the prover could pick
-$z$ at random, and just compute $R$ as $(g^r)(X^c)^{-1}\in \calG$.
-The protocol also depends on the verifier not asking for answers to
-both values of $c$: otherwise, the verifier can learn $x$ by subtracting
-the responses for the two values of $c$.  However, running the protocol
-just once does not reveal information about $x$: even if $c=1$, adding
-a random value $r$ to $x$ modulo $q$ makes $z$ effectively random as well.
+$z \getsr \Z_q$ at random, and just compute $R$ as $(g^z)(y^c)^{-1}\in \G$.
 
+\paragraph{Reducing soundness error.}
 In any given interaction of the protocol, the prover could falsely
 convince the verifier that it knows $x$, using the attack we just
-described, but by repeating this protocol $\lambda$ times, the verifier
-can reduce the probability of an unsound proof (called the ``soundness
+described. The prover only will succeed in this attack with probability $\frac 12$,
+which is exactly the probability that the prover guesses the verifier's challenge
+$c$ in advance.
+By repeating this protocol $\lambda$ times and accepting only if all $\lambda$
+iterations accept, the verifier
+can reduce the probability of accepting a cheating prover (called the ``soundness
 error'') to $2^{-\lambda}$.
 
-We will now flesh out this argument---that Schnorr's protocol is a
-zero-knowledge proof---in more detail.  This will amount to showing that
-the protocol protects the two parties in the protocol (the prover and
-the verifier) from each other.  A verifier can be sure that the protocol
-is sound, regardless of what adversarial prover it interacts with: if
-the verifier accepts, the prover really knew $x$.  A prover can also be
-sure that the protocol is zero-knowledge, regardless of what adversarial
-verifier it interacts with: if the prover participates in the protocol
-with an arbitrary verifier, it can be sure that the verifier did not
-learn anything about its secret $x$.
+A more efficient way to reduce the soundness error is to have 
+the verifier sample the challenge value $c \getsr \Z_q$ as a
+random $\Z_q$ element instead of a random bit.
+With this transformation, the soundness error becomes roughly $1/q$,
+which is $\approx 2^{-256}$ for the cryptographic groups we use in practice.
+An important caveat is that if we increase the challenge space in this way,
+we cannot prove that the resulting protocol is zero knowledge.
+This modified protocol only
+satisfies a weaker flavor of zero knowledge called ``honest-verifier zero knowledge.''
+We won't discuss those details here.
 
+
+
+\section{Analysis of Schnorr's protocol}
+
+We will now argue that Schnorr's protocol is really
+a zero-knowledge proof of knowledge of discrete log.
+To do this, we must show that the protocol satisfies
+completeness, soundness, and zero knowledge, as
+we defined them in \cref{sec:zkdefn}.
+
+The completeness follows by construction.
+The more challenging steps are proving soundness and zero knowledge.
 
 \subsection{Soundness using an extractor}
 
-To show that Schnorr's protocol is a zero-knowledge proof, we need to
-first convince ourselves that the protocol is \emph{sound}: that is,
+We first need to convince ourselves that the protocol is \emph{sound}: that is,
 if the verifier accepts, the prover really knows $x$.  We can prove
-soundnes by showing that, if there is a (possibly adversarial) prover
-$P$ that can convince our verifier $V$ using Schnorr's protocol, there
-exists an efficient extractor $E$ that can return $x$ based on $P$'s
-interaction with $V$, with some high probability (say, $\ge 1/2$).
+soundness by showing that, if there is a (possibly adversarial) prover
+$P^*$ that can convince our honest verifier to accept, there
+exists an efficient extractor that can use the cheating prover $P^*$
+to extract $x$ with some high probability (say, $\gg 1/2$).
 
-The extractor $E$ for Schnorr's protocol can be constructed as follows:
+For simplicity, assume here that the prover $P^*$ manages to convince
+the verifier to accept with probability $1$---i.e., for all choices of
+the verifier's challenge bit $c$ and all choices of the prover's randomness.
+Then, given a prover algorithm $P^*$,
+the extractor for Schnorr's protocol works as follows:
 
 \begin{itemize}
 
-\item $E$ runs $P$ to get some initial transcript with challenge 0.
-  The transcript consists of $\langle R, c=0, z\rangle$.
+\item The extractor runs the prover $P^*$ to get some initial protocol transcript with challenge $c=0$.
+The transcript consists of $(R, c=0, z)$.
 
-\item Rewind the state of the prover to just after the point when it
-  sent $R$ to $V$.
+\item The extractor rewinds the state of the prover $P^*$ to just after the point when it
+      sent the first protocol message $R$ to the verifier.
 
-\item Run $P$ again to get the transcript $\langle R, c=1, z'\rangle$.
+\item The extractor runs $P^*$ again, but this time feeds its the challenge $c=1$.
+This produces a second transcript $(R, c=1, z')$.
 
-\item Output $z'-z$ as the discrete log $x$.
+\item The extractor outputs $z'-z$ as the discrete log $x$.
 
 \end{itemize}
 
-By our assumption---namely, that $P$ can convince our verifier $V$---both
-runs of $P$ by the extractor must convince $V$ to accept (otherwise,
-$P$ would not convince $V$ in at least one of the two $c$ choices).
-That means that both $g^z=R$ and that $g^{z'}=RX$.  Thus, $g^{z'-z}=X$,
+By our assumption---namely, that $P^*$ can convince our honest verifier
+to accept with probability one---both
+runs of the prover $P^*$ by the extractor must convince the verifier to accept. (Otherwise,
+the prover $P^*$ would not convince the verifier in at least one of the two runs of the protocol.)
+That means that both $g^z=R \in \G$ and that $g^{z'}=RX \in \G$.  Thus, $g^{z'-z}=y \in \G$,
 which is exactly the definition of what it means for something ($z'-z$
-in particular) to be the discrete log of $X$.
+in particular) to be the discrete log of $y \in \G$.
 
 Here we have glossed over the details of what happens if the prover
 convinces the verifier with some non-negligible probability that is
 nonetheless less than 1.
-
+A similar but more involved argument handles that case.
 
 \subsection{Zero-knowledge using a simulator}
 
-The second part of showing that Schnorr's protocol is zero-knowledge
-requires us to show that the verifier learns nothing as a result.
-To do this, we construct a \emph{simulator} $S$.  The simulator's job
-is to convince an arbitrary verifier $V$ to accept, without actually
-knowing $x$, thereby producing a transcript that looks indistinguishable
-from $V$ interacting with the real prover $P$.
+Our second task is to show that Schnorr's protocol satisfies zero knowledge.
+That is, that even a malicious verifier $V^*$ that deviates from
+the protocol ``learns nothing'' about the prover's witness
+$x$ as a result of interacting with the prover in the Schnorr protocol.
+To do this, given a malicious verifier algorithm $V^*$, we construct a \emph{simulator} algorithm.
+The simulator's job
+is to produce a transcript of the prover-verifier interaction that is
+indistinguishable from a true prover-verifier interaction.
+Crucially, in the simulated interaction, the simulator \emph{does not know} the witness $x$,
+while in the real prover-verifier interaction, the prover \emph{does know} the witness $x$.
 
-We can construct this simulator $S$ as follows:
+Given the verifier $V^*$, 
+we construct this simulator as follows:
 
 \begin{itemize}
 
-\item Run the cheating strategy of $P$ with $V$, where $P$ guesses
-  the challenge upfront.
+  \item Make a guess $c' \getsr \{0,1\}$ of the verifier's challenge bit.
 
-\item If the guess turns out to be correct, output the transcript.
-  This happens with probability $1/2$.
+  \item Choose the third protocol message $z \getsr \Z_q$ at random.
 
-\item If the guess was wrong, retry.  This happens with probability $1/2$
-  as well.
+  \item Set the first message to $R \gets g^z (y^c')^{-1} \in \G$.
+
+  \item Run the verifier $V^*$ on first message $R$.
+        The verifier outputs a challenge $c$.
+  \item If $c=c'$, output $(R, c, z)$ as the simluated transcript.
+        This happens with probability $1/2$.
+
+\item Otherwise, retry.  This happens with probability $1/2$ as well.
 
 \end{itemize}
 
 Both the extractor and simulator constructions rely crucially on being
-able to rewind the prover or verifier and try again.  This enables us
-to convince ourselves that the protocol is sound and zero-knowledge,
-but in a real-world interaction, the verifier cannot rewind the prover
+able to rewind the prover or verifier and try again. 
+In a real prover-verifier interaction, the verifier cannot rewind the prover
 and the prover cannot rewind the verifier.
+This is why the existence of an extractor does \emph{not} mean that
+in a real protocol interaction the verifier can extract the witness
+$x$ from the prover.
 
 
 \section{Fiat-Shamir heuristic and Schnorr signatures}
+\label{sec:hvzk}
 
-One challenge with zero-knowledge proofs is that they are interactive,
-requiring the prover and verifier to send messages back and forth
-in order for the verifier to be convinced of the proof.  A clever
-trick, called the Fiat-Shamir heuristic, allows us to turn interactive
-zero-knowledge proofs into non-interactive proofs.  The idea is that,
-whenever the protocol expects the verifier to send a challenge to the
-prover, the challenge should just be the hash of the transcript so far
-in protocol's execution.  The prover can then execute the zero-knowledge
+One challenge with Schnorr's protocol as we have presented it,
+and zero-knowledge proof systems more generally,
+is that they are interactive.
+They require the prover and verifier to send messages back and forth.
+A clever trick, called the Fiat-Shamir heuristic, allows us to turn interactive
+zero-knowledge proofs into non-interactive proofs, provided that
+\begin{itemize}
+  \item we use a cryptographic hash function that we model as a random oracle, and
+  \item the verifier only sends the prover independent random values.\marginnote{In Schnorr's protocol,
+    the verifier's challenge is just a random bit, so it satisfies this second property.}
+\end{itemize}
+The idea is that, whenever the protocol expects the verifier to send a challenge to the
+prover, we can instead derive the challenge just as a hash of the protocol transcript so far.
+The prover can then execute the zero-knowledge
 protocol against a synthetic verifier (the hash function), and produce
 a transcript.  The prover can now send this transcript to the verifier,
 and if the verifier can confirm that indeed all of the challenges were
-correctly computed using a collision-resistant hash function (like
-SHA-256), it's sound to accept this transcript as a proof.
+correctly computed using a cryptographic hash function, such as 
+SHA-256, it's sound to accept this transcript as a proof.
 
 We can use this Fiat-Shamir heuristic to construct a (regular,
 non-interactive) signature scheme from an (interactive) zero-knowledge
-proof of the discrete log problem.  This requires a slight modification
-of the protocol we described above, where instead of sending a
-single challenge bit $c$, the verifier sends a 256-bit vector of bits
-$\overrightarrow{c}$.  This also requires a slight modification to the
-zero-knowledge definition, requiring an honest verifier, which we won't
-discuss the details of.  The elliptic-curve signatures used in practice
-today are effectively variants of this Schnorr signature scheme.
-
+proof of knowledge for the discrete-log problem.
+The elliptic-curve signatures used in practice today
+effectively take the Schnorr protocol for proof of knowledge of discrete log
+using challenge space $\Z_q$, and apply the Fiat-Shamir heuristic to it.
+The resulting signature scheme is called the \emph{Schnorr signature scheme}.
