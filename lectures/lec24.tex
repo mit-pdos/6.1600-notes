@@ -259,11 +259,11 @@ we construct this simulator as follows:
 
   \item Choose the third protocol message $z \getsr \Z_q$ at random.
 
-  \item Set the first message to $R \gets g^z (y^c')^{-1} \in \G$.
+  \item Set the first message to $R \gets g^z y^{-c'} \in \G$.
 
   \item Run the verifier $V^*$ on first message $R$.
         The verifier outputs a challenge $c$.
-  \item If $c=c'$, output $(R, c, z)$ as the simluated transcript.
+  \item If $c=c'$, output $(R, c, z)$ as the simulated transcript.
         This happens with probability $1/2$.
 
 \item Otherwise, retry.  This happens with probability $1/2$ as well.
