@@ -149,7 +149,7 @@ the client does not need to communicate with the CA to validate a
 name-to-key mapping. The client only needs to perform one signature-verification
 check.
 \marginnote{In order to use TLS on a website you own, you need to convince one of the certificate authorities to give you a certificate---i.e., to sign your $(\ttt{name}, \vk)$ pair. 
-To do so, the CA will have some protocol to follow---typically, you will send your $(\ttt{name}, \vk)$ pair to the CA, who will then ask you to verify that you own the name somehow.
+To do so, the CA will have some protocol to follow---typically, you will send your $(\ttt{name}, \vk)$ pair to the CA, who will then ask you to verify that you own the name somehow. This is called \textit{domain validation}.
 In the case of web certificates, the CA may verify ownership by requiring you to upload a file file to your server, to add a new DNS record with a random value, or something similar.
 Once the CA is convinced that you own the domain, the CA will reply with a certificate: a signature over the tuple $(\ttt{name}, \vk)$. This $(\ttt{name}, \vk, \sig_{\text{CA}})$.
 }
@@ -170,6 +170,16 @@ However, certificates still have some drawbacks:
 	\item If a server's private key gets stolen, 
         there is no great plan for \emph{revoking} or updating a name-to-key mapping.
 \end{itemize}
+
+\subsection{Domain Validation}
+
+Domain Validated (DV) certificates are quite common. CA validation uses a simple technical check for domain ownership. For example, the CA asks the requester amazon.com to put a nonce in a file on an amazon.com server. Then, the CA retrieves that file, and checks the nonce. The (reasonable) assumption is that only the server owner could have created such a file. Alternately, the CA could ask the requester to create certain Domain Name Services (DNS) records under amazon.com, e.g., acme-challenge.amazon.com.
+
+This check is often automated, and is fast, convenient, cheap. An example DV CA is {\bf Let's Encrypt}. It is easy to use and free; the requester doesn't have to be a real company.
+
+DV certificates only have low-level DNS ownership guarantees: "CA validated that owner of certificate owns amazon.com". However, the guarantee closely matches what CAs can be expected to validate in real life. 
+
+A standard protocol for validating domain ownership is ACME\footnote{https://tools.ietf.org/html/rfc8555\#section-8.3}.
 
 \subsection{Revocation}
 In many cases, a CA will want to delete or change a name-to-key mapping.
