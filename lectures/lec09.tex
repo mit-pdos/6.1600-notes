@@ -169,8 +169,11 @@ is encrypt-then-MAC.
 \section{AES-GCM (Galois Counter Mode)}\label{sec:enc:gcm}
 One of the most widely used authenticated-encryption constructions is AES-GCM.
 It follows the encrypt-then-MAC paradigm.
-It uses AES as a pseudorandom function for counter-mode encryption (\cref{sec:enc:ctr}).
-It uses a Carter-Wegman-style MAC (\cref{sec:mac:cw}) as the MAC scheme.
+It uses AES as a pseudorandom function for counter-mode encryption from the previous
+lecture. %(\cref{sec:enc:ctr}).
+It uses a Carter-Wegman-style MAC -- see previous lecture --
+%(\cref{sec:mac:cw})
+as the MAC scheme.
 
 There are a few optimizations that AES-GCM uses beyond what we have described:
 \begin{itemize}
