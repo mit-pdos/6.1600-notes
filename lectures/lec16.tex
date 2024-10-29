@@ -101,7 +101,7 @@ For example, an import might look like this:
 	import "github.com/grpc/grpc-go"
 \end{lstlisting}
 
-When compiling the code, the developer's PC will contact the server at the given URL over HTTPS (verifying the server certificate via TLS) and download the software bundle. On the other end, when a library developer wants to update their library, they do so by interacting with the hosting server via HTTPS and whatever authentication the server has set up---credentials, maybe two-factor authentication, etc.
+When compiling the code, the user's PC will contact the server at the given URL over HTTPS (verifying the server certificate via TLS) and download the software bundle. On the other end, when a library developer wants to update their library, they do so by interacting with the hosting server via HTTPS and whatever authentication the server has set up---credentials, maybe two-factor authentication, etc.
 
 This has some good features: the server name is explicit so there is no ambiguity about packages and the decentralized nature of specifying individual URLs avoids the necessity for a central server that attracts attacks. However, this requires trusting the server hosting the library to secure the update process and distribute software honestly.
 
@@ -268,7 +268,9 @@ One different plan to help involves an audit log that keeps track of all publish
 
 This helps prevent in particular targeted attacks---for example, if some adversary has a specific target in mind and compromised the distribution of the Linux kernel, they would likely be immediately noticed if they introduced a backdoor into Linux for the whole world. However, if they were able to introduce a backdoor and distribute that backdoored version only to their target, the adversary would be much more likely to evade detection. If clients check their received binary against the publicly available one before installing it, this personalized attacks can be avoided---if the attacker wants to change the binary for someone, they will need to change it for everyone.
 
-\section{Booting the System: Secure Boot}
+\section{Booting the System}
+
+\subsection{Secure Boot}
 In order to actually run an application, we rely on large amounts of software running on our computer, from the applications themselves to the operating system that supports them.
 If the operating system itself is compromised, for example, the modified OS could undermine all of the defenses we just discussed.
 ``Secure Boot'' is one strategy for getting some partial protection against these attacks.
@@ -310,6 +312,14 @@ system on the device. Game-console vendors often sell the console
 hardware at a loss, and they make their money back by selling game software.
 They have a strong incentive then to prevent users from buying
 game consoles and using them for non-game purposes.
+
+\subsection{Measured Boot}
+
+Secure boot assumes you know which key is needed to sign the software. But what if the hardware cannot determine which software is good and which is bad? The idea is to measure what software is being booted. This involves hashing the bootloader, then hashing the OS kernel, and finally hashing the OS image. This idea is called measured boot.
+
+While measured boot cannot prevent bad software from loading, different software generates different secrets. The system contains a secret that is durably stored in hardware and remains consistent across reboots. When the system boots up, it derives a secret key based on this hardware secret, using a derivation method that incorporates the hashes of the bootloader, and OS kernel, and perhaps other software.
+
+The OS then uses this secret key to decrypt its data and authenticate to remote servers. Booting a different OS —- perhaps due to malware corruption —- will result in a different key being generated, and this is detected when the data cannot be decrypted.
 
 \section{Secure attention key}
 
