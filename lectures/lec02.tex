@@ -83,7 +83,8 @@ are, in increasing order of strength are:
         as the honest user (\emph{active attack}).
 
         U2F security keys, and other schemes based on digital
-        signatures (\cref{sec:sig}), aim to protect against active attacks.
+        % signatures (\cref{sec:sig}), aim to protect against active attacks.
+        signatures, aim to protect against active attacks.
 
 \end{itemize}
 Systems that defend against active attacks provide the strongest
@@ -106,7 +107,8 @@ provide any protection against the other types of attack.
 To authenticate, the client sends its secret key
 $k$ to the server.
 {\color{red} WARNING: In practice, the server should store the secret $k$ under
-a slow hash function (see \cref{sec:auth:pwhash}).}
+a slow hash function.}
+%a slow hash function (see \cref{sec:auth:pwhash}).}
 }\label{fig:auth-direct}
 \end{figure}
 
@@ -159,6 +161,17 @@ This creates all sorts of headaches\dots
 A small number of common passwords dominate.}
 \end{figure}
 
+The security of a password-based authentication system
+rests entirely on the attacker's inability to guess the password
+in a small number of guesses.
+
+\emph{Entropy} is a way to quantify an adversary's
+uncertainty about a value sampled using a random
+process, or from a particular probability distribution.
+If a distribution has $b$ bits of entropy, then
+it will take at least roughly $2^b$ guesses 
+for an attacker to correctly
+guess a value sampled from this distribution.
 
 \marginnote[-2in]{
   \begin{tabular}{cc}
@@ -188,18 +201,6 @@ A small number of common passwords dominate.}
   \captionof{table}{The most popular passwords in 2021, according to 
   NordPass, \url{https://nordpass.com/most-common-passwords-list/}.}
 }
-
-The security of a password-based authentication system
-rests entirely on the attacker's inability to guess the password
-in a small number of guesses.
-
-\emph{Entropy} is a way to quantify an adversary's
-uncertainty about a value sampled using a random
-process, or from a particular probability distribution.
-If a distribution has $b$ bits of entropy, then
-it will take at least roughly $2^b$ guesses 
-for an attacker to correctly
-guess a value sampled from this distribution.
 
 The uniform distribution over 128-bit strings has 128 bits of entropy.
 The distribution from which humans typically choose their passwords
@@ -444,7 +445,7 @@ The protocol takes place between a client and server holding a shared secret key
         and sends it to the authenticating client.
   \item The client computes an authentication ``tag'' $t \gets F(k, c)$, where $F(\cdot, c)$ is hard to compute without knowing $k$.
         (The function $F$ here is a Message Authentication Code, 
-        which we will talk more specifically about in \cref{lec:mac}.)
+        which we will talk more specifically about in a later lecture.) % \cref{lec:mac}.)
         The sends the MAC tag $t$ to the server.
   \item The server receives a tag $t'$ from the client and ensures that $t' = F(k,c)$.
         If so, the server considers the authentication successful.
@@ -516,7 +517,8 @@ U2F, which we now discuss, handles that issue.
 \end{figure}
 
 To provide security against active attacks, we can use an authentication
-scheme based on digital signatures, which we will discuss in \cref{sec:sig}.
+scheme based on digital signatures, which we will discuss in a lecture on signatures.
+% \cref{sec:sig}.
 With these schemes, the client has a secret key $k$ and the server stores
 some hard-to-invert function of the key $F(k)$.
 (We call $F(k)$ the ``public key.'')
