@@ -42,7 +42,7 @@ However, without additional security measures, the mirror may
 server users a different file than the one the mirror fetched from the origin server.
 If the mirror is malicious, it can, for example, trick the user into installing
 a backdoored software update.
-(We saw an attack based on mirrors in~\cref{sec:intro:xcode}.)
+%(We saw an attack based on mirrors in~\cref{sec:intro:xcode}.)
 
 To protect against a malicious mirror, we can add some authentication on the file that the mirror hosts.
 Say that the origin server publishes a large software update~$f$.
@@ -307,7 +307,8 @@ different intents had the same concatenation.\autocite{flickr}
 Recall the concept of Message Authentication Codes
 (MAC) from the last lecture---a code that can be
 sent along with a message to verify that the message was not changed.
-(We will see the formal definition in \cref{lec:mac}.)
+(We will see the formal definition in the lecture on message authentication codes.)
+%cref{lec:mac}.)
 
 \paragraph{Bad idea.}
 Poorly designed software uses $\MAC(k, m) = H(k \| m)$ as a very simple construction of a MAC.
@@ -374,5 +375,5 @@ the origin server, along with the additional hashes
 from the mirror server, to be convinced that the mirrored
 file it downloaded was authentic.
 
-\todo{Add diagram from lecture.}
+%\todo{Add diagram from lecture.}
 
