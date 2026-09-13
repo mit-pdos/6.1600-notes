@@ -265,7 +265,7 @@ collision-resistant hash function $H_\text{small}$.}
 \end{figure}
 (Here, we are assuming that the message is at most 
 $\lambda 2^{\lambda}$ bits long.)
-\marginnote{In practice, standard hash functions have limits on the
+\marginnote{In practice, standard hash functions have their own limits on the
 length of the messages that they can hash. For example, SHA256 can
 hash messages of length up to $2^{64}-1$ bits.}
 
@@ -279,6 +279,90 @@ string and start by setting $b \gets m_1$ and then continue by hashing $m_2, m_3
 The construction is \emph{not} collision resistant if we omit the length block
 $\mathsf{ToBlock}(n)$ that we hash in at the end.
 
+\paragraph{Why the length block is necessary.}
+Suppose we delete the final step $b \gets H_\text{small}(\mathsf{ToBlock}(n))$
+from \Cref{fig:md}, and call the resulting function $H^-$.
+Collisions between two messages with the \emph{same} number of blocks still
+yield collisions in $H_\text{small}$: walking backwards from the last block,
+at each step either the two inputs to $H_\text{small}$ differ---giving a
+collision---or they agree and we continue.
+So any attack must use messages of \emph{different} lengths, and the job of
+$\mathsf{ToBlock}(n)$ is exactly to keep those apart.
+
+To see that $H^-$ really is broken, it is not enough to exhibit an attack
+against some particular hash function: we must show that the collision
+resistance of $H_\text{small}$ does not \emph{imply} that of $H^-$.
+We do this by constructing an $H_\text{small}$ that is collision resistant
+and yet makes $H^-$ trivially insecure.
+
+\begin{const}[A collision-resistant $H_\text{small}$ that breaks $H^-$]
+  \label{const:md-no-length}
+  Let $G\colon \bin^{2\lambda} \rightarrow \bin^{\lambda-1}$ be any
+  collision-resistant function, and define
+  $H_\text{small}\colon \bin^{2\lambda} \rightarrow \bin^{\lambda}$ by
+  \[
+    H_\text{small}(b, m) =
+    \begin{cases}
+      0^{\lambda} & \text{if } b \concat m = 0^{2\lambda},\\[2pt]
+      1 \concat G(b, m) & \text{otherwise.}
+    \end{cases}
+  \]
+\end{const}
+
+\begin{claim}
+  If $G$ is collision resistant, then so is $H_\text{small}$.
+\end{claim}
+\begin{proof}
+  Let $x \neq x'$ satisfy $H_\text{small}(x) = H_\text{small}(x')$.
+  The two outputs have the same leading bit, so either both begin with $1$,
+  in which case $G(x) = G(x')$ and we have a collision in $G$;
+  or both equal $0^{\lambda}$, which forces $x = x' = 0^{2\lambda}$ and
+  contradicts $x \neq x'$.
+\end{proof}
+
+By construction $H_\text{small}$ has a \emph{fixed point at the initialization
+value}:\marginnote{This is the only property of $H_\text{small}$ the attack
+uses. Any $H_\text{small}$ with $H_\text{small}(0^\lambda, m^*) = 0^\lambda$
+for some block $m^*$ is equally fatal; prepending copies of $m^*$ then leaves
+the hash unchanged.}
+\[
+  H_\text{small}(0^{\lambda}, 0^{\lambda}) = 0^{\lambda}.
+\]
+Feeding an all-zeros block into the chaining variable while the chaining
+variable still holds the initialization value $0^{\lambda}$ leaves it
+unchanged. Prepending an all-zeros block to a message therefore adds one
+iteration that does nothing, and so for \emph{every} message $m$,
+\[
+  H^-(0^{\lambda} \concat m) = H^-(m).
+\]
+
+Taking $n = 1$ and $n = 2$ gives an explicit collision.
+With $\lambda = 32$ and $G$ instantiated by truncating \textsf{SHA-256}
+to its first $31$ bits, the two messages
+\[
+  M = \ttt{41414141}
+  \qquad\text{and}\qquad
+  M' = \ttt{00000000} \concat \ttt{41414141}
+\]
+both satisfy $H^-(M) = H^-(M') = \ttt{d740d7ef}$.
+Note that $M$ and $M'$ differ in content, not merely in length.
+The same trick works at any size: for $n = 2$ versus $n = 3$,
+\[
+  \ttt{41414141} \concat \ttt{42424242}
+  \qquad\text{and}\qquad
+  \ttt{00000000} \concat \ttt{41414141} \concat \ttt{42424242}
+\]
+both hash to \ttt{d314a585}. Degenerately, every all-zeros message
+$0^{\lambda}, 0^{2\lambda}, 0^{3\lambda}, \dots$ hashes to $0^{\lambda}$.
+
+Restoring the length block repairs all of this.
+The two messages above now reach the final step with the same chaining
+value \ttt{d740d7ef} but distinct second arguments
+$\mathsf{ToBlock}(1)$ and $\mathsf{ToBlock}(2)$, so their hashes
+\ttt{ca06ae43} and \ttt{dae0f489} could only coincide if
+$H_\text{small}$ itself had a collision.
+In short: a fixed point lets messages with different block counts converge
+on a common chaining value, and $\mathsf{ToBlock}(n)$ separates them again.
 
 \subsection{The Birthday Paradox}
 \marginnote{If you sample $2^{\lambda/2}$ random $10\lambda$-bit strings and hash them
