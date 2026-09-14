@@ -381,6 +381,9 @@ this---they concatenated all parameters before
 hashing, and had parameters such that two
 different intents had the same concatenation.\autocite{flickr}
 
+A better though more expensive way is
+\[ H_2(x, y) = H(H(x) || H(y)). \]
+
 \subsection{Length-Extension}
 Recall the concept of Message Authentication Codes
 (MAC) from the last lecture---a code that can be
