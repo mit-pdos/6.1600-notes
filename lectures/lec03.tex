@@ -412,9 +412,8 @@ keeps iterating $H_\text{small}$ is simply resuming the hash computation where
 the honest party stopped.
 
 \paragraph{The attack.}
-Let $m''$ be any suffix the attacker wishes to append,\marginnote{In
-\Cref{fig:merkle-damgard-extension} this attacker-chosen suffix is labelled
-$x$.} padded to a whole number of blocks. Given $m$ and $t$, the attacker
+Let $m''$ be any suffix the attacker wishes to append,
+padded to a whole number of blocks. Given $m$ and $t$, the attacker
 computes
 \begin{enumerate}
   \item $b \gets H_\text{small}(t, m'')$, and
@@ -466,7 +465,7 @@ construction from \Cref{fig:merkle-damgard}.
     \node (start) {Hash of $m_1 || m_2 || \ldots || m_n$};
     \node [right=.5cm of start] (H1) [draw] {$H_\textrm{small}$};
     \draw [->] (start) edge (H1);
-    \node [above=.5cm of H1] (x) {$x$};
+    \node [above=.5cm of H1] (x) {$m''$};
     \draw [->] (x) edge (H1);
     \node [right=.5cm of H1] (Hfinal) [draw] {$H_\textrm{small}$};
     \draw [->] (H1) edge (Hfinal);
@@ -477,7 +476,7 @@ construction from \Cref{fig:merkle-damgard}.
   \end{tikzpicture}
   \caption{Sketch of the extension attack on the Merkle-Damg\aa{}rd
     construction, starting with a hash of $m_1 || m_2 || \ldots || m_n$
-    to compute the hash of $m_1 || m_2 || \ldots || m_n || \textsf{ToBlock}(n) || x$.}
+    to compute the hash of $m_1 || m_2 || \ldots || m_n || \textsf{ToBlock}(n) || m''$.}
   \label{fig:merkle-damgard-extension}
 \end{figure}
 
