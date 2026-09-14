@@ -151,16 +151,10 @@ discussion of these constants.\autocite{lenstra:universal}
 \end{table}
 
 
-
-\marginnote{For most cryptosystems, there is a tradeoff between the
-attacker's running time and success probability.
-For example, an attacker running in time $T$ can find a collision in
-a hash function with $n$-bit output with probability $T^2/2^n$.
-So, as the attack runs for more time, it has a better chance of
-finding a collision.
-}
 The takeaway is that if an attacker finds a collision with probability
 $2^{-128}$, we can be extremely sure that a collision will never occur.
+
+\marginnote{For most cryptosystems, there is a tradeoff between the attacker's running time and success probability.  For example, an attacker running in time $T$ can find a collision in a hash function with $n$-bit output with probability $T^2/2^n$.  So, as the attack runs for more time, it has a better chance of finding a collision.  }
 
 \section{Constructing a collision-resistant hash function}
 The current standard for fast collision-resistant
