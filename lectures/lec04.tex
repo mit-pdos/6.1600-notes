@@ -232,7 +232,8 @@ in time $2^{64}$.
 If we have a pseudorandom function $F$ with an input space of 256-bits,
 we can construct a MAC on arbitrary-length messages using the ``hash-and-sign'' paradigm.
 In particular, we use a collision-resistant hash function $H\colon \zo^* \to \zo^{256}$ 
-(\cref{def:crhf}) and we define the MAC on message space $\zo^*$ as:
+%(\cref{def:crhf})
+and we define the MAC on message space $\zo^*$ as:
 \[ \MAC(k,m) \deq F(k, H(m)).\]
 
 
@@ -311,7 +312,7 @@ single PRF invocation per message authenticated (independent of
 the message length).
 The construction is named the Carter-Wegman MAC, after its
 inventors.\autocite{CW81}
-Modern encryption schemes, including AES-GCM (\cref{sec:enc:gcm})
+Modern encryption schemes, including AES-GCM %(\cref{sec:enc:gcm})
 use a Carter-Wegman-style MAC as a key ingredient.
 
 For this construction, we will use the notation
