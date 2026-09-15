@@ -274,7 +274,7 @@ The construction is \emph{not} collision resistant if we omit the length block
 $\mathsf{ToBlock}(n)$ that we hash in at the end.
 
 \paragraph{Why the length block is necessary.}
-Suppose we delete the final step $b \gets H_\text{small}(\mathsf{ToBlock}(n))$
+Suppose we delete the final step $b \gets H_\text{small}(b, \mathsf{ToBlock}(n))$
 from \Cref{fig:md}, and call the resulting function $H^-$.
 Collisions between two messages with the \emph{same} number of blocks still
 yield collisions in $H_\text{small}$: walking backwards from the last block,
