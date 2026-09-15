@@ -381,6 +381,10 @@ this---they concatenated all parameters before
 hashing, and had parameters such that two
 different intents had the same concatenation.\autocite{flickr}
 
+A better though more expensive way is
+\[ H_2(x, y) = H(H(x) || H(y)). \]
+
+
 \subsection{Length-Extension}
 Recall the concept of Message Authentication Codes
 (MAC) from the last lecture---a code that can be
@@ -389,16 +393,64 @@ sent along with a message to verify that the message was not changed.
 %cref{lec:mac}.)
 
 \paragraph{Bad idea.}
-Poorly designed software uses $\MAC(k, m) = H(k \| m)$ as a very simple construction of a MAC.
-However, this construction has an easy attack---given $\MAC(k, m)$, it is easy to compute $\MAC(k, m\|m')$ 
-without knowing the key $k$ if $H$ is a hash function built with the Merkle-Damg\aa{}rd construction.
-To do this, the attacker hashes the output of $\MAC(k, m)$ with two more blocks---a new 
-message $m''$ and another length block. Now, we
-have computed $\MAC(k, m\|m')$ where $m'$ is the
-original length block plus some custom message
-without knowing the key~$k$. 
+Poorly designed software uses $\MAC(k, m) = H(k \| m)$ as a very simple
+construction of a MAC.
+If $H$ is built with the Merkle-Damg\aa{}rd construction, this has an easy
+attack: an adversary who sees a single valid tag can forge a tag on a
+\emph{longer} message, without ever learning the key~$k$.
 
-This problem here is that we were using a hash
+The reason is that a Merkle-Damg\aa{}rd hash \emph{is} its own chaining
+variable. Write $n$ for the number of blocks in $k \| m$, and let
+\[
+  t = \MAC(k, m) = H(k \| m).
+\]
+By \Cref{fig:md}, $t$ is exactly the value of the chaining variable $b$ after
+the construction has absorbed the $n$ message blocks and the final length
+block $\mathsf{ToBlock}(n)$. Nothing about $t$ is secret or opaque: it is a
+snapshot of the entire internal state. An attacker who sets $b \gets t$ and
+keeps iterating $H_\text{small}$ is simply resuming the hash computation where
+the honest party stopped.
+
+\paragraph{The attack.}
+Let $m''$ be any suffix the attacker wishes to append,
+padded to a whole number of blocks. Given $m$ and $t$, the attacker
+computes
+\begin{enumerate}
+  \item $b \gets H_\text{small}(t, m'')$, and
+  \item $b \gets H_\text{small}(b, \mathsf{ToBlock}(n+2))$,
+\end{enumerate}
+and outputs $b$. This is a valid tag on a message the attacker never had the
+key to authenticate.
+
+\paragraph{Which message was forged?}
+Here is the subtle point. The attacker resumed the chain \emph{after} the
+length block $\mathsf{ToBlock}(n)$ had already been absorbed, so that block is
+now an unavoidable part of the string being hashed. What the attacker has
+computed is
+\[
+  b = H\big(\,\underbrace{k \| m}_{\text{original}} \;\|\;
+       \underbrace{\mathsf{ToBlock}(n)}_{\text{forced ``glue''}} \;\|\;
+       \underbrace{m''}_{\text{attacker's choice}}\big)
+  \;=\; \MAC(k, m \| m'),
+\]
+where
+\[
+  m' = \mathsf{ToBlock}(n) \;\|\; m''.
+\]
+So $m''$ is not an alternative name for $m'$: it is the tail of it. The
+attacker chooses $m''$ freely but cannot avoid the glue block that precedes
+it, which is why the forgery is a tag on $m \| m'$ rather than on the cleaner
+$m \| m''$. In practice this is rarely an obstacle---the glue is a short run of
+bytes, and many formats (query strings, log lines, serialized records) will
+happily ignore or tolerate it.
+
+Two details are worth noting. First, the attacker must know $|k|$, though not
+$k$ itself, since $n$ depends on the key's length; in practice the key length
+is public, or the attacker simply tries each plausible value. Second, the
+attack needs no collision in $H$ and no weakness in $H_\text{small}$
+whatsoever---it works against a perfectly good compression function.
+
+The problem here is that we were using a hash
 function that was \emph{only} guaranteed to be
 collision resistant, but we assumed that it had other
 properties (such as that it is guaranteed to be
@@ -413,7 +465,7 @@ construction from \Cref{fig:merkle-damgard}.
     \node (start) {Hash of $m_1 || m_2 || \ldots || m_n$};
     \node [right=.5cm of start] (H1) [draw] {$H_\textrm{small}$};
     \draw [->] (start) edge (H1);
-    \node [above=.5cm of H1] (x) {$x$};
+    \node [above=.5cm of H1] (x) {$m''$};
     \draw [->] (x) edge (H1);
     \node [right=.5cm of H1] (Hfinal) [draw] {$H_\textrm{small}$};
     \draw [->] (H1) edge (Hfinal);
@@ -424,7 +476,7 @@ construction from \Cref{fig:merkle-damgard}.
   \end{tikzpicture}
   \caption{Sketch of the extension attack on the Merkle-Damg\aa{}rd
     construction, starting with a hash of $m_1 || m_2 || \ldots || m_n$
-    to compute the hash of $m_1 || m_2 || \ldots || m_n || \textsf{ToBlock}(n) || x$.}
+    to compute the hash of $m_1 || m_2 || \ldots || m_n || \textsf{ToBlock}(n) || m''$.}
   \label{fig:merkle-damgard-extension}
 \end{figure}
 
