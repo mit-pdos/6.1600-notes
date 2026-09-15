@@ -25,7 +25,7 @@ it is \textquote{computationally infeasible} to find two distinct strings
 $x$ and $x'$ such that $H(x) = H(x')$.
 \end{framed}
 
-Given a long message $m$, it's hash $H(m)$ under a collision-resistant
+Given a long message $m$, its hash $H(m)$ under a collision-resistant
 hash function is like a short ``fingerprint'' of the message---the
 hash essentially uniquely identifies the message $m$.
 For that reason, collision-resistant hash functions let you authenticate 
@@ -39,7 +39,7 @@ To speed up this process, a company or Internet-service provider may set up loca
 of the remote files.
 Users can then download the files from the nearby mirror instead of the far-away server.
 However, without additional security measures, the mirror may 
-server users a different file than the one the mirror fetched from the origin server.
+serve users a different file than the one the mirror fetched from the origin server.
 If the mirror is malicious, it can, for example, trick the user into installing
 a backdoored software update.
 %(We saw an attack based on mirrors in~\cref{sec:intro:xcode}.)
@@ -105,7 +105,7 @@ we use in this definition---one mindset we use in practice and the other mindset
 	\item In practice$\ldots$
 		\begin{itemize}
 			\item We use a fixed hash function $H$ with a fixed-length output,
-        which might be as 256 or 512 bits.
+        which might be 256 or 512 bits.
 			\item An \textquote{efficient} adversary is one that runs in time $\leq 2^{128}$.
 			\item A \textquote{negligible} probability is some very small constant, like one smaller than $2^{-128}$.
 		\end{itemize}
