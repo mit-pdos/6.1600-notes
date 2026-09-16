@@ -70,12 +70,12 @@ to compute a valid MAC of \emph{any} message $m\in \mathcal{M}$
 of its choice.
 It's not entirely obvious why we care about the adversary producing 
 a valid MAC on \textit{any} message: ``If the
-adversary MACs a message that is jibberish, they
+adversary MACs a message that is gibberish, they
 are unlikely to be able to do any harm with it,''
 you might think. 
 But there will certainly be applications
 that authenticate messages that violate whatever
-definition of \textquote{non-jibberish} we define.
+definition of \textquote{non-gibberish} we define.
 So allowing the adversary to forge a MAC tag on any 
 message makes the definition as broadly applicable as possible.
 
@@ -347,13 +347,13 @@ the adversary does not know what key will be used.
 
 One simple and practical construction of a universal hash function
 is based on polynomials.  Given a long message $m$, break it up into
-fixed-size chunks $m_0, m_1, \ldots, m_{l-1}$.\marginnote{In practice,
+fixed-size chunks $m_1, m_2, \ldots, m_{l}$.\marginnote{In practice,
 these fixed-size chunks are going to be 128 or 256 bits long.}  Then,
 the hash of that message is defined as:
 
 $$
-H(k, m_0 || m_1 || \ldots || m_{l-1}) = (m_0 + m_1 k + m_2 k^2 +
-  \ldots + m_{l-1} k^{l-1} + k^{l}) \mod p
+H(k, m_1 || m_2 || \ldots || m_{l}) = (m_1 + m_2 k + m_3 k^2 +
+  \ldots + m_{l} k^{l-1} + k^{l}) \mod p
 $$
 
 \marginnote{The final monic term $k^l$ is essential, even though it
@@ -371,7 +371,7 @@ $H(k, m) = H(k, m')$, which in turn means that $H(k, m) - H(k, m') = 0$.
 Expanding the definition of $H$ as a polynomial, this means that
 
 $$
-(m_0 - m'_0) + (m_1 - m'_1) k + \ldots + (m_{l-1} - m'_{l-1}) k^{l-1}
+(m_1 - m'_1) + (m_2 - m'_2) k + \ldots + (m_{l} - m'_{l}) k^{l-1}
   + (k^{l} - k^{l'}) = 0
 $$
 
