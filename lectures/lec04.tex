@@ -245,8 +245,17 @@ compute (per bit of input) than pseudorandom functions, such as AES.
 
 \marginnote{
 Applying the PRF to the last block using an independent random key is important.
-If we do not use a new key, an adversary can mount a length-extension attack.
-That is, if the adversary asks for $t = \mathsf{MAC}(k, m_1)$ and $t' = \mathsf{MAC}(k, t)$, $t'$ is also a valid key for the original message with two zero blocks attached $\mathsf{MAC}(k, m_1 \| 0 \| 0)$. The chain of AES applications becomes equivalent, since zero blocks are equivalent to skipping the XOR and adding AES applications.
+If we use the same key $k$, an adversary can mount a length-extension attack.
+Writing $E(x) = F(k,x)$, an $n$-block message costs $n+1$ applications of $E$.
+The adversary queries the one-block message $m_1$, receiving $t = E(E(m_1))$, and
+then queries the one-block message whose contents are the bit string $t$,
+receiving $t' = E(E(t))$. But
+$\mathsf{MAC}(k, m_1 \| 0 \| 0) = E(E(E(E(m_1)))) = E(E(t)) = t'$,
+so $t'$ is a valid tag on a message the adversary never queried. Two zero blocks
+are needed because the second query contributes two applications of $E$: one for
+its message block and one for its final step. A zero block is free to append
+since $0 \oplus t_{i-1} = t_{i-1}$, so it passes the chaining value through and
+adds one more $E$.
 }
 
 A common and secure way to construct a MAC for long messages from a MAC for short messages
@@ -254,7 +263,7 @@ is to \emph{chain} the output of each of these calls to the pseudorandom functio
 Given our chopped message $(m_1, m_2, \ldots, m_n)$, we will generate $t_1 = F(k,m_1)$ as before. When generating $t_2$, we will first XOR $t_1$ into the input: 
 $t_2 = F(k, m_2 \oplus t_1)$. This continues until the end of the message, at which point have a tag $t_n$.
 Finally, we apply the PRF \emph{with a different key} $k'$ to the value $t_n$ and output this tag $t \gets F(k', t_n)$. 
-This construction is called CBC-MAC or CMAC. % TOOD: explanation of why we need a second key here would be useful---the diagram in lecture 9/21 was very useful to understand the same-key attack.
+This construction is called CBC-MAC or CMAC.
 
 
 \begin{figure}[htpb]
