@@ -244,7 +244,7 @@ of our assumptions, so the first adversary cannot exist.
 
 \begin{proof}[Proof of Claim]
 Suppose there exists an adversary $\A$ that wins the 
-one-time-security game of \cref{def:sig-once} with non-negligible probability $\epsilon$.
+one-time-security game of \cref{def:sig-once} with non-negligible probability $\gamma$.
 That is, the adversary can produces $(m^*, \sig^*)$ such that $\Ver(\vk, m^*, \sig^*) = 1$ and $m \neq m^*$ given only $\sig = \Sign(\sk, m)$.
 We can then construct an adversary $\B$ that can use $\A$ to 
 invert the one-way function.
@@ -313,16 +313,16 @@ we can say:
 
 The events that $\calA$ breaks the signature scheme
 and that either of these failures occur are all \emph{independent}.
-Then if $\calA$ breaks the one-time security of the Lamport signature scheme with probability $\epsilon$,
+Then if $\calA$ breaks the one-time security of the Lamport signature scheme with probability $\gamma$,
 our one-way-function adversary $\calB$
 inverts the one-way function with probability
-\[ \epsilon_\text{one-way} = \epsilon \cdot \frac{1}{2} \cdot \frac{1}{n}.\]
+\[ \gamma_\text{one-way} = \gamma \cdot \frac{1}{2} \cdot \frac{1}{n}.\]
 
 The probability of either bad is at most $1/2 + 1/n$,
 by the union bound.
 Therefore if algorithm $\calA$ breaks one-time security of Lamport's
-scheme with probability $\epsilon$,
-If $\epsilon$ is non-negligible, then $\epsilon_\text{one-way} = \epsilon/2n$
+scheme with probability $\gamma$, and
+if $\gamma$ is non-negligible, then $\gamma_\text{one-way} = \gamma/2n$
 is also non-negligible, and we have a contradiction.
 \end{proof}
 
@@ -377,7 +377,7 @@ sampled and uniformly random value from the co-domain of the hash function, $\zo
 (Of course, a real-world hash function is \emph{never actually} a random
 oracle. A random oracle from $h \colon \zo^* \to \zo^\lambda$ would take
 infinitely many bits to describe, while real-world hash functions have
-finite size (and polynomial-size descriptions).)
+finite size and polynomial-size descriptions.)
 
 Recall that the standard security definition for
 digital signatures (\cref{def:sig-sec}) allows
@@ -408,7 +408,7 @@ For all efficient adversaries $\calA$:
 Note that this definition is \emph{not} good enough on its own---an adversary often does have the ability to generate signatures for messages of his choice. However, paired with a hash function modeled as a random oracle, this definition becomes very useful---if the inputs are passed through the hash function before they are passed to the signature scheme, they become effectively random. We can even relax the definition further without losing practicality: by the same logic, with hash function in front of the signature scheme, what the adversary needs to sign is really not a message of their choise, but is the \emph{hash} of a message of their choice---effectively a random value.
 
 \begin{definition}[Digital signatures: random security against random message attacks] \label{def:signatures_random_security}
-	Any efficient adversary given $\vk$ and a list of random message-signature pairs $((m_1, \sig_1), \ldots, (m_t, \sig_t))$ and random $m^* \notin \set{m_1, \ldots, m_t}$ cannot generate $\sig^*$ such that $\Ver(\vk, m^*, \sig^*) = 1$.
+	Any efficient adversary given $\vk$ and a list of random message-signature pairs $((m_1, \sig_1), \ldots, (m_t, \sig_t))$ and \textbf{random} $m^* \notin \set{m_1, \ldots, m_t}$ cannot generate $\sig^*$ such that $\Ver(\vk, m^*, \sig^*) = 1$.
 \end{definition}
 
 It is possible to formally argue that given a signature scheme satisfying \cref{def:signatures_random_security} and a random oracle, we can construct a scheme satisfying existential unforgeability under chosen message attacks.
@@ -430,6 +430,7 @@ of accidentally choosing the same leaf twice is negligible ($2^{-128}$).
 The signing key in an intermediate nodes (and in the root) will be used
 to sign the (public) verification keys of the two corresponding child
 nodes in the tree.  \cref{fig:lamport_tree} shows a sketch of this tree.
+We write $\varepsilon$ for the empty string, signifying the root of the tree.
 
 
 \begin{figure}[htpb]
@@ -485,6 +486,14 @@ a collision-resistant hash function.  Using these building blocks,
 we will construct a many-time secure signature scheme $(\Gen, \Sign,
 \Ver)$ for arbitrary-length messages (i.e., on message space $\zo^\ast$),
 where all of the algorithms are efficient ($\poly(\cdot)$ running time).
+\marginnote{Two details matter here. First, node labels have varying
+lengths, so the PRF input must encode them injectively---otherwise
+$\varepsilon$, $0$, and $00$ collide and the root shares a one-time key
+with its descendants, which is a total break. Second, a single PRF output
+is far shorter than the randomness $\Gen_0$ needs (e.g., in the Lamport scheme),
+so $F(k,s)$ is used as a seed for a pseudorandom number generator, or each
+component is derived separately as $F(k, \langle s \rangle \| \langle i
+\rangle \| b)$.}
 
 Our construction is as follows:
 
@@ -493,8 +502,8 @@ Our construction is as follows:
   \item $\Gen() \to (\sk, \vk)$:
     \begin{itemize}
       \item Sample a fresh PRF key $k \getsr \calK$.
-      \item Set $(\sk_\epsilon, \vk_\epsilon) \gets \Gen_0^{F(k, \text{``''})}()$.
-      \item Output $(\sk, \vk) \gets (k, \vk_\epsilon)$.
+      \item Set $(\sk_\varepsilon, \vk_\varepsilon) \gets \Gen_0^{F(k, \varepsilon)}()$.
+      \item Output $(\sk, \vk) \gets (k, \vk_\varepsilon)$.
     \end{itemize}
 
   \item $\Sign_t(k, m) \to \sigma$: 
@@ -511,14 +520,14 @@ Our construction is as follows:
             as shown in \cref{fig:lamport_tree}.
       \item Output $\sigma \gets (r, \sigma_\varepsilon, \vk_0, \vk_1, \sigma_{r_1}, \vk_{r_1 0}, \vk_{r_1 1}, \ldots, \sigma_r)$.
     \end{itemize}
-  \item $\Ver_t(\vk_\epsilon, m, \sigma) \to \zo$:
+  \item $\Ver_t(\vk_\varepsilon, m, \sigma) \to \zo$:
     \begin{itemize}
       \item Parse $(r, \sigma_\varepsilon, \vk_0, \vk_1, \sigma_{r_1}, \vk_{r_1 0}, \vk_{r_1 1}, \ldots, \sigma_r) \gets \sigma$.
       \item Output ``1'' if and only if 
         \begin{itemize}
-          \item $\Ver_0(\vk_r, \sigma_r, \text{SHA256}(m)) = 1$
+          \item $\Ver_0(\vk_r, \text{SHA256}(m), \sigma_r) = 1$
         and 
-      \item $\Ver_0(\vk_x, \sigma_x, \vk_{x0} || \vk_{x1}) = 1$ for every
+      \item $\Ver_0(\vk_x, \vk_{x0} || \vk_{x1}, \sigma_x) = 1$ for every
         prefix $x$ of $r$ (from $\varepsilon$ to $r_1 r_2 \ldots r_{255}$).
         \end{itemize}
     \end{itemize}

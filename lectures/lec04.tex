@@ -523,4 +523,6 @@ The security argument here goes as follows:
      on security parameter $\lambda$.
 \end{itemize}
 
-
+Note that nonce reuse is catastrophic. Say two distinct messages $m \neq m'$
+that produce $(r, z)$ and $(r, z')$, where $z = F(k,r) + M(v)$ and
+$z' = F(k,r) + M'(v)$. The adversary is able to discover the secret value $v$, and then forge any message.
