@@ -98,16 +98,17 @@ are believed to have this strong security property.
 \section{Constructing a Signature Scheme}
 In the following sections, we will show how to construct a digital-signature
 scheme from any one-way function. % (\cref{def:owf}).
+\marginnote{One benefit of the signature scheme that 
+we present here is that---unlike EC-DSA, RSA, DSA, and other widely used
+signature schemes---this one is plausibly secure even against \emph{quantum}
+adversaries.  There is ongoing work to standardize signature schemes secure
+against quantum adversaries; see \url{https://csrc.nist.gov/projects/pqc-dig-sig}}
 
 We will generate a signature scheme that is secure, but that has relatively large
 signatures and public keys: to achieve security against attackers running
 in time $2^\lambda$, this signature scheme has signatures of $O(\lambda^2)$ bits.
 Widely used modern digital signature schemes (e.g., EC-DSA) have signatures
-of $O(\lambda)$ bits.\marginnote{One benefit of the signature scheme that 
-we present here is that---unlike EC-DSA, RSA, DSA, and other widely used
-signature schemes---this one is plausibly secure even against \emph{quantum}
-adversaries.  There is ongoing work to standardize signature schemes secure
-against quantum adversaries; see \url{https://csrc.nist.gov/projects/pqc-dig-sig}}
+of $O(\lambda)$ bits.
 
 We will construct this scheme in three stages:
 
@@ -534,6 +535,7 @@ Our construction is as follows:
 \end{itemize}
 \end{framed}
 
+A final note is that when multiple messages are signed, the paths to the two different leaves are shared from the root. But the shared path from the root (up until divergence) will sign the \emph{same} strings, thanks to determinism. Therefore, the one-time signing requirement is not violated.
 This is Goldreich's construction; the practical descendant is SPHINCS+, which appears in the table below.
 
 
