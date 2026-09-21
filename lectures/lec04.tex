@@ -526,3 +526,55 @@ The security argument here goes as follows:
 Note that nonce reuse is catastrophic. Say two distinct messages $m \neq m'$
 that produce $(r, z)$ and $(r, z')$, where $z = F(k,r) + M(v)$ and
 $z' = F(k,r) + M'(v)$. The adversary is able to discover the secret value $v$, and then forge any message.
+
+
+% \paragraph{Why the universal hash function may have a constant term.}
+% In the universal-hash game there is no adversary-supplied offset.  The
+% adversary picks $m \neq m'$, and we need only that
+% $H(\cdot, m) - H(\cdot, m')$ is a non-zero polynomial: with a constant term
+% that difference is
+% \[
+%   (m_1 - m'_1) + (m_2 - m'_2) k + \dots,
+% \]
+% which is non-zero as soon as the messages differ.  The root-counting argument
+% then applies unchanged.  So the constant term in the definition of $H$ above
+% does no harm.
+% 
+% \paragraph{Why the MAC's message polynomial must not have one.}
+% In the MAC, by contrast, the adversary chooses the second component $z^*$ of
+% the tag freely, and $\MACVerify$ accepts when $z^* - F(k, r^*) = M^*(v)$.
+% Choosing $z^*$ is therefore the same as adding an arbitrary constant to the
+% message polynomial, and a constant term in $M$ gives the adversary something
+% that this constant can cancel.
+% 
+% Concretely, suppose we had defined $M(v) = m_1 + m_2 v + \dots + m_{\ell}
+% v^{\ell-1}$, in the style of the universal hash function above.  An adversary
+% queries the two-block message $m = (m_1, m_2)$ and receives $t = (r, z)$ with
+% $z = F(k, r) + M(v)$.  It then outputs the forgery
+% \[
+%   m^* = (m_1 + 1,\; m_2), \qquad t^* = (r,\; z + 1),
+% \]
+% reusing the queried nonce.  Verification computes
+% \[
+%   z^* - F(k, r) = \big(F(k,r) + M(v) + 1\big) - F(k,r) = M(v) + 1 = M^*(v),
+% \]
+% so the tag is accepted.  The forgery succeeds with probability $1$, after a
+% single query, and the adversary never learns anything about
+% $v$.\marginnote{Deployed constructions agree.  \textsf{GHASH}, the universal
+% hash inside AES-GCM, evaluates the powers $H^1, \dots, H^m$ and never $H^0$;
+% Poly1305 likewise starts at $r^1$ and adds its mask separately.  Neither has a
+% constant term.}
+% 
+% This is the same failure as the missing trailing monomial, in a different
+% disguise: both are ways for $M(\cdot) - M^*(\cdot)$ to be cancelled out
+% entirely, one by appending zero blocks and one by the adversary's free choice
+% of constant.  The trailing monic term $v^{\ell+1}$ handles the message length;
+% starting the polynomial at $m_1 v$ rather than $m_1$ handles the offset.
+% Together they are exactly what the security argument needs when it observes
+% that $\big(M(\cdot) - M^*(\cdot)\big) + (z^* - z)$ is not identically zero.
+
+% After the lecture Adem asked me if in Carter-Wegman we could set $$v$$ to be $$k$$, right now it is defined as $$v = F(k, 0)$$.
+% 
+% I'm not aware of an efficient attack on the $$v = k$$ variant when instantiated with AES. However, you'd be relying on a key-dependent-input property AES was never analyzed for, in exchange for saving one block cipher call. You are now exposing many $$F(k, r) + M(k)$$ pairs, as opposed to $$F(k, r) + M(v)$$ pairs, where $$v$$ is unrelated to $$k$$. That trade is why the $$v = F(k, 0)$$ line is there.
+% 
+% Further, a repeated nonce lets the adversary recover the evaluation point $$v$$.  If you set $$v = k$$, you have lost your master key. So the damage is catastrophic, and not worth the saved block cipher call.
