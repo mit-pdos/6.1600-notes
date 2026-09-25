@@ -83,11 +83,23 @@ depends on the public key, but we elide that technical detail here.}
 \end{itemize}
 
 \paragraph{Correctness.}
-Informally, we want that for keypairs $(\sk, \pk)$ output by $\Gen$,
-we have that $F(\pk, \cdot)$ and $I(\sk, \cdot)$ are inverses of each other.
-More formally, for all $\lambda \in \N$, $(\sk, \pk) \gets \Gen(1^\lambda)$, and $x \in \calX$,
-we require:
-\[ I(\sk, F(\pk, x))= x.\]
+We want $F(\pk, \cdot)$ and $I(\sk, \cdot)$ to be mutually inverse
+permutations of $\cal X$.  Formally, for all $\lambda \in \N$,
+$(\sk, \pk) \gets \Gen(1^\lambda)$, and $x, y \in \calX$:
+\[ I(\sk, F(\pk, x)) = x \qquad\text{and}\qquad F(\pk, I(\sk, y)) = y. \]
+\marginnote{The second identity follows from the first when $\cal X$ is
+finite: $I \circ F = \mathrm{id}$ forces $F$ to be injective, hence a
+bijection on a finite set, so $I = F^{-1}$ and the two compose to the
+identity in either order.  We state both because the signature
+construction below needs the second, and because for a trapdoor one-way
+\emph{function} --- where $F$ need not be onto --- the second can fail.}
+
+%\paragraph{Correctness.}
+%Informally, we want that for keypairs $(\sk, \pk)$ output by $\Gen$,
+%we have that $F(\pk, \cdot)$ and $I(\sk, \cdot)$ are inverses of each other.
+%More formally, for all $\lambda \in \N$, $(\sk, \pk) \gets \Gen(1^\lambda)$, and $x \in \calX$,
+%we require:
+%\[ I(\sk, F(\pk, x))= x.\]
 
 \paragraph{Security.}
 Security requires that $F(\pk, \cdot)$ is hard to invert (in the sense of a one-way function)
@@ -174,14 +186,22 @@ inverting $F$ on an attacker-chosen point in its co-domain, which
 could be easy.
 
 \paragraph{Correctness.}
-For all $\lambda \in \N$, $(\sk, \pk) \gets \Gen(1^\lambda)$, and $m \in \zo^*$,
-we have:
-\begin{align*}
-\Ver(\pk, m, \Sign(\sk, m)) &= 1\{ F(\pk, I(\sk, H(m))) = H(m) \}\\
-&= 1\{ I(\sk, F(\pk, I(\sk, H(m)))) = I(\sk, H(m)) \}
+For all $\lambda \in \N$, $(\sk, \pk) \gets \Gen(1^\lambda)$ and
+$m \in \zo^*$, the signature is $\sigma = I(\sk, H(m))$, and
+verification recomputes $H(m)$ and checks
+$F(\pk, \sigma) = F(\pk, I(\sk, H(m))) = H(m)$,
+which holds by correctness of the trapdoor one-way permutation.
+Hence, $\Ver(\pk, m, \Sign(\sk, m)) = 1$.
+
+%\paragraph{Correctness.}
+%For all $\lambda \in \N$, $(\sk, \pk) \gets \Gen(1^\lambda)$, and $m \in \zo^*$,
+%we have:
+%\begin{align*}
+%\Ver(\pk, m, \Sign(\sk, m)) &= 1\{ F(\pk, I(\sk, H(m))) = H(m) \}\\
+%&= 1\{ I(\sk, F(\pk, I(\sk, H(m)))) = I(\sk, H(m)) \}
 \intertext{and by correctness of the trapdoor one-way permutation:}
-&= 1\{ I(\sk, H(m)) = I(\sk, H(m)) \} = 1.
-\end{align*}
+%&= 1\{ I(\sk, H(m)) = I(\sk, H(m)) \} = 1.
+%\end{align*}
 
 \paragraph{Security.}
 The intuition here is that if the adversary cannot invert $F$,
