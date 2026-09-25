@@ -375,18 +375,27 @@ Then
 
 
 
-\begin{lemma}\label{lemma:inv}
+\begin{theorem}\label{lemma:inv}
 Let $p$ and $q$ be distinct primes congruent to $4$ modulo $5$.
 Define the integer $d = \frac{\phi(N) - 4}{5} + 1$.
 Then $5d \equiv 1 \bmod \phi(N)$.
-\end{lemma}
+\end{theorem}
 
 \begin{proof}
-Observe that
-\[ p \equiv 4 \bmod 5 \quad \Rightarrow \quad \phi(N) - 4 \equiv 0 \bmod 5,\]
-so $\frac{\phi(N) - 4}{5}$ is an integer and thus $d$ is well defined.
-Then $5 d = \phi(N) - 4 + 5 = 1 \bmod \phi(N)$.
+  Since $p \equiv q \equiv 4 \pmod 5$, we have $p - 1 \equiv q - 1 \equiv
+  3 \pmod 5$, and so
+  \[ \phi(N) = (p-1)(q-1) \equiv 3 \cdot 3 = 9 \equiv 4 \pmod 5. \]
+  Hence $\phi(N) - 4 \equiv 0 \pmod 5$, so $\frac{\phi(N)-4}{5}$ is an
+  integer and $d$ is well defined.  Then
+  \[ 5d = \big(\phi(N) - 4\big) + 5 = \phi(N) + 1 \equiv 1 \pmod{\phi(N)}. \]
 \end{proof}
+
+%\begin{proof}
+%Observe that
+%\[ p \equiv 4 \bmod 5 \quad \Rightarrow \quad \phi(N) - 4 \equiv 0 \bmod 5,\]
+%so $\frac{\phi(N) - 4}{5}$ is an integer and thus $d$ is well defined.
+%Then $5 d = \phi(N) - 4 + 5 = 1 \bmod \phi(N)$.
+%\end{proof}
 
 
 \subsection{Inverting the RSA function}
