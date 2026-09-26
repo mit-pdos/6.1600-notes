@@ -290,7 +290,7 @@ a value $y \getsr \Z^*_N$ and must find a value $x$ such that $x^5 = y \bmod N$.
 Or, put another way, the attacker's task is essentially the following:
 \begin{itemize}
   \item \textbf{Given:} A polynomial $p(X) \deq X^5 - y \in \Z_N[X]$,
-                        for $y \getsr \Z*_N$.
+                        for $y \getsr \Z^*_N$.
   \item \textbf{Find:}  A value $x \in \Z^*_N$ such that $p(x) = 0 \in \Z^*_N$.
 \end{itemize}
 
@@ -361,7 +361,7 @@ number-theoretic tools.
 
 \subsection{Tools from number theory}
 For a natural number $N$, let $\phi(N)$ denote the number of integers
-in $\Z_N = \{0, 1, 2, 3, \dots, N\}$ that are relatively prime to $N$.
+in $\Z_N = \{0, 1, 2, 3, \dots, N-1\}$ that are relatively prime to $N$.
 When $p$ is prime $\phi(p) = p-1$.
 The function $\phi(\cdot)$ is called \emph{Euler's totient function}.
 
