@@ -308,11 +308,22 @@ know of essentially two ways to find roots of polynomials modulo $N$:
 \begin{itemize}
 \item \textbf{Factor $N$ into primes} and find a root modulo each of the primes.
       (We will say more on this in a moment.)
-      Since the best algorithms for factoring run in time roughly $2^{\sqrt[3]{\log N}} = 2^{\sqrt[3]{\lambda}}$,
+%      Since the best algorithms for factoring run in time roughly $2^{\sqrt[3]{\log N}} = 2^{\sqrt[3]{\lambda}}$,
       this approach is infeasible at present without knowing the factorization of $N$.
 %      \marginnote{In \cref{sec:fact} we present a factoring algorithm that runs
 %      in sub-exponential time $2^{\sqrt{\log N \log \log N}}$.
 %}
+Since the best known algorithm, the general number field sieve, runs in
+time
+\[ \exp\Big( \big(\sqrt[3]{64/9} + o(1)\big)
+   (\ln N)^{1/3} (\ln \ln N)^{2/3} \Big), \]
+this approach is infeasible at present without knowing the
+factorization of $N$.\marginnote{For a $2048$-bit modulus $N$ (that is,
+$\lambda = 1024$-bit primes) this is roughly $2^{117}$ operations. The
+largest RSA modulus factored to date is $829$ bits, which took about
+$2700$ core-years in 2020. Note that $\log N = 2\lambda$, so doubling
+the prime size more than doubles the security level: a $4096$-bit
+modulus costs about $2^{157}$.}
 
 \item \textbf{Find a root over the integers} and reduce it modulo $N$.\marginnote{Actually,
       it suffices to find a root over the rational numbers, but the distinction isn't important here.}
