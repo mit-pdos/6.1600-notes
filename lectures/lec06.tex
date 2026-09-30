@@ -290,7 +290,7 @@ a value $y \getsr \Z^*_N$ and must find a value $x$ such that $x^5 = y \bmod N$.
 Or, put another way, the attacker's task is essentially the following:
 \begin{itemize}
   \item \textbf{Given:} A polynomial $p(X) \deq X^5 - y \in \Z_N[X]$,
-                        for $y \getsr \Z^*_N$.
+                        for $y \getsr \Z*_N$.
   \item \textbf{Find:}  A value $x \in \Z^*_N$ such that $p(x) = 0 \in \Z^*_N$.
 \end{itemize}
 
@@ -336,8 +336,9 @@ factorization of $N$.
   X^2-3x+2 &= (X-2)(X-1) = 3 &&\mod N.
 \end{align*}\marginnote{There are many clever attacks 
 for solving polynomial equations modulo composites
-that work in certain special cases, but for most purposes
-these are the two known attacks.}
+that work in certain special cases.  The most important of these is
+Coppersmith's method (\cref{sec:coppersmith}), which applies whenever
+the root we are looking for is small.}
 When $y \getsr \Z_N$, the probability that $y$ is a perfect
 5-th power, and thus that there is an integral root to $X^5 - y$,
 is $\sqrt[5]{N}/N \approx 2^{-4\lambda/5}$, which is negligible
@@ -353,6 +354,70 @@ But for RSA-type polynomials, the answer is unclear.
 
 \end{itemize}
 
+\subsection{Coppersmith's method: finding small roots}
+\label{sec:coppersmith}
+There is a third way to find roots of a polynomial modulo $N$, which
+works without factoring $N$ but only when the root we seek is
+\emph{small}.
+
+\begin{theorem}[Coppersmith\autocite{Coppersmith97}]\label{thm:coppersmith}
+  Let $f(X) \in \Z_N[X]$ be a monic polynomial of degree $d$.  Then
+  there is a polynomial-time algorithm that finds all integers $x_0$
+  with $f(x_0) \equiv 0 \bmod N$ and
+  \[ |x_0| < N^{1/d}. \]
+\end{theorem}
+
+The method builds a lattice whose vectors correspond to polynomials
+that vanish at $x_0$ modulo a high power $N^k$, and then runs the LLL
+lattice-reduction algorithm\autocite{LLL82} to find a combination $g$
+whose coefficients are so small that $|g(x_0)| < N^k$.  But $g(x_0)$ is
+also a multiple of $N^k$, and the only multiple of $N^k$ smaller in
+absolute value than $N^k$ is zero.  So $g(x_0) = 0$ holds
+\emph{over the integers}, and we can recover $x_0$ by ordinary
+root-finding.\marginnote{In one sentence: lattice reduction converts a
+modular equation into an integer equation, and integer equations we
+know how to solve.  The bound $N^{1/d}$ is essentially the point at
+which $f(x_0)$ stops wrapping around the modulus.}
+
+The theorem also applies when $x_0$ is close to a \emph{known} value
+rather than close to zero: substituting $X = \tilde{x} + X'$ for a
+known guess $\tilde x$ turns ``$x_0$ is within $N^{1/d}$ of
+$\tilde x$'' into ``the root of the shifted polynomial is small.''
+This is what makes the method dangerous in practice, and it has
+several consequences for RSA.
+
+\begin{itemize}
+  \item \textbf{Partial knowledge of a prime factor is fatal.}  Given
+    roughly the top half of the bits of $p$---that is, $p = \tilde p +
+    x_0$ with $\tilde p$ known and $|x_0| < N^{1/4}$---one can factor
+    $N$ in polynomial time.  RSA keys tolerate no partial leakage of
+    their primes whatsoever.
+
+  \item \textbf{Structured primes are fatal.}  The ROCA
+    vulnerability\autocite{ROCA17} concerned a widely deployed library
+    that generated primes of the special form $p = k \cdot M +
+    (65537^a \bmod M)$ for a fixed constant $M$.  That structure leaves
+    few enough unknowns that Coppersmith's method factors the modulus:
+    1024-bit keys fell in a few hundred CPU-hours.  Affected keys were
+    identifiable \emph{from the public modulus alone}, and the flaw
+    forced a mass revocation of national identity certificates.
+
+  \item \textbf{A small private exponent is fatal.}  If $d <
+    N^{0.292}$, the modulus can be factored\autocite{BD99}, improving
+    an earlier bound of $N^{0.25}$ due to Wiener.  This is why we choose
+    a small \emph{public} exponent $e$ to speed up the forward
+    direction, and never a small private exponent $d$.
+\end{itemize}
+
+None of this breaks the scheme as we have presented it.  Full-domain
+hash applies the RSA function to $H(m)$, which is a uniform element of
+$\Z^*_N$ with no small or structured part, so \cref{thm:coppersmith}
+has no small root to find.  But it does sharpen the warning made
+earlier in this chapter: the RSA function is assumed hard to invert only on
+\emph{random} inputs, and Coppersmith's method is the concrete reason
+that inputs which are small, structured, or partially known are a
+different matter entirely.
+
 \section{The RSA construction: Inverse direction}
 
 To understand how the inversion algorithm works, we will need some
@@ -361,7 +426,7 @@ number-theoretic tools.
 
 \subsection{Tools from number theory}
 For a natural number $N$, let $\phi(N)$ denote the number of integers
-in $\Z_N = \{0, 1, 2, 3, \dots, N-1\}$ that are relatively prime to $N$.
+in $\Z_N = \{0, 1, 2, 3, \dots, N\}$ that are relatively prime to $N$.
 When $p$ is prime $\phi(p) = p-1$.
 The function $\phi(\cdot)$ is called \emph{Euler's totient function}.
 
@@ -455,10 +520,15 @@ That algorithm is more general, but the one we used in \cref{lemma:inv}
 is simpler and is self-contained.
 
 \paragraph{Inverting RSA is easy on a negligible fraction of points.}
-Recall the RSA is 
-If the preimage under the RSA function of a point $y$ is very very small,
-then 
-If $x < N^{1/5}$, then computing $x$ given $y = x^5 \bmod N$ is \emph{easy}.
+If the preimage $x$ of a point $y$ under the RSA function is very small,
+inverting the function is \emph{easy}: when $x < N^{1/5}$, the value
+$x^5$ never wraps around the modulus, so $y = x^5$ holds over the
+integers and we can recover $x$ by taking an ordinary fifth root.
+More generally, \cref{thm:coppersmith} recovers $x$ whenever it lies
+within $N^{1/5}$ of a value we can guess.  For a uniformly random
+$y \getsr \Z^*_N$ such an $x$ occurs only with negligible
+probability $\approx 2^{-4\lambda/5}$, which is why the RSA assumption
+is stated for random inputs.
 
 
 \paragraph{Is inverting RSA as hard as factoring the modulus $N$?}
