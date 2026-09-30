@@ -358,9 +358,9 @@ But for RSA-type polynomials, the answer is unclear.
 \label{sec:coppersmith}
 There is a third way to find roots of a polynomial modulo $N$, which
 works without factoring $N$ but only when the root we seek is
-\emph{small}.
+\emph{small}.\autocite{Coppersmith97}
 
-\begin{theorem}[Coppersmith\autocite{Coppersmith97}]\label{thm:coppersmith}
+\begin{theorem}[Coppersmith]\label{thm:coppersmith}
   Let $f(X) \in \Z_N[X]$ be a monic polynomial of degree $d$.  Then
   there is a polynomial-time algorithm that finds all integers $x_0$
   with $f(x_0) \equiv 0 \bmod N$ and
