@@ -237,7 +237,7 @@ message into $\lambda$-sized blocks $[m_1, \ldots, m_n]$ and successively hashes
 In the following pseudocode,
 the function $\mathsf{ToBlock}$ converts an integer, representing the length of the input message
 in blocks, into a $\lambda$-bit string.
-Then the Merkle-Damg\aa{}rd construction is:
+Then, the Merkle-Damg\aa{}rd construction is as in Figure \ref{fig:md}.
 \begin{figure}
 \begin{framed}
 \noindent
@@ -364,7 +364,7 @@ with a hash function that has $\lambda$-bit outputs, you will find a collision
 among these inputs with constant probability.}
 An important thing to understand when dealing with hash functions is the ``Birthday Paradox,'' 
 which states that given a hash function with $\lambda$-bit output, you can 
-always find a collision in time $O(\sqrt{2^\lambda}) = O(2^{\lambda/2})$.
+find a collision in expected time $O(\sqrt{2^\lambda}) = O(2^{\lambda/2})$.
 So, if you want to force an attacker to use at least $2^{128}$ to find a collision,
 you must use a hash function with at least 256 bits of output.
 
