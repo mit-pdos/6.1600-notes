@@ -219,7 +219,7 @@ The algorithms are:
         \item Use this key to compute the ciphertext using the one-time pad: 
           output $c \gets (r, k \xor m) \in \zo^{2n}$.
       \end{itemize}
-	\item $\Dec(k, c)$:
+	\item $\Dec(k, c) \to m$:
         \begin{itemize}
           \item Parse the ciphertext $c$ into $(r, c')$.
           \item Compute $m \gets c' \xor F(k, r)$.
@@ -377,7 +377,7 @@ Because there is no randomness involved in the encryption process, the same mess
 If an encryption scheme is deterministic, an adversary can easily win the $\INDCPA$ game:
 \begin{enumerate}
     \item The adversary selects two messages $m_0$ and $m_1$.
-    \item The challenger encrypts one, $c^* = Enc(\mathsf{pk}, m_b)$, and returns it.    \item The adversary simply computes $c_0 = m_0^e \pmod n$ and $c_1 = m_1^e \pmod n$ using the public key.
+    \item The challenger encrypts one, $c^* = Enc(\mathsf{pk}, m_b)$, and returns it.    \item The adversary simply computes $c_0 = m_0^e \pmod N$ and $c_1 = m_1^e \pmod N$ using the public key.
     \item By comparing $c^*$ to $c_0$ and $c_1$, the adversary knows $b$ with $100\%$ certainty.
 \end{enumerate}
 
