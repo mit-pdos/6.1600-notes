@@ -114,6 +114,13 @@ the following game with probability at most $\tfrac{1}{2}$ + ``negligible:''
           So, if the message space $\calM$ contains messages of different
           lengths, our security definition requires the adversary to distinguish
           the encryption of two messages of the \emph{same} length.}
+\marginnote{Note that there is \emph{no} requirement that $m^*_0$ and
+$m^*_1$ be distinct from the messages $m_1, \dots, m_n$ queried earlier;
+either or both may be repeats.  This differs from our MAC definition,
+where the forgery had to be on a fresh message.  Allowing repeats here
+is essential: the attack below showing that deterministic encryption is
+insecure works by submitting a previously queried message as part of the
+challenge pair.}
 
     \item The challenger replies with $c^* \gets \Enc(k, m^*_b)$.
 		\item The adversary outputs a value $b' \in \bin$. The adversary wins if $b=b'$. 
@@ -125,7 +132,8 @@ for encryption schemes is:
 \begin{center}
 \emph{For an encryption scheme to be secure in any meaningful sense,\\
 the encryption algorithm \textbf{must} be randomized}.
-\end{center}\marginnote{In contrast, secure MACs can be---and typically are---deterministic!}
+\end{center}
+\marginnote{In contrast, secure MACs can be---and typically are---deterministic!}
 
 If the encryption algorithm is deterministic (i.e., not randomized),
 an attacker can win the CPA security game in \cref{defn:cpa}
@@ -198,7 +206,7 @@ What we effectively need is a way to generate many bits of random-looking keys
 from a single short random string.
 
 To generate this, we can use a pseudorandom function! 
-\marginnote{If you forget what a pseudorandom function is, refer back to \cref{defn:prf}.}
+%\marginnote{If you forget what a pseudorandom function is, refer back to \cref{defn:prf}.}
 In particular, we would like a pseudorandom 
 function of the form $F \colon \bin^n \times \bin^n \rightarrow \bin^n$. 
 \marginnote{In practice, we will use AES or another block cipher
