@@ -207,7 +207,8 @@ There are a few optimizations that AES-GCM uses beyond what we have described:
   \item AES-GCM derives both the encryption and MAC keys from a single short key
         using a pseudorandom function.
   \item AES-GCM implements a fast form of the Carter-Wegman MAC that does not 
-        need arithmetic modulo a big prime $p$, as the scheme described in \cref{sec:mac:cw} does.
+        need arithmetic modulo a big prime $p$.
+% as the scheme described in \cref{sec:mac:cw} does.
         Instead, of defining the MAC using $\Z_p$ (integers mod a 128-bit prime $p$),
         GCM works with 128-bit strings.
         The GCM mode of operation replaces addition modulo $p$ with XOR of 128-bit strings
@@ -217,7 +218,7 @@ There are a few optimizations that AES-GCM uses beyond what we have described:
         coefficients in $\Z_2 = \{0,1\}$. Multiply the polynomials, reducing the 
         coefficients modulo $2$. Then reduce the resulting polynomial modulo some 
         fixed polynomial of degree-$128$. Then interpret the result as a $128$-bit string.} 
-        (Formally, the scheme works over the field $\F_{2^{128}}$ of order $2^{128}$.)
+        Formally, the scheme works over the field $\F_{2^{128}}$ of order $2^{128}$.
         This gives a big performance boost with no loss in security.
 \end{itemize}
 
