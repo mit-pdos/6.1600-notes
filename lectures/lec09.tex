@@ -159,14 +159,14 @@ The decryption routine first checks the MAC tag, then decrypts the ciphertext.
 
 Using independent keys $(k_\mathsf{Enc}, k_\mathsf{MAC})$ is important 
 in encrypt-then-MAC, as in many other cryptographic constructions.
-For example, a CPA-secure encryption scheme using $n$-bit keys can reveal
-the low order $n/2$ bits of its secret key in the ciphertext.
-And a secure MAC scheme using $n$-bit keys can reveal the high-order
-$n/2$ bits of its secret key in each MAC tag.
+For example, a CPA-secure encryption scheme using $2n$-bit keys can reveal
+the low order $n$ bits of its secret key in the ciphertext.
+And a secure MAC scheme using $2n$-bit keys can reveal the high-order
+$n$ bits of its secret key in each MAC tag.
 Used independently, the encryption scheme and the MAC scheme are both
-secure.
-Used together with the same key $k$, the attacker learns all $n$ bits
-of the key $n$ and can break both primitives!
+secure, each with security parameter $n$.
+Used together with the same key $k$ with $2n$ bits, the attacker learns all $2n$ bits
+of the key and can break both primitives!
 
 So, in general, you should always use independent keys for different primitives.
 To reduce the amount of keying material parties need to store, it is actually 
@@ -175,7 +175,7 @@ and derive all subsequent keys from the pseudorandom strings $F(k, 0), F(k, 1), 
 
 \begin{theorem}[Informal]
 The Encrypt-then-MAC construction yields a CCA-secure encryption scheme,
-provided that: the underlying encryption scheme is CPA-secure and the
+provided that the keys are generated independently, and the underlying encryption scheme is CPA-secure and the
 underlying MAC scheme is secure (existentially unforgeable against adaptive chosen message attacks).
 \end{theorem}
 
