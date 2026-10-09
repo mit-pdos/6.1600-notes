@@ -129,15 +129,15 @@ Even if randomized for CPA security, ``textbook'' RSA and simple padding covered
 
 \subsection{The Homomorphic Property}
 RSA has a multiplicative homomorphic property:
-\[ (m_1)^e \cdot (m_2)^e \equiv (m_1 \cdot m_2)^e \pmod n \]
-This allows an attacker to manipulate a ciphertext $c = m^e \pmod n$ into a new ciphertext $c' = c \cdot 2^e \pmod n$. 
+\[ (m_1)^e \cdot (m_2)^e \equiv (m_1 \cdot m_2)^e \pmod N \]
+This allows an attacker to manipulate a ciphertext $c = m^e \pmod N$ into a new ciphertext $c' = c \cdot 2^e \pmod N$. 
 
 \subsection{The Attack}
 In an IND-CCA2 game, the adversary is allowed to use a Decryption Oracle:
 \begin{enumerate}
-    \item Adversary receives challenge $c^* = m_b^e \pmod n$.
+    \item Adversary receives challenge $c^* = m_b^e \pmod N$.
     \item Adversary cannot ask the Oracle to decrypt $c^*$.
-    \item However, they can compute $c' = c^* \cdot 2^e \pmod n = (2m_b)^e \pmod n$.
+    \item However, they can compute $c' = c^* \cdot 2^e \pmod N = (2m_b)^e \pmod N$.
     \item Since $c' \neq c^*$, the Oracle decrypts it and returns $m' = 2m_b$.
     \item The adversary divides $m'$ by 2 to recover the original message $m_b$.
 \end{enumerate}
