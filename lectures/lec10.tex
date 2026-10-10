@@ -89,10 +89,9 @@ more structured problems (e.g., based on number theory).}
 The version we will see uses large primes $p$ 
 and $q$ a public parameters, along with a number $g \in \Z^*_p$,
 called the ``generator.''
-(\textbf{Warning:} The parameters $p$, $q$, and $g$ must have
-some particular relation. So do not attempt to pick these parameters
-yourself.)
-Typically, we will have $p \approx q \approx 2^{2048}$.
+\marginnote{(\textbf{Warning:} The parameters $p$, $q$, and $g$ must have
+a particular relation. Namely, $q \mid p-1$ and $g$ has order $q$.}
+Typically, we will have $p \approx q \approx 2^{2048}$, and a special case is $p = 2q + 1$, a safe prime.
 \marginnote{For a prime $p$, the 
 notation $\Z^*_p$ just denotes 
 the non-zero integers modulo $p$.
@@ -186,7 +185,7 @@ for a suitable choice of $p$, $q$, and $g$, and for all adversaries $\calA$:
 
 
 \section{The discrete-log problem}
-The DDH assumption (\cref{defn:ddh}) is no harder than the following
+The DDH assumption (Definition \ref{defn:ddh}) is no harder than the following
 problem, which asserts that computing $x$ given $(g, g^x) \in (\Z_p^*)^2$
 is computationally infeasible:
 \begin{definition}[Discrete-log assumption]
@@ -416,22 +415,30 @@ and $g \in \Z^*_p$.
   instantiate ElGamal encryption, instead of $\Z^*_p$.
   But the general principle is exactly the same.}
 
-Let $H: \Z^*_p \rightarrow \bin^*$ be a hash function (modelled as a random oracle). Let $(\Enc', \Dec')$ 
+Let $H \colon \langle g \rangle \to \calK'$ be a hash function
+(modelled as a random oracle), where $\calK'$ is the key space of the
+authenticated-encryption scheme $(\Enc', \Dec')$ --- in practice
+$\calK' = \zo^{128}$ or $\zo^{256}$.
+\marginnote{Group elements must be hashed under a canonical
+fixed-length encoding, so that both parties feed $H$ the same bit
+string. For elliptic curves this is typically the compressed-point
+encoding.}
+Let $(\Enc', \Dec')$ 
 be a symmetric-key authenticated-encryption scheme. Then define:
 
 \begin{compactitem}
 \item $\Gen() \to (\sk, \pk)$:
     \begin{itemize}[noitemsep]
-          \item Choose $a \gets \{1, \dots, q\}$.
+          \item Choose $a \getsr \{1, \dots, q\}$.
           \item Compute $A \gets g^a \in \Z^*_p$.
           \item Output $(\sk, \pk) \gets (a, A)$.	
     \end{itemize}
   \item $\Enc(\pk, m) \to c$:
     \begin{itemize}[noitemsep]
-      \item Choose $r \gets \{1, \dots, q\}$.
+      \item Choose $r \getsr \{1, \dots, q\}$.
       \item Compute $R \gets g^r \in \Z^*_p$.
       \item Compute $k \gets H(\pk^r \in \Z^*_p)$.
-      \item Output $c \gets (R, \Enc'(k, m)$.
+      \item Output $c \gets (R, \Enc'(k, m))$.
     \end{itemize}
 
   \item $\Dec(\sk, c) \to m$:
@@ -443,16 +450,66 @@ be a symmetric-key authenticated-encryption scheme. Then define:
 \end{compactitem}
 \end{definition}
 
+\subsection{Correctness}
+Correctness of hashed ElGamal reduces to two facts: that the sender and
+the recipient derive the \emph{same} symmetric key $k$, and that the
+underlying authenticated-encryption scheme is itself correct.
+
+Fix a key pair $(\sk, \pk) = (a, A) \gets \Gen()$, so that $A = g^a \in
+\Z_p^*$, and fix a message $m \in \calM$.  Encrypting $m$ samples a
+value $r \getsr \{1, \dots, q\}$ and produces the ciphertext
+\[
+  c = \big(R,\; c'\big), \qquad
+  R = g^r \in \Z_p^*, \qquad
+  c' = \Enc'(k, m), \qquad
+  k = H\big(A^r\big).
+\]
+Decryption parses $c$ as $(R, c')$ and computes its own key
+$k' = H(R^a)$.  These two keys are equal:
+\[
+  k' \;=\; H\big(R^{a}\big)
+     \;=\; H\big((g^{r})^{a}\big)
+     \;=\; H\big(g^{ra}\big)
+     \;=\; H\big(g^{ar}\big)
+     \;=\; H\big((g^{a})^{r}\big)
+     \;=\; H\big(A^{r}\big)
+     \;=\; k.
+\]
+The middle equality is nothing more than the commutativity of
+multiplication in the exponent, $ra = ar$---exactly the fact that makes
+Diffie-Hellman key exchange correct in \cref{sec:dh}.  The remaining
+equalities hold because $H$ is a deterministic function, so equal inputs
+produce equal outputs.\marginnote{This is where we rely on group elements
+being hashed under a \emph{canonical} fixed-length encoding: the two
+parties must feed $H$ the identical bit string, not merely two encodings
+of the same group element.}
+
+Since the two parties hold the same key, correctness of the
+authenticated-encryption scheme $(\Enc', \Dec')$ finishes the argument:
+\[
+  \Dec(\sk, c)
+    \;=\; \Dec'\big(k', c'\big)
+    \;=\; \Dec'\big(k, \Enc'(k, m)\big)
+    \;=\; m.
+\]
+
+Note that this holds for \emph{every} choice of $a$ and $r$, not merely
+with high probability, so hashed ElGamal is perfectly
+correct.\marginnote{Correctness uses only that $H$ is a deterministic
+function---it does not need $H$ to be a random oracle, or even
+collision resistant.  The random-oracle assumption on $H$ is needed
+solely for the security argument.}
+
+\subsection{Security}
+If we model the hash function $H$ as a random oracle, 
+we can prove CCA security of ElGamal encryption from 
+(a) the computational Diffie-Hellman assumption (Definition \ref{defn:cdh}) and
+(b) the CCA security of the underlying authenticated-encryption
+scheme $(\Enc', \Dec')$.
+
 \subsection{Performance}
 The performance of this scheme is limited by the exponentiations---the symmetric encryption scheme is quite fast (gigabytes per second), but a single exponentiation can take a millisecond on modern processors. For encryption, this scheme requires two exponentiations ($g^r$ and $\pk^r$). Decryption requires one exponentiation $(R^\sk)$.
 To speed up the encryption routine, we can precompute powers of $g$: $g^2, g^4, g^8, g^{16}, \dots$, which saves a factor of two in exponentiations.
 \marginnote{Hashed ElGamal encryption is one of the most common public-key encryption
 schemes used today.}
-
-\subsection{Security}
-If we model the hash function $H$ as a random oracle, 
-we can prove security of ElGamal encryption from 
-(a) the computational Diffie-Hellman assumption (\cref{defn:cdh}) and
-(b) the CCA security of the underlying authenticated-encryption
-scheme $(\Enc', \Dec')$.
 
