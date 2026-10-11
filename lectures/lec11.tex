@@ -298,10 +298,23 @@ For example, the install script might consist of a
 single function definition that is called at the very 
 end of the function.
 
-\paragraph{Plaintext Length Obfuscation}
-As we have discussed, encryption reveals exactly
-the length of the plaintext. If there is data that
-is not encrypted that is then included inside the
-encrypted data as well, this can cause
-a vulnerability---see the CRIME attack.
-% TODO: Finish this up. It's a clever attack.
+\paragraph{Plaintext Length Obfuscation.}
+As we have discussed, encryption reveals exactly the length of the
+plaintext.  This becomes dangerous when attacker-controlled data and
+secret data are compressed together \emph{before} being encrypted, since
+the compressed length then depends on the \emph{content} of the secret.
+This is the CRIME attack\autocite{crime}, which recovered TLS session
+cookies one character at a time.\marginnote{The attacker makes the
+victim's browser issue requests whose path it controls, so that the
+guess and the secret cookie land in the same compression window.  A
+correct guess compresses to a back-reference and the ciphertext is one
+byte shorter; a wrong guess is not.  Reading off the length turns a
+$256^{16}$ search into a $16 \times 256$ one.  Note that the cipher is
+never broken---the entire leak is in the length, which is exactly what
+our CPA security definition declines to protect when it requires
+$\abs{m_0} = \abs{m_1}$.}
+TLS compression was removed in response, but the follow-up
+attack BREACH\autocite{breach} applies the same idea to HTTP response
+compression, which cannot simply be turned off; defending against it
+requires application-level measures such as not reflecting user input
+into responses that contain secrets.
