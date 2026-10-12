@@ -223,11 +223,17 @@ set of goals:
         cryptographic keys for key exchange and encryption.
         Protocol participants delete these ephemeral keys on
         connection teardown and/or they rotate these keys often.
-
         This way, if an attacker compromises a party's secret key,
         the attacker can only sign messages on behalf of that party;
         the attacker cannot use the secret to decrypt past messages.}
-      \item \textbf{Protection against key-compromise impersonation:} If an attacker steals a client's secret key, the attacker should not be able to impersonate other servers to the client.
+      \item \textbf{Protection against key-compromise impersonation:} If an
+        attacker steals a client's secret key, the attacker should not be able
+        to impersonate other servers to the client.\marginnote{This is subtler
+        than it looks, and we return to it below.  Stealing the client's key
+        obviously lets the attacker impersonate \emph{the client} to others;
+        that much is unavoidable.  The requirement runs the other way: it must
+        not also let the attacker impersonate \emph{everyone else} to the
+        client.}
       \item \textbf{Protection of endpoint
         identities:} The public keys of the two
         parties should never flow over the wire in
@@ -240,7 +246,41 @@ set of goals:
         hosted on Akamai or Cloudflare.
 \end{compactitem}
 
+\paragraph{Key-compromise impersonation.}
+Suppose the two parties
+authenticated each other using \emph{static} Diffie-Hellman keys: the
+client holds $a$ with $A = g^a$, the server holds $b$ with $B = g^b$,
+and the session key is $k = H(g^{ab})$.  Authentication here is
+implicit---only the two genuine parties can compute $k$.  Now suppose an
+attacker steals the client's key $a$.  For \emph{any} server, with
+public key $B$, the attacker can compute
+\[
+  g^{ab} = B^{a},
+\]
+using only the stolen key and the server's public key.  It can therefore
+impersonate every server on the Internet to this one client, without
+attacking any of those servers.  The problem is that the shared secret
+is symmetric in the two long-term keys, so holding either one is as good
+as holding the other.
+
+Signing fixes this.  If the server authenticates by signing the
+handshake transcript, as in \cref{sec:tls-handshake}, an attacker
+holding $a$ still cannot produce that signature: authentication becomes
+one-directional, and the server proves possession of something the
+client never had.\marginnote{Note that this is the same design choice
+described above.  Using long-term secrets \emph{only} for signing, and
+ephemeral keys for key exchange, buys forward secrecy and
+key-compromise-impersonation resistance together---one decision, two
+properties.}
+TLS~1.2 permitted static Diffie-Hellman and static RSA, and practical
+attacks of this kind were demonstrated against real
+browsers\autocite{kci2015}.  TLS~1.3 removes those modes entirely:
+every handshake uses ephemeral key exchange and a signature over the
+transcript, so the property follows from the shape of the protocol
+rather than from configuring it correctly.
+
 \subsection{TLS Handshake}
+\label{sec:tls-handshake}
 The TLS handshake is very carefully designed to achieve these properties. A grossly simplified version looks something like the following:
 
 \begin{compactenum}
