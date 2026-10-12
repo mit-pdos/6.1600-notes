@@ -318,10 +318,11 @@ The TLS handshake is very carefully designed to achieve these properties. A gros
 		\item a ciphersuite to use,
 		\item and an ephemeral Diffie-Hellman public key
 	\end{compactitem}
-\item Both partices compute a shared session key $k$
+\item Both parties compute a shared session key $k$
   using Diffie-Hellman key agreement on the ephemeral keys 
   they exchanged.
-\item Under encryption using the keys derived from the session key $k$, the server sends the certificate for \ttt{mit.edu} as well as a signature over all messages sent so far, using its long-term secret key $\sk_\text{MIT}$. The client then checks that:
+\item Under encryption using the keys derived from the session key $k$, the server sends the certificate for \ttt{mit.edu} as well as a signature over all messages sent so far, using its long-term secret key $\sk_\text{MIT}$.
+\item The client then checks that:
 	\begin{compactitem}
 	\item the certificate has been signed by one of the client's trusted CAs, and
 	\item the signature from the server matches their own record of the messages.
@@ -334,7 +335,66 @@ does not provide many of the features that the real TLS handshake
 provides. But it should give you a flavor of what the real 
 handshake looks like.
 
-% TODO: protection of endpoint identities
+\subsection{Ephemeral keys, forward secrecy, and transcript signing}
+\label{sec:tls:ephemeral}
+
+Three design choices do most of the work in the handshake above.  We
+describe them at a high level here; the real protocol is considerably
+more involved.
+
+\paragraph{Ephemeral keys.}
+The Diffie-Hellman keys exchanged in steps 2 and 3 are \emph{ephemeral}:
+each party runs the ordinary key-generation algorithm of
+the Diffie-Hellman key exchange lecture afresh for every connection, sampling $x \getsr
+\{1, \dots, q\}$ and sending $g^x$.  These keys have nothing to do with
+the server's long-term signing key $\sk_\text{MIT}$.  Note that the
+client must generate and send its share before it has heard anything
+from the server, so it guesses which group the server supports; if it
+guesses wrong, the server says so and the client generates a new
+keypair for the group the server names.\marginnote{Both parties then
+compute the shared secret $g^{xy}$, but neither uses it as a key
+directly.  The secret is passed through a hash
+function---in TLS, a key-derivation function---to produce the
+encryption and authentication keys for the rest of the connection.  The
+derivation also mixes in a hash of every handshake message sent so far,
+so the two parties end up with the same keys only if they saw the same
+conversation.}
+
+\paragraph{Forward secrecy.}
+When the handshake completes, both parties \emph{delete} their
+ephemeral secrets $x$ and $y$.  This is what gives forward secrecy: an
+attacker who records the encrypted traffic today and compromises the
+server tomorrow finds nothing on the server that decrypts the recording,
+because the only secret that could have done so no longer exists.  The
+long-term key $\sk_\text{MIT}$ is of no help, since it was never used to
+encrypt anything.
+
+\paragraph{Signing the transcript.}
+How, then, does the client know it ran the key exchange with
+\texttt{mit.edu} and not with an in-network attacker?  The ephemeral
+public keys are unauthenticated when they are sent, so the server
+authenticates them \emph{after the fact}: in step 5 it signs a hash of
+the entire handshake transcript---every message exchanged so far,
+including both ephemeral public keys, the nonces, and the negotiated
+ciphersuite---under $\sk_\text{MIT}$, and sends that signature together
+with its certificate.\marginnote{Signing the whole transcript, rather
+than just the server's own ephemeral key, is what makes the other
+handshake properties fall out.  An attacker who tampered with any
+earlier message---say, to force a downgrade to an older version of
+TLS---changes the transcript, so the signature no longer verifies.  And
+because the signature is itself sent \emph{encrypted} under keys
+derived from $g^{xy}$, the server's certificate never travels in the
+clear, which is what protects the endpoint identities.}
+The client checks the certificate against its trusted certificate
+authorities and checks the signature against its own record of the
+messages.  If both pass, the client knows that the party on the other
+end of this particular key exchange holds $\sk_\text{MIT}$.
+
+Observe that $\sk_\text{MIT}$ is used only to \emph{sign}, never to
+encrypt or to derive keys.  This single choice is what buys both
+forward secrecy and resistance to key-compromise impersonation: an
+attacker who steals a long-term key can sign messages from that point
+on, but cannot read past traffic and cannot impersonate anyone else.
 
 \section{Properties that TLS does not provide}
 
