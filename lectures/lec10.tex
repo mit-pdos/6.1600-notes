@@ -120,10 +120,10 @@ the computational efficiency of the scheme:
 
 \paragraph{Efficiency.} In order for the algorithm to be useful,
 Alice and Bob must be able to compute $g^x \in \Z^*_p$ efficiently,
-for $x \in \{1, \dots, q \approx 2^{2048}\}$.
-However, trying to compute $g^x$ where $x$ is 2048
+for $x \in \{1, \dots, q \approx 2^{256}\}$.
+However, trying to compute $g^x$ where $x$ is $256$
 bits long naively would certainly not be
-efficient: it would require $x \approx 2^{2048}$ multiplications!
+efficient: it would require $x \approx 2^{256}$ multiplications!
 However, we can compute this exponentiation much more efficiently using
 the following strategy:
 \begin{itemize}[noitemsep]
@@ -133,7 +133,7 @@ the following strategy:
         where all of these are in $\Z^*_p$.
         It is possible to compute $g^{2^{i}}$ with a single multiplication
         modulo $p$ as $g^{2^i} = (g^{2^{(i-1)}})^2 \in \Z^*_p$.
-        So this step takes only $\ell = 2048$ multiplications.
+        So this step takes only $\ell = 256$ multiplications.
         \marginnote{In many applications, the generator $g$ is fixed in advance.
         In this case, the implementation can precompute and store these powers of $g$.}
   \item \textbf{Compute exponentiation.}
@@ -409,7 +409,7 @@ Diffie-Hellman already having been published.}
 \begin{definition}[Hashed ElGamal Encryption]
 Let $p$, $q$, and $g$ be integers of the sort we use for Diffie-Hellman
 key exchange (\cref{sec:dh}).
-In particular, $p \approx q \approx 2^{2048}$
+In particular, $p \approx 2^{2048}$, and $q \approx 2^{256}$
 and $g \in \Z^*_p$.
   \marginnote{In practice, we typically use elliptic-curve groups to 
   instantiate ElGamal encryption, instead of $\Z^*_p$.
