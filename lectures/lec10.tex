@@ -128,7 +128,7 @@ However, we can compute this exponentiation much more efficiently using
 the following strategy:
 \begin{itemize}[noitemsep]
   \item \textbf{Compute powers of $g$.}
-        Write $\ell \gets \lceil \log_2 p \rceil$.
+        Write $\ell \gets \lceil \log_2 q \rceil$.
         Then compute $(g, g^2, g^4, g^{8}, g^{16}, \dots, g^{2^\ell})$,
         where all of these are in $\Z^*_p$.
         It is possible to compute $g^{2^{i}}$ with a single multiplication
