@@ -427,20 +427,16 @@ so---exactly as with masking---there is no window to jump into.  In
 practice engines reserve enough address space that a $32$-bit index
 cannot escape it, and the hardware performs the check for free.}
 
-% It is worth being precise about what this does and does not buy.
-% WebAssembly makes the boundary \emph{between} the sandbox and its host
-% unbreakable by construction, but it provides no memory safety
-% \emph{within} the sandbox.  Code compiled from C or C++ keeps a
-% ``shadow stack'' of address-taken local variables inside the program's
-% own memory array, so an ordinary buffer overflow can still corrupt that
-% program's data, or overwrite a table index so that an indirect call
-% reaches a different function \emph{of the same type}.  Classic
-% memory-corruption bugs therefore remain exploitable inside a
-% WebAssembly module---in some respects more easily than in native code,
-% since the sandbox has no stack canaries, no address-space layout
-% randomization, and no guard pages between
-% allocations.\marginnote{WebAssembly is in this sense a hybrid of the
-% techniques in this chapter: it gives roughly the safety of emulation
-% (\cref{sec:emulation}) at close to the speed of code running directly
-% on the hardware, which is why browsers have largely moved to it for
-% running untrusted code.}
+It is worth being precise about what this does and does not buy.
+WebAssembly makes the boundary \emph{between} the sandbox and its host
+unbreakable by construction, but it provides no memory safety
+\emph{within} the sandbox.  Code compiled from C or C++ keeps a
+``shadow stack'' of address-taken local variables inside the program's
+own memory array, so an ordinary buffer overflow can still corrupt that
+program's data, or overwrite a table index so that an indirect call
+reaches a different function \emph{of the same type}.  Classic
+memory-corruption bugs therefore remain exploitable inside a
+WebAssembly module---in some respects more easily than in native code,
+since the sandbox has no stack canaries, no address-space layout
+randomization, and no guard pages between
+allocations.
