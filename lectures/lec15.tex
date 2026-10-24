@@ -11,7 +11,7 @@ component from interfering with the execution of other code in the system.
 We often refer to separate isolated components as running in
 separate \emph{isolation domains}.
 
-Ideally, we could have each isolation domain run on 
+Ideally, we could have each isolation domain run on a
 separate physical computer.
 If this were the case, (modulo physical side-channel attacks)
 one domain would clearly not be able to touch another's state.
@@ -31,7 +31,7 @@ In order to define isolation, we will think about two key properties: integrity 
 \subsection{(Weak) Integrity}
 One property that we would like an isolation scheme
 to provide is \emph{integrity}:
-one domain cannot modifying the state of another
+one domain cannot modify the state of another
 domain. To formalize this, let's consider two
 domains running on a single host, an adversary
 domain $A$ and a victim domain $V$. We would like
@@ -316,43 +316,131 @@ an isolation mechanism must answer:
   
 \end{enumerate}
 
-
 \subsection{Software interposition}
+A final isolation technique that we will discuss is \emph{software
+interposition}.  Say that an isolated program contains an indirect
+call and an array access, in two unrelated places:
+\begin{verbatim}
+    var f = ....;
+    f();
+      ...
+    var a = b[c];
+\end{verbatim}
+When using software isolation, a compiler can insert a check in front
+of the array access, to make sure that \texttt{b[c]} does not read
+out-of-bounds memory:\marginnote{We write the two fragments in this
+order, with an ellipsis between them, to emphasize that they need not
+be near each other: the call and the instrumented access may sit in
+different functions, in different source files, or in either order.}
+\begin{verbatim}
+              ...
+              if c >= b.size: error
+      (***)   load b+c -> a
+\end{verbatim}
+After inserting these checks, the isolated code can run directly on
+hardware: the checks ensure that the isolated code cannot touch any
+state outside of its isolated context.
 
-A final isolation technique that we will discuss
-is \emph{software interposition}.
-Say that an isolated program wants to run the following code:
-\begin{lstlisting}
-var a = b[c];
-var f = ....;
-f();
-\end{lstlisting}
+\paragraph{The problem: indirect control transfers.}
+The argument above rests on an invariant that the code as written
+appears to guarantee, but does not: \emph{the load at
+\texttt{(***)} is only ever reached by falling through the check
+above it}.  Straight-line code preserves this invariant.  An
+\emph{indirect} control transfer does not.  When the isolated program
+calls the function \texttt{f}, the hardware executes something like
+\begin{verbatim}
+    jump *f
+\end{verbatim}
+which transfers control to whatever address is stored at
+\texttt{f}---and nothing so far prevents that address from being
+\texttt{(***)} itself.  An adversarial isolated program can therefore
+do the following:
+\begin{verbatim}
+    c = <any out-of-bounds offset>
+    f = address of (***)
+    jump *f
+\end{verbatim}
+Control arrives \emph{directly at the load}.  The bounds check sits
+upstream of \texttt{(***)} and is simply never executed, and the
+program reads memory outside its domain.\marginnote{The call site has
+nothing to do with the access it subverts.  \emph{Any} indirect control
+transfer anywhere in the program---a function pointer, a virtual method
+dispatch, a return address on the stack---can be made to target
+\texttt{(***)}.  The danger is \emph{entering the instrumented code
+between the check and the access it guards}.}
 
-When using software isolation, a compiler can insert checks
-into this isolated program to make sure that the memory access
-\texttt{b[c]} does not access out-of-bounds memory:
-\begin{lstlisting}
-if c >= b.size: error;
-load b+c -> a             (***)
-\end{lstlisting}
-After inserting these checks,
-the isolated code can run directly on hardware,
-since the checks ensure that the isolated code cannot touch 
-any state outside of its isolated context.
+This is the central challenge of software interposition.  Inserting a
+bounds check is easy; guaranteeing that the check cannot be bypassed is
+a property of \emph{every} indirect control transfer in the program,
+and so is global rather than local.
 
-A central challenge of using software interposition is handling
-function calls.
-When calling the function \texttt{f} in the code snippet above,
-the hardware might execute an instruction like:
-\begin{lstlisting}
-jump *f
-\end{lstlisting}
-which would execute the code at the location stored in 
-memory location \texttt{*f}.
+\paragraph{Masking instead of checking.}
+The standard answer is to arrange that there is no check to skip.
+Rather than testing the address and branching, the compiler
+\emph{forces} the address into the domain's range with arithmetic:
+\begin{verbatim}
+    addr = (b + c) & mask
+    load addr -> a
+\end{verbatim}
+If the domain occupies an aligned, power-of-two-sized region of memory,
+a single bitwise \texttt{and} truncates any address to one inside that
+region.  This is the key idea behind \emph{software fault
+isolation}.
+Now an adversary who jumps directly
+to the load gains nothing: the address is sanitized by the very
+instruction that uses it, so there is no window between ``check'' and
+``use'' to jump into.\marginnote{Masking costs one extra arithmetic
+instruction per access---usually cheaper than a compare-and-branch,
+and with no branch to mispredict.}
 
-If an isolated program can set the value in \texttt{*f}
-to the location \texttt{(***)} in the snippet above,
-the isolated program can skip the safety checks on the 
-memory accesses.
+\paragraph{Changing the language: WebAssembly.}
+The above defense accepted that the hardware permits a jump to
+an arbitrary address, and then fenced that capability in.  WebAssembly
+takes the more radical route of removing the capability from the
+language, so that there is nothing to fence.  Three features combine to
+achieve this.
 
+First, control flow is \emph{structured}: there is no computed jump.
+A branch names an enclosing \texttt{block}, \texttt{loop} or
+\texttt{if} by a static label index, so the legal targets of every
+branch are fixed before the program runs, and every one of them is a
+block boundary.  Second, an indirect call must go through a \emph{table}:
+the \texttt{call\_indirect} instruction takes an index into a table of
+functions, together with a statically declared type, and the engine
+checks both the index and the function's signature at run time.  The
+target is therefore always a whole function entered at its first
+instruction, never an offset into the middle of one.  Third, and most
+importantly, \emph{code is not addressable}.  A WebAssembly program's
+memory is a separate array of bytes; its code lives outside that array
+and cannot be read, written, or pointed at.  What a C compiler turns
+into a function pointer becomes a table index---an integer bearing no
+relation to any machine address.
 
+Taken together, these mean the attack above cannot be written down.
+There is no step that sets \texttt{f} to the address of
+\texttt{(***)}, because \texttt{(***)} has no name in the
+language.\marginnote{Two related consequences.  Return addresses are
+kept by the engine rather than in the program's own memory, so they
+cannot be overwritten.  And bounds checks on memory accesses are part
+of the semantics of the load instruction rather than a separate guard,
+so---exactly as with masking---there is no window to jump into.  In
+practice engines reserve enough address space that a $32$-bit index
+cannot escape it, and the hardware performs the check for free.}
+
+% It is worth being precise about what this does and does not buy.
+% WebAssembly makes the boundary \emph{between} the sandbox and its host
+% unbreakable by construction, but it provides no memory safety
+% \emph{within} the sandbox.  Code compiled from C or C++ keeps a
+% ``shadow stack'' of address-taken local variables inside the program's
+% own memory array, so an ordinary buffer overflow can still corrupt that
+% program's data, or overwrite a table index so that an indirect call
+% reaches a different function \emph{of the same type}.  Classic
+% memory-corruption bugs therefore remain exploitable inside a
+% WebAssembly module---in some respects more easily than in native code,
+% since the sandbox has no stack canaries, no address-space layout
+% randomization, and no guard pages between
+% allocations.\marginnote{WebAssembly is in this sense a hybrid of the
+% techniques in this chapter: it gives roughly the safety of emulation
+% (\cref{sec:emulation}) at close to the speed of code running directly
+% on the hardware, which is why browsers have largely moved to it for
+% running untrusted code.}
