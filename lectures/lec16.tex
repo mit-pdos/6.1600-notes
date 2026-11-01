@@ -117,7 +117,7 @@ This adds another hop to the Go model: when compiling code, a developer PC will 
 \fi
 
 \subsection{More Explicit Trust: Code Signing}
-In each of these approaches, if an attacker can cause the user to download
+In each of these approaches, an attacker can cause the user to download
 a bad package \emph{without} compromising the package developer.
 In particular, if the attacker can compromise Github, it can 
 cause Github to distribute malware to end users.
@@ -192,7 +192,7 @@ it can serve up any code it wants to a user
 asking for a particular version of a library.
 
 In contrast, in the Go programming language, 
-when a users imports a package, the \texttt{go get}
+when a user imports a package, the \texttt{go get}
 software will store a hash of the downloaded code
 in a file called \texttt{go.sum}.\marginnote{This
 is an example of ``trust on first use'' in the context
