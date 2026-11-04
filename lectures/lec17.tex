@@ -205,8 +205,8 @@ When one process accesses memory, it brings that memory into the cache,
 which necessarily evicts something else from the cache.
 An attacker who can run code on the same machine can observe these
 evictions and learn about the victim's memory-access pattern.
-\marginnote{The chapter on hardware security gives a more basic
-introduction to cache timing attacks.}
+%\marginnote{The chapter on hardware security gives a more basic
+%introduction to cache timing attacks.}
 
 For example, a fast implementation of modular exponentiation (for RSA
 or Diffie-Hellman) uses a \emph{sliding window}: it precomputes a table
