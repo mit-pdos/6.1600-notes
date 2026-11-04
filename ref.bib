@@ -283,3 +283,137 @@ month = oct
   booktitle = {USENIX Workshop on Offensive Technologies (WOOT)},
   year      = {2015},
 }
+
+% ---- Side channels and Spectre (lec20-sidechannels) ----
+
+@article{nsa:tempest,
+  author  = {{National Security Agency}},
+  title   = {{TEMPEST}: A Signal Problem},
+  journal = {Cryptologic Spectrum},
+  volume  = {2},
+  number  = {3},
+  year    = {1972},
+  note    = {Declassified 2007},
+  url     = {http://cryptome.org/nsa-tempest.pdf},
+}
+
+@inproceedings{backes:printers,
+  author    = {Michael Backes and Markus D{\"u}rmuth and Sebastian Gerling
+               and Manfred Pinkal and Caroline Sporleder},
+  title     = {Acoustic Side-Channel Attacks on Printers},
+  booktitle = {USENIX Security Symposium},
+  year      = {2010},
+}
+
+@inproceedings{brumley:remote-timing,
+  author    = {David Brumley and Dan Boneh},
+  title     = {Remote Timing Attacks Are Practical},
+  booktitle = {USENIX Security Symposium},
+  year      = {2003},
+  url       = {https://crypto.stanford.edu/~dabo/papers/ssl-timing.pdf},
+}
+
+@article{tromer:cache-aes,
+  author  = {Eran Tromer and Dag Arne Osvik and Adi Shamir},
+  title   = {Efficient Cache Attacks on {AES}, and Countermeasures},
+  journal = {Journal of Cryptology},
+  volume  = {23},
+  number  = {1},
+  pages   = {37--71},
+  year    = {2010},
+}
+
+@inproceedings{kocher:spectre,
+  author    = {Paul Kocher and Jann Horn and Anders Fogh and Daniel Genkin
+               and Daniel Gruss and Werner Haas and Mike Hamburg and Moritz Lipp
+               and Stefan Mangard and Thomas Prescher and Michael Schwarz
+               and Yuval Yarom},
+  title     = {Spectre Attacks: Exploiting Speculative Execution},
+  booktitle = {IEEE Symposium on Security and Privacy},
+  year      = {2019},
+}
+
+@inproceedings{lipp:meltdown,
+  author    = {Moritz Lipp and Michael Schwarz and Daniel Gruss and Thomas Prescher
+               and Werner Haas and Anders Fogh and Jann Horn and Stefan Mangard
+               and Paul Kocher and Daniel Genkin and Yuval Yarom and Mike Hamburg},
+  title     = {Meltdown: Reading Kernel Memory from User Space},
+  booktitle = {USENIX Security Symposium},
+  year      = {2018},
+}
+
+@misc{horn:projectzero,
+  author       = {Jann Horn},
+  title        = {Reading Privileged Memory with a Side-Channel},
+  howpublished = {Google Project Zero blog},
+  year         = {2018},
+  url          = {https://googleprojectzero.blogspot.com/2018/01/reading-privileged-memory-with-side.html},
+}
+
+@inproceedings{vanbulck:foreshadow,
+  author    = {{Van Bulck}, Jo and Marina Minkin and Ofir Weisse and Daniel Genkin
+               and Baris Kasikci and Frank Piessens and Mark Silberstein
+               and Thomas F. Wenisch and Yuval Yarom and Raoul Strackx},
+  title     = {Foreshadow: Extracting the Keys to the {Intel SGX} Kingdom with
+               Transient Out-of-Order Execution},
+  booktitle = {USENIX Security Symposium},
+  year      = {2018},
+}
+
+@inproceedings{behrens:mitigations,
+  author    = {Jonathan Behrens and Anton Cao and Cel Skeggs and Adam Belay
+               and M. Frans Kaashoek and Nickolai Zeldovich},
+  title     = {Performance Evolution of Mitigating Transient Execution Attacks},
+  booktitle = {European Conference on Computer Systems (EuroSys)},
+  year      = {2022},
+  doi       = {10.1145/3492321.3519559},
+}
+
+@inproceedings{yarom:flush-reload,
+  author    = {Yuval Yarom and Katrina Falkner},
+  title     = {{FLUSH+RELOAD}: A High Resolution, Low Noise, {L3} Cache
+               Side-Channel Attack},
+  booktitle = {USENIX Security Symposium},
+  year      = {2014},
+}
+
+@misc{percival:cache,
+  author       = {Colin Percival},
+  title        = {Cache Missing for Fun and Profit},
+  howpublished = {BSDCan},
+  year         = {2005},
+}
+
+@inproceedings{zhang:cross-vm,
+  author    = {Yinqian Zhang and Ari Juels and Michael K. Reiter and Thomas Ristenpart},
+  title     = {Cross-{VM} Side Channels and Their Use to Extract Private Keys},
+  booktitle = {ACM Conference on Computer and Communications Security (CCS)},
+  year      = {2012},
+}
+
+@inproceedings{genkin:handsoff,
+  author    = {Daniel Genkin and Itamar Pipman and Eran Tromer},
+  title     = {Get Your Hands Off My Laptop: Physical Side-Channel Key-Extraction
+               Attacks on {PCs}},
+  booktitle = {Cryptographic Hardware and Embedded Systems (CHES)},
+  year      = {2014},
+}
+
+@misc{fogh:negative,
+  author       = {Anders Fogh},
+  title        = {Negative Result: Reading Kernel Memory from User Mode},
+  howpublished = {cyber.wtf blog},
+  year         = {2017},
+  url          = {https://cyber.wtf/2017/07/28/negative-result-reading-kernel-memory-from-user-mode/},
+}
+
+@article{bernstein:ed25519,
+  author  = {Daniel J. Bernstein and Niels Duif and Tanja Lange and Peter Schwabe
+             and Bo-Yin Yang},
+  title   = {High-Speed High-Security Signatures},
+  journal = {Journal of Cryptographic Engineering},
+  volume  = {2},
+  number  = {2},
+  pages   = {77--89},
+  year    = {2012},
+}
