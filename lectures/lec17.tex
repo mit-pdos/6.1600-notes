@@ -1,0 +1,636 @@
+\chapter{Side-Channel Attacks and Spectre}
+\label{chap:sidechannels}
+
+Up to this point, we have mostly reasoned about the security of a
+system by looking at its \emph{intended} interfaces: the inputs that
+an attacker can send to a program and the outputs that the program
+returns.
+Real systems also leak information through channels that their
+designers never intended to be outputs at all: how long an operation
+takes, how much power it draws, which parts of the processor's cache it
+touches, the sounds it makes, and so on.
+These unintended outputs are called \emph{side channels}.
+\marginnote{We already saw a few side channels in the chapter on isolation,
+when we discussed the limits of isolation.}
+
+Historically, the side channel that people worried about most was
+electromagnetic emanations: electronic equipment radiates
+signals that an eavesdropper with an antenna can sometimes pick up and
+decode from a distance.\autocite{nsa:tempest}
+\marginnote{The U.S. government's program to study and shield against
+these emanations went by the code name TEMPEST.}
+The broader lesson is that a system may need to worry about many
+unexpected ways in which information can be revealed.
+
+\paragraph{What can leak.}
+Researchers have studied many side channels as a means to extract
+cryptographic keys, including:
+\begin{compactitem}
+  \item how long it takes to decrypt a message,
+  \item how decryption affects shared hardware resources
+        (the cache, the TLB, the branch predictor), and
+  \item physical emissions from the CPU itself (radio-frequency signals,
+        sound, power consumption, etc.).
+\end{compactitem}
+
+\paragraph{Side channels beyond cryptography.}
+Many side-channel attacks have nothing to do with cryptography:
+\begin{compactitem}
+  \item The time a password check takes may reveal \emph{which}
+        character of a password guess was incorrect
+        (see the Tenex attack in \cref{sec:sc:tenex}).
+  \item The time a social network takes to answer a query may reveal
+        how many friends you have in common with some other user.
+  \item The time a browser takes to load a page reveals whether the
+        page was already in the browser's cache---and thus whether the
+        user visited that page recently.
+  \item The sound of a dot-matrix printer is enough to recover the text
+        it prints.\autocite{backes:printers}
+  \item The sizes and timing of network packets can reveal a lot, even
+        when the traffic is encrypted.
+\end{compactitem}
+
+The last example deserves a closer look, since encryption is often
+treated as a cure-all.
+Encryption hides the contents of a message, but the ciphertext is
+roughly the same size as the plaintext, and an eavesdropper still sees
+when each message is sent.
+Researchers have shown that one can infer a great deal about TLS and
+VPN traffic from sizes and timing alone.
+The CRIME attack,\autocite{crime} which we discussed earlier in the term,
+is a related problem.
+\marginnote{In CRIME, compressing data before encrypting it makes the
+ciphertext length depend on the plaintext contents.}
+
+\paragraph{Example: Inferring stock holdings.}
+At one point, Fidelity let customers manage their stocks through a
+TLS-protected website.
+The site displayed a pie-chart image for each stock in the user's
+portfolio, so the user's browser fetched one image per stock.
+An attacker can download every possible pie-chart image ahead of time
+and record its size.
+Then, by watching the sizes of the (encrypted) transfers between the
+user's browser and the server, the attacker can tell which stocks
+the user holds.
+
+Even with all of these examples, attacks that recover passwords or
+cryptographic keys are usually the most damaging, so we focus on them
+for the rest of this chapter.
+
+\section{Timing Attack on Password Checking: Tenex}
+\label{sec:sc:tenex}
+
+A famous early timing attack targeted password checking in the Tenex
+operating system.
+Suppose that the kernel provides a system call that checks a user's
+password.
+The kernel compares the guess against the stored password one byte at
+a time and returns an error as soon as it finds a mismatch:
+\marginnote{Tenex stored passwords in plaintext, which is a problem in
+its own right, as we saw when we discussed password storage.}
+\begin{lstlisting}
+check_password(guess):
+    for i in 0 .. len(password)-1:
+        if guess[i] != password[i]:
+            return ERROR
+    return OK
+\end{lstlisting}
+
+The attacker exploits the fact that the kernel reads the guess out of
+the attacker's own memory, and that the attacker controls where that
+memory lives:
+\begin{compactenum}
+  \item The attacker places the guess so that its first byte is the last
+        byte of one memory page and the rest of the guess is on the
+        next page.
+  \item The attacker arranges for the second page to be swapped out to
+        disk.
+        (Or the attacker simply unmaps the second page entirely, using
+        the equivalent of \ttt{munmap}.)
+  \item The attacker calls the password-checking system call and
+        measures how long it takes to return an error.
+\end{compactenum}
+If the call takes a long time, the kernel had to read the second page
+in from disk.
+(If the page was unmapped and the call crashes, the kernel tried to read
+the second page.)
+Either way, the kernel only touches the second page if the first byte of
+the guess was correct!
+The attacker then shifts the guess one byte to the left and repeats the
+process to learn the second byte, and so on.
+
+\begin{quote}
+  With this attack, an attacker can guess an $N$-character password in
+  $256 \cdot N$ tries, rather than $256^N$.
+\end{quote}
+\marginnote{Source code for a password-checking routine similar to the
+original is preserved in the Xerox Alto archives at the Computer
+History Museum: the \ttt{chkpsw} routine calls \ttt{stcmp} to compare
+strings byte by byte.}
+
+The fix is to compare passwords in a way whose running time and memory
+accesses do not depend on where the first mismatch occurs---or, better,
+to store and compare password hashes.
+
+\section{Timing Attacks on Cryptography}
+\label{sec:sc:crypto}
+
+The same basic idea---learn a secret a little bit at a time by
+measuring how long an operation takes---applies to cryptographic
+implementations.
+The main difference is that the signal is much noisier, so attacks
+require many more measurements and more careful statistics.
+
+\subsection{Remote timing attack on RSA}
+
+Brumley and Boneh showed that timing attacks on RSA are practical even
+across a network.\autocite{brumley:remote-timing}
+In their setting, the victim is an Apache HTTPS web server using
+OpenSSL, which holds an RSA private key in memory.
+The attacker's goal is to extract that private key.
+
+The attacker controls a client machine on the same campus network as the
+server (Stanford's, in the original experiment).
+The attacker sends the server specially constructed ciphertexts as part
+of the TLS handshake.
+The server decrypts each ciphertext, finds garbage padding, and returns
+an error.
+The client measures how long it takes to receive the error message, and
+uses these response times to guess the bits of $q$, one of the two
+secret primes $p$ and $q$ that make up the RSA secret key.
+
+The overall response time is on the order of 5 milliseconds, while
+the time difference that the attack exploits can be around
+10 microseconds.
+\marginnote{The timing variations come from optimizations that make
+RSA efficient: OpenSSL switches between Karatsuba and ordinary
+multiplication depending on the sizes of the operands, and Montgomery
+multiplication occasionally needs an ``extra reduction'' step. Both
+depend on the relationship between the ciphertext and the secret
+prime.}
+About one million queries were enough to recover the 512-bit primes
+$p$ and $q$ of a 1024-bit RSA key.
+In fact, the attacker only needs to learn the top 256 bits of $q$; a
+separate algorithm (due to Coppersmith) can then factor the modulus.
+
+Countermeasures are needed, such as \emph{RSA blinding}: the server
+multiplies the ciphertext by a random value $r^e$ before decrypting and
+divides out $r$ afterwards, so that the time the decryption takes is
+uncorrelated with the ciphertext that the attacker chose.
+
+\paragraph{How worried should we be about RSA timing attacks?}
+\begin{compactitem}
+  \item Developing an exploit is relatively tricky, but this is a
+        one-time cost: once someone writes it, anyone can run it.
+  \item A server operator could notice an attack, since it requires a
+        large number of connection requests.
+        This might not be so easy on a busy web-server cluster, though.
+  \item The attacker has to be close by in terms of the network.
+        This is not much of an obstacle: the attacker can average
+        over more queries, co-locate a machine nearby (e.g., in the same
+        cloud data center), run the attack from a nearby bot or browser,
+        and so on.
+  \item The attacker may need to know the exact version of OpenSSL,
+        its optimization flags, and so on.
+        Is it a good idea to rely on such a defense?
+        How big of an impediment is it really?
+  \item If an attacker does mount the attack, the effects are quite
+        bad: the server's private key leaks.
+\end{compactitem}
+
+\subsection{Cache timing attacks}
+
+A processor's cache is shared by all of the processes that run on it.
+When one process accesses memory, it brings that memory into the cache,
+which necessarily evicts something else from the cache.
+An attacker who can run code on the same machine can observe these
+evictions and learn about the victim's memory-access pattern.
+\marginnote{The chapter on hardware security gives a more basic
+introduction to cache timing attacks.}
+
+For example, a fast implementation of modular exponentiation (for RSA
+or Diffie-Hellman) uses a \emph{sliding window}: it precomputes a table
+of small multiples and, as it walks through the bits of the secret
+exponent $d$, it looks up different table entries depending on the
+bits of $d$.
+Accessing one of these entries brings it into the cache.
+A malicious process can fill the cache with a large array of its own,
+let the victim run, and then check which parts of its array were
+evicted by timing accesses to them.
+The offsets that were evicted reveal which table entries the victim
+used, and thus parts of the secret exponent.
+
+Similar attacks work against table-based implementations of AES.
+Tromer, Osvik, and Shamir used them to recover AES keys from
+\ttt{dm-crypt}, the Linux disk-encryption subsystem, by running an
+unprivileged process on the same machine.\autocite{tromer:cache-aes}
+
+Cache attacks are particularly worrisome in the presence of
+\emph{mobile code}: WebAssembly modules, JavaScript, etc.\ that run on
+your laptop or phone.
+Mobile code is untrusted and may come from an attacker.
+It runs inside a sandbox, but the sandbox may still allow it to measure
+side channels.
+
+\section{Spectre and Meltdown}
+\label{sec:sc:spectre}
+
+In 2018, researchers disclosed a family of attacks known as Spectre and
+Meltdown.\autocite{kocher:spectre,lipp:meltdown,hill:spectre-meltdown}
+Cache timing attacks had been known for years, so why did these attacks
+cause such an uproar?
+
+\begin{itemize}
+  \item \textbf{They changed the threat model.}
+        Before these attacks, most system designers assumed side channels
+        away.
+        Spectre and Meltdown showed that micro-architectural side channels
+        are a real, practical threat.
+        \marginnote{On Linux, you can see which of these attacks your
+        processor is vulnerable to, and which mitigations are enabled, by
+        running: \\
+        \ttt{grep .} \nolinkurl{/sys/devices/system/cpu/vulnerabilities/*}}
+  \item \textbf{They exploit speculative execution}, a standard processor
+        feature that is essential for high performance.
+  \item \textbf{The attacker has some control over speculative execution.}
+        This is a big difference from earlier cache timing attacks, in which
+        the attacker could only passively observe the victim's
+        (legitimate) memory accesses.
+        Here the attacker can steer the victim into accessing memory that
+        the victim's program never accesses in a correct execution.
+  \item \textbf{Speculative execution has observable side effects.}
+        In particular, it brings values into the cache, even when the
+        speculation turns out to be wrong.
+  \item \textbf{They break process isolation.}
+        The attacker probes the cache to read out the secrets, and this
+        side channel has high bandwidth.
+  \item \textbf{They are architectural.}
+        The underlying problem is a consequence of how modern processors
+        are designed, so it is not easy to fix.
+        There are several workarounds, each with costs.
+  \item \textbf{They can be exploited remotely},
+        through JavaScript, WebAssembly, and other mobile code.
+\end{itemize}
+
+\subsection{Processor features exploited}
+
+Both of the features that these attacks exploit exist to make processors
+fast.
+
+\paragraph{Speculative execution.}
+Consider code with a branch:
+\begin{lstlisting}
+if (cond) {
+    ...
+}
+\end{lstlisting}
+Computing \ttt{cond} may take a long time---for example, if it depends
+on a value that must be loaded from main memory.
+Rather than wait, the processor \emph{guesses} which way the branch will
+go (using a \emph{branch predictor} that learns from the branch's past
+behavior) and speculatively executes the instructions on the predicted
+path.
+On today's processors, the processor may speculatively execute
+hundreds of instructions before it learns whether its guess was correct.
+If the guess was wrong, the processor cleans up its architectural
+state---registers, etc.---and proceeds down the correct path, as if the
+speculatively executed instructions never ran.
+
+\paragraph{Caching.}
+Processors have several levels of caches.
+The last-level cache is shared between all of the cores on the chip.
+On failed speculation, the processor does \emph{not} undo the
+effects of the speculative instructions on the cache: data that those
+instructions loaded stays in the cache.
+
+\subsection{Attack variants}
+
+There are many variants of these attacks, including:
+\begin{compactenum}
+  \item Bounds-check bypass (Spectre, variant 1).
+  \item Branch-target injection (Spectre, variant 2).
+  \item Data access that bypasses protection checks (Meltdown, variant 3).
+  \item \ldots and any other micro-architectural side channel.
+\end{compactenum}
+The list of known attacks is surprisingly long.\autocite{behrens:mitigations}
+We will start with variant 1, then discuss variants 2 and 3.
+
+\subsection{Spectre variant 1: Bounds-check bypass}
+\label{sec:sc:v1}
+
+\paragraph{Outline of the exploit.}
+Suppose that the kernel holds a secret byte---for example, the random
+offset that it uses for address-space layout randomization.
+Suppose also that the kernel contains a code fragment
+(a \emph{gadget}) like the following, where \ttt{x} is a value that the
+attacker supplies, say as an argument to a system call:
+\begin{lstlisting}
+if (x < array1_size) {
+    v = array1[x];
+    y = array2[v * 4096];
+}
+\end{lstlisting}
+\marginnote{We multiply \ttt{v} by 4096 so that each possible value of
+\ttt{v} maps to a different page, and thus a different cache line. The
+exact constant does not matter much, as long as different values land
+in different cache lines; the proof of concept below uses 512.}
+The bounds check means that, architecturally, this code never reads
+outside \ttt{array1}.
+But the attacker can make it do so speculatively:
+\begin{compactenum}
+  \item \textbf{Train the branch predictor.}
+        The attacker calls the gadget many times with in-bounds values of
+        \ttt{x}, so that the branch predictor learns that the
+        \ttt{if} branch is usually taken.
+  \item \textbf{Set up the cache.}
+        The attacker arranges for \ttt{array1_size} to \emph{not} be in
+        the cache, so that the bounds check takes a long time to resolve
+        and the processor speculates.
+        The attacker arranges for \ttt{array1} (and the secret) to be in
+        the cache, so that the read \ttt{array1[x]} completes quickly and
+        there is time to start the next instruction before the
+        speculation is squashed.
+        Finally, the attacker makes sure that no part of \ttt{array2} is
+        in the cache.
+  \item \textbf{Trigger the gadget.}
+        The attacker calls the gadget with an out-of-bounds \ttt{x} such
+        that \ttt{array1 + x} is the address of the secret byte.
+        The processor speculatively reads the secret byte into \ttt{v}
+        and then speculatively reads \ttt{array2[v * 4096]}, which brings
+        that one line of \ttt{array2} into the cache.
+        The attacker cannot read \ttt{v} directly.
+        When the bounds check finally resolves, the processor realizes that it
+        mispredicted and squashes its internal state.
+        But it does not remove \ttt{array2[v * 4096]} from the cache, which
+        lives outside the processor core.
+  \item \textbf{Probe the cache.}
+        The attacker measures the time to read
+        \ttt{array2[0 * 4096]}, \ttt{array2[1 * 4096]}, \ldots,
+        \ttt{array2[255 * 4096]}.
+        If one of them is fast, the attacker knows the value of \ttt{v}.
+\end{compactenum}
+
+\subsection{A concrete example}
+
+Appendix~A of the Spectre paper\autocite{kocher:spectre} contains a short C
+program that demonstrates variant 1.
+It is illustrative, not a real attack: the victim code and attacker
+code live in the same address space.
+The program has the following parts:
+
+\paragraph{Victim code.}
+The victim has a gadget like the one above, a secret string, and the
+arrays \ttt{array1} and \ttt{array2}.
+\marginnote{The victim's global variables include some unused padding
+(\ttt{unused1} and \ttt{unused2}). The padding forces
+\ttt{array1_size} to live in a different cache line from \ttt{array1},
+so that the attacker can flush \ttt{array1_size} from the cache while
+\ttt{array1} stays cached.}
+
+\paragraph{Main function.}
+The main function tries to read the secret one byte at a time by calling
+\ttt{readMemoryByte} with \ttt{malicious_x}, the out-of-bounds offset
+from \ttt{array1} to the secret byte (the attacker-supplied
+\ttt{x} from \cref{sec:sc:v1}).
+\ttt{readMemoryByte} uses cache measurements to determine the byte.
+
+\paragraph{The \ttt{readMemoryByte} function.}
+This function does the following, repeatedly:
+\begin{compactenum}
+  \item \textbf{Flush \ttt{array2} from the cache}, using the
+        \ttt{clflush} instruction on each of the 256 lines of
+        \ttt{array2} that the gadget might touch---one for each of the
+        256 possible values of a byte.
+        Consecutive values are 512 bytes apart in \ttt{array2}, so that
+        each lands in its own cache line and the processor's hardware
+        prefetcher is less likely to pull in neighboring values.
+  \item \textbf{Train the branch predictor and invoke the gadget.}
+        The function calls the victim's gadget several times with an
+        in-bounds \ttt{training_x}, then once with \ttt{malicious_x}
+        (flushing \ttt{array1_size} before each call).
+        \marginnote{The code computes \ttt{x} with a convoluted sequence of
+        bit operations rather than an \ttt{if} statement. This avoids
+        introducing a branch into the attacker's own loop, which could
+        confuse the branch predictor that the attacker is trying to
+        train.}
+  \item \textbf{Time every possible value.}
+        The function times a read of each of the 256 candidate lines of
+        \ttt{array2}, probing them in a scrambled order (again to defeat
+        the prefetcher), and counts a cache hit for any line that loads
+        quickly.
+\end{compactenum}
+Any single trial is noisy: other activity on the machine may evict lines
+or bring them into the cache.
+So \ttt{readMemoryByte} repeats this procedure up to 1,000 times and
+picks the value with the most hits.
+It stops early once one value clearly has more hits than any other.
+
+\paragraph{Bandwidth.}
+This side channel leaks on the order of 10~KB/s.
+
+\subsection{Making the attack real}
+
+To mount the attack against a real victim, rather than against code in
+its own address space, the attacker must:
+\begin{compactitem}
+  \item find a suitable gadget in the victim process (or kernel),
+  \item be able to access \ttt{array2}, so that it can time reads to it,
+  \item evict \ttt{array1_size} from the cache in the victim process,
+  \item evict \ttt{array2} from the cache in the victim process, and
+  \item train the branch predictor in the victim process.
+\end{compactitem}
+
+\paragraph{Stealing a secret from a victim process on Windows.}
+The Spectre paper's Windows attack exploits dynamically loaded libraries
+(DLLs).
+Common DLLs are mapped into every process's address space, backed by the
+same physical memory.
+So any process can read the DLL's memory and flush it from the cache with
+\ttt{clflush}---and the attacker can even write to it (copy-on-write
+gives the attacker its own private copy, but this is enough to train the
+branch predictor).
+The shared DLL memory plays the role of \ttt{array2}.
+
+\paragraph{Stealing a secret from the Linux kernel.}
+Google Project Zero's attack against the Linux kernel\autocite{horn:projectzero}
+exploits eBPF, a mechanism that lets user-space programs load small
+programs (e.g., packet filters) into the kernel.
+The kernel checks eBPF programs to make sure that they cannot access
+memory out of bounds, and then runs them.
+The attack uses two eBPF filters:
+\begin{compactenum}
+  \item one to train the branch predictor and to find the kernel address of
+        an array that serves as \ttt{array2}, and
+  \item one that contains the gadget and leaks secret data.
+\end{compactenum}
+The attacker then measures the cache state of \ttt{array2} from user
+space.
+This is possible because the kernel's address space includes a mapping
+of all physical memory, including the user's pages: an array in user
+memory also has a kernel address, so the gadget in the kernel and the
+attacker's timing code in user space can touch the same cache lines.
+
+\subsection{Discussion}
+\begin{itemize}
+  \item The attack breaks process isolation, which is the foundation that
+        most of the system defenses in this course build on.
+        It is a serious attack!
+  \item The attacker can be remote: the attack can be carried out from
+        JavaScript running in a web page.
+  \item Any piece of micro-architectural state may be a side channel:
+        the branch predictor, the write buffer, the cache-coherence
+        directory, and so on.
+\end{itemize}
+
+\subsection{Spectre variant 2: Branch-target injection}
+
+Variant 2 exploits speculation on \emph{indirect} branches---jumps and
+calls through a function pointer.
+Consider kernel code like:
+\begin{lstlisting}
+if (x < array1_size) {
+    v = array1[x];
+    (*f)();   // f reads memory at an address that depends on v
+}
+\end{lstlisting}
+When the processor reaches an indirect call, it may not yet know the
+value of \ttt{f}, so it predicts the call's target and speculatively
+executes the code there.
+Fast indirect calls are important for object-oriented code, which makes
+heavy use of virtual method calls.
+
+The attacker chooses a convenient \ttt{f}---a fragment of existing kernel
+code that reads memory depending on \ttt{v}---and trains the branch
+predictor so that the processor speculatively jumps to it.
+This is much like a return-to-libc attack: the attacker does not inject
+code, but redirects (speculative) execution to code that already exists.
+The attack requires reverse-engineering the processor's branch
+predictor, in order to know how to train it to predict the chosen
+target.
+
+\subsection{Meltdown (variant 3): Bypassing protection checks}
+
+Meltdown lets user-space code read kernel memory directly.\autocite{lipp:meltdown}
+The core of the attack is a few user-space instructions:
+\begin{lstlisting}
+mov  al, byte [some_kernel_address]
+shl  rax, 12
+mov  rbx, qword [some_user_address + rax]
+\end{lstlisting}
+\marginnote{The \ttt{shl} (shift-left by 12) multiplies the secret byte by
+4096, so that each possible value touches a different page of the
+attacker's user-space array.}
+Architecturally, the first instruction faults: user code may not read
+kernel memory.
+But the first instruction is implemented as several micro-operations,
+including a permission check and a load.
+The processor executes instructions out of order, and some processors
+perform the load before the check has completed.
+The loaded value is forwarded to the following instructions, which
+speculatively use it to compute an address and load from it.
+When the check fails, the processor raises the fault and discards the
+results---the loaded value is never committed to a register---but the
+user-space address that depended on the secret is in the cache.
+The attacker then uses a Flush+Reload probe\autocite{yarom:flush-reload}
+to determine which address is in the cache, and thus the secret byte.
+
+This works because the kernel and the user process share one address
+space.
+The kernel's memory is present in the user process's page table, marked
+as not accessible to user code.
+\marginnote{Mapping the kernel into every process's address space makes
+system calls faster, since the processor does not have to switch page
+tables on each entry into and exit from the kernel.}
+
+A fairly realistic attack using a Meltdown-style technique, called
+Foreshadow, stole secret keys from Intel SGX enclaves.\autocite{vanbulck:foreshadow}
+
+\section{Mitigations}
+\label{sec:sc:mitigations}
+
+\paragraph{Variant 1.}
+\begin{itemize}
+  \item \textbf{Linux kernel:} Kernel developers use code analysis to find
+        potentially vulnerable gadgets, and modify the code to constrain
+        the index in the gadget even under speculation.
+        The kernel provides helpers in \ttt{include/linux/nospec.h} for
+        this purpose:
+        \marginnote{\ttt{array_index_nospec()} computes a mask from the
+        comparison using arithmetic, rather than a branch, so that a
+        mispredicted branch cannot make the processor use an out-of-bounds
+        index.}
+\begin{lstlisting}
+if (index < ARRAY_SIZE) {
+    // array_index_nospec() blocks speculation
+    index = array_index_nospec(index, ARRAY_SIZE);
+    return array[index];
+}
+\end{lstlisting}
+  \item \textbf{Browsers:} JavaScript engines avoid generating vulnerable
+        code sequences when they compile JavaScript and WebAssembly to
+        machine code.
+\end{itemize}
+
+\paragraph{Variant 2.}
+The defenses are microcode updates and kernel patches, such as
+\emph{retpoline} (``return trampoline'').
+A retpoline replaces each indirect jump with a sequence built around a
+\ttt{ret} instruction.
+The sequence contains an infinite loop that is never executed
+architecturally; any speculation lands in this harmless loop, which
+prevents the CPU from speculating on the target of the indirect jump.
+Retpolines slow down every indirect jump.
+Another approach (``optpoline'') resolves indirect jumps at runtime and
+replaces them with direct jumps where possible.
+
+\paragraph{Variant 3.}
+The defense is \emph{kernel page-table isolation} (KPTI): the kernel uses
+two page tables, one for the kernel and one for user space.
+The user-space page table maps almost none of the kernel's memory, so
+there is nothing for a Meltdown attack to read.
+\marginnote{KPTI was developed (under the name KAISER) before Meltdown was
+known, to protect kernel address-space layout randomization against other
+side channels.}
+
+\paragraph{Hardening browsers.}
+Since many attacks need a precise timer, browsers stopped giving web
+pages precise timing information.
+
+\paragraph{Performance.}
+All of these mitigations have a performance cost, which varies across
+processor generations as vendors add hardware support for them.\autocite{behrens:mitigations}
+
+\paragraph{Other side effects of speculative execution.}
+The cache is not the only observable side effect of speculative
+execution.
+Speculatively executed instructions also affect power consumption, bus
+traffic, and more.
+
+\section{How to Stop Side Channels?}
+
+There is no single answer, but there are several broad strategies:
+\begin{itemize}
+  \item \textbf{Remove side channels.}
+        For example, one could redesign processors so that speculative
+        execution does not change the cache state until it is committed.
+        But every shared resource could be a side channel, so it is hard
+        to be sure that one has found them all.
+  \item \textbf{Reduce shared resources when processing secret data.}
+        For example, process confidential data on a separate core, with
+        its own cache, etc.
+        This requires refactoring software, which is not easy.
+  \item \textbf{Measure channels and make them low bandwidth.}
+        A channel that leaks a bit per hour is much harder to exploit
+        than one that leaks 10~KB per second.
+\end{itemize}
+
+\paragraph{Further reading.}
+Percival\autocite{percival:cache} and Yarom and
+Falkner\autocite{yarom:flush-reload} describe early cache attacks that
+work across processes;
+Zhang et al.\autocite{zhang:cross-vm} extend them across virtual machines in
+the cloud; Genkin, Pipman, and Tromer\autocite{genkin:handsoff} extract keys
+from laptops via physical side channels; and Fogh\autocite{fogh:negative}
+describes an early, ``negative'' attempt at what became Meltdown.
+The Ed25519 signature scheme\autocite{bernstein:ed25519} is an example of a
+cryptosystem designed from the start to run in constant time.
