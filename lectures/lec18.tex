@@ -1,81 +1,629 @@
 \chapter{Case Study: iOS Security}
+\label{chap:ios}
 
-There are several things we might worry about when it comes to the security of a smartphone, spanning software, platform, and hardware security:
+In this chapter, we look at how a real, widely deployed platform puts
+together many of the ideas from the platform-security part of the
+course: secure boot, isolated hardware for handling secrets, encryption
+of data at rest, and careful management of keys.
+Our case study is the security architecture of Apple's iPhone, as
+described in Apple's platform-security guide.\autocite{apple:platform-security}
 
+\paragraph{Threat model.}
+A smartphone faces many threats: malicious apps, a malicious network,
+tampered-with hardware, and so on.
+In this chapter, we focus on one specific threat:
+\begin{quote}
+  Someone steals your iPhone and wants to extract data from it.
+\end{quote}
+The design makes two assumptions about the stolen device:
 \begin{compactitem}
-	\item Malicious apps that steal contacts, eavesdrop on calls, or steal you credit card data
-	\item Someone stealing a phone and extracting secret data
-	\item A non-Apple operating system that is loaded on a phone (i.e. Jailbreaking)
-	\item Malicious chips installed in the factory, en route to the store, or during repairs
-	\item People selling fake phones as real iPhones
+  \item the device is protected with a passcode, and
+  \item the device is \emph{locked} at the time of the theft.
+\end{compactitem}
+\marginnote{The next chapter looks at a different threat: malicious
+apps, and how a mobile operating system isolates apps from each other
+while still letting them share data in controlled ways. We will focus
+on Android there.}
+If the thief grabs the phone out of your hand while it is unlocked,
+there is not much the phone can do.
+
+\paragraph{Why does Apple care?}
+The design we will describe represents a large engineering effort, and
+it requires dedicated hardware that makes every phone more expensive.
+Why might Apple invest in it?
+\begin{compactitem}
+  \item Some customers must keep secrets: doctors with medical records,
+        government employees, reporters protecting their sources, and so on.
+  \item Ordinary customers are nervous about what a thief could do with,
+        say, the password to their bank account.
+  \item Strong security is a competitive advantage over other phones.
+  \item It is the right thing to do.
 \end{compactitem}
 
-The iOS platform is a very well-designed integration of the topics that have been covered in the platform security section and which addresses many of these considerations effectively.
-
-\section{App Security}
-In any platform, there is a balance between the \textquote{openness} of the platform---who is able to run software on it---and the access that software has to sensitive data. Of course, the most secure platform is one that doesn't do anything at all: it is very closed and provides no access to sensitive data. More practical systems have a different balance:
-
-\begin{itemize}
-	\item A typical laptop is very open---anyone can write software for it---and every application is able to access the entire filesystem.
-	\item The web is still very open, as any website can include JavaScript code that will execute on your machine, but access to sensitive data is tightly locked down via language sandboxing.
-\end{itemize}
-
-iOS improves its security story by locking this down: applications are given some (checked) access to sensitive data, but are very closed---applications must go through a review process and only approved developers can write software for iOS.\marginnote{In addition to security policies, the review process checks that applications follow policies in place for business reasons, such as the restriction that digital purchases must go through apples In-App Purchase mechanism.}
-
-iOS apps run in a sandbox that does not provide access to a shared filesystem and that allows communication between apps only though limited APIs provided by the operating system. If an application wants to interact with data that is controlled by the operating system, such as VPN configurations or health data, the application developer must ask for access to special APIs and have that access approved as part of the review process.
-
-\subsection{Things Can Still Go Wrong}
-Even with these checks and the sandboxing, malware can slip through the gaps. As we discussed earlier, XCode Ghost was a compromised version of the XCode compiler distributed via mirrors behind China's firewall that inserted malware into apps developed by honest developers. This malware was not found in App Store reviews, allowing apps that people expected to be honest to run arbitrary malicious code. Even with the sandbox, an app has quite a bit of access to do potentially sensitive actions:
-
+\paragraph{What could a thief try?}
+Here are some potential attacks on a stolen phone:
 \begin{compactitem}
-	\item Learn Country
-	\item Learn Language
-	\item Learn UUID, before recent privacy changes
-	\item Read and modify clipboard contents, including copied passwords or credit card numbers
-	\item Open a URL that points to a phishing webpage 
+  \item \textbf{Guess the passcode.}
+        Passcodes are short---often only four or six digits---so
+        exhaustive search is a real threat.
+  \item \textbf{Impersonate the user's fingerprint or face}, to fool the
+        biometric sensors.
+  \item \textbf{Read the hardware directly.}
+        The attacker can take the phone apart and remove the flash storage
+        chips, or read the contents of RAM while the phone is powered up.
+  \item \textbf{Exploit a bug in the operating-system kernel.}
+        Even when the phone is locked, its USB, WiFi, and cellular-radio
+        interfaces may be active and processing attacker-supplied input.
+  \item \textbf{Install a modified operating system} that omits the
+        security checks---for example, one that allows unlimited passcode
+        guesses.
+        The attacker could try to redirect the phone's network traffic to
+        an update server that the attacker controls, or take the phone apart
+        and write a different OS image directly onto the flash chips.
+  \item \textbf{Downgrade the operating system} to an old version that
+        has a known bug.
 \end{compactitem}
 
-Despite this, isolation buys a lot of security. A malicious app that makes it through review cannot access your text messages, browser history, etc.
+The iOS design is reasonably successful against these attacks.
+It is much harder to extract data from a stolen iPhone than it was ten
+years ago---hard enough that law-enforcement agencies, including the FBI,
+have complained about it publicly.
+\marginnote{In 2016, the FBI asked a court to compel Apple to write and
+sign a modified version of iOS that would let the FBI guess the
+passcode of a seized iPhone 5c without limits or delays. This is exactly the
+``install a modified OS'' attack above: thanks to secure boot, the
+FBI could not mount it without Apple's signing key. The FBI eventually
+dropped the request after a third party found another way into the phone.}
+History suggests, though, that this is not the end of the story:
+researchers and companies that sell phone-unlocking tools continue to
+find weaknesses.
 
-\section{iOS Secure Boot}
-For security and business reasons, Apple would like to ensure that an Apple-signed operating system is running on the phone. This prevents a malicious actor from distributing a backdoored operating system and convincing people to install it on their phone and against malware that tries to persistently modify the operating system. It also prevents users from installing a customized operating system on their phone, bypassing the Apple restrictions on apps and other policies.
+\section{iOS Hardware Architecture}
+\label{sec:ios:hw}
 
-To achieve this, iOS uses a secure boot system as described in the last chapter. Each phone ships with a Boot ROM that cannot be changed that is burned with some public key for a secret key that Apple knows. This boot ROM is responsible for verifying that this secret key signed the code for a low-level bootloader and running that bootloader. This bootloader will then verify and check the operating system kernel. This allows the bootloader and the kernel to be updated as necessary, but places a root of trust in the boot ROM that cannot be updated. If the bootloader is updated by anyone besides Apple, however, the boot ROM's signature check will fail and the boot ROM will refuse to run the bootloader. 
+\begin{figure}
+  \centering
+  \begin{tikzpicture}[
+      box/.style={draw, rounded corners, align=center,
+                  minimum height=1.1cm, font=\small},
+      lbl/.style={font=\scriptsize, align=center}]
+    \node[box, minimum width=2.7cm] (cpu)
+      {Main CPU + DRAM\\[-1pt]{\scriptsize Boot ROM, Apple pub.\ key, ECID}};
+    \node[box, right=1.0cm of cpu] (aes) {AES\\engine};
+    \node[box, right=1.0cm of aes] (flash) {Flash\\storage};
+    \node[box, above=1.3cm of aes, minimum width=3.0cm] (sep)
+      {Secure Enclave\\[-1pt]{\scriptsize Boot ROM, UID, AES}};
+    \node[box, above=1.3cm of cpu, xshift=-0.6cm] (sensor)
+      {Touch ID /\\Face ID\\[-1pt]{\scriptsize $K_\text{sensor}$}};
+    \draw[<->] (cpu) -- (aes);
+    \draw[<->] (aes) -- (flash);
+    \draw[<->] (sep) -- node[lbl, right] {$K_e$} (aes);
+    \draw[<->] (sensor) -- node[lbl, above] {encrypted,\\authenticated} (sep);
+    \draw[<->, dashed] (cpu.north east) -- node[lbl, below right, pos=0.4]
+      {shared\\DRAM} (sep.south west);
+    \draw[<->, dotted] (sep.east) -| node[lbl, right, pos=0.75]
+      {effaceable\\storage} (flash.north);
+  \end{tikzpicture}
+  \caption{The main hardware components of an iPhone that are relevant to
+    protecting data on a stolen device. The AES engine sits on the path
+    between main memory and flash storage, so all data written to flash
+    is encrypted.}
+  \label{fig:ios:hw}
+\end{figure}
 
-Many device owners that wanted to customize their devices sought to modify the operating system to add new features. This process generally is referred to as \textquote{jailbreaking}.
+\Cref{fig:ios:hw} shows the hardware components that matter for this
+chapter:
+\begin{compactitem}
+  \item \textbf{The main CPU and DRAM}, which run iOS and its apps.
+  \item \textbf{Flash storage}, which holds the file system.
+  \item \textbf{An AES encryption engine} that sits between main
+        memory and flash storage.
+        Every block that moves between them is encrypted or decrypted
+        on the way, using direct memory access (DMA), without the data
+        passing through the main CPU.
+  \item \textbf{The Secure Enclave}, a separate processor that handles
+        keys and passcodes.
+  \item \textbf{A unique ``UID'' key} that is fused into the Secure
+        Enclave's hardware when the chip is manufactured.
+        The Secure Enclave can ask its hardware AES unit to encrypt or
+        decrypt with the UID, but no software---not even the Secure
+        Enclave's own software---can read the UID itself.
+        \marginnote{Not even Apple keeps a record of each device's UID.}
+  \item \textbf{Authentication sensors}: a fingerprint reader (Touch ID)
+        or a face-recognition camera (Face ID).
+        Each sensor shares a secret key, $K_\text{sensor}$, with the
+        Secure Enclave.
+\end{compactitem}
 
-\subsection{Checkra1n Jailbreak}
-One set of exploits that constituted a jailbreak was named \ttt{checkra1n}. This took advantage of complex code in the unchangeable boot ROM---the devices supported running code directly via USB, bypassing the low-level bootloader and the OS kernel, which meant that the boot ROM contained code to act as a USB peripheral. USB code is quite complex, and as with most complex code, it had bugs. \ttt{checkra1n} took advantage of these USB bugs to trick the phone into executing arbitrary code.
-
-Because the Boot ROM can never be updated, it was impossible for Apple to fix these bugs: this jailbreak will work forever on the devices that had the bug. 
-
-However, these bugs did not allow the jailbreak to bypass the signature check entirely, so this exploit needed to be run on every boot---if you tried to reboot your phone without running this, it would no longer be jailbroken.
-
-\section{iOS protection for data at rest}
-If a phone is stolen, it would be nice if the theif could not learn any sensitive information from the device. As with any time that we want to hide data, encryption is the answer here---a simple solution is to encrypt all data on the phone with 128-bit AES. However, this does not tell the whole story: in order to decrypt the data, the key for this encryption must be stored somewhere. We can't store the key in normal flash memory, since then anyone could use it to decrypt the data. We also can't use the only secret that the user knows, their 6-digit PIN, since it is much too short to be an AES key.
-
-Even an approach like using a PRF based on the key to extend it into key for AES will not be secure---6 digits is so short that it can easily be brute-forced. Instead, recent iPhones use a special chip called a \textquote{secure enclave} that holds the key and provides access to it only if the user enters the correct PIN. Doing so allows the secure enclave to enforce strict guess limits that prevent brute-forcing the PIN.
-
-The secure enclave is essentially another processor that runs its own operating system. It uses a similar secure boot system to prevent tampering with the secure enclave's operating system, but it also uses \emph{measured boot} to derive the secret encryption key from the contents of the OS being run---if an attacker modifies the secure enclave's operating system, the encryption key will change and the attacker will not be able to decrypt the phone data.
-
-Importantly, the secure enclave has access to two things that the main application processor does not. First, on the first boot: the secure enclave generates a long-term secret unique ID and burns it into internal fuses. The enclave also has access to a secure NVRAM module that has a limited amount of secure storage with support for real deletion\marginnote{In typical storage, deleting data does not really delete the data---instead, it marks it as deleted and indicates that the operating system should overwrite it in the future. However, if someone inspects the storage directly, they are likely to be able to recover the data that was deleted. Apple's \textquote{effacable storage} that is used for the secure enclave supports deleting data such that it cannot be recovered.}. This secure storage contains the root encryption key itself, a hashed version of the user's PIN salted with the UID, and a guess counter that keeps track of how many incorrect guesses have been made.
-
-When put together, these elements enable the following process:
+The aspects of this design that we will look at are:
 \begin{compactenum}
-	\item User enters a PIN
-	\item iOS passes the PIN to the secure enclave 
-	\item The enclave enforces some delay after each guess
-	\item The enclave passes $H(\text{PIN}, \text{UID})$ to the secure storage. \marginnote{The communication between the secure enclave and the secure storage is also encrypted with a key burned into the enclave and into the secure storage. This prevents an attacker with a probe on the wire from learning the data.}
-	\item Secure storage uses included logic to check whether the hashed PIN matches the stored hash.
-		\begin{compactitem}
-			\item If correct, return the root AES key and zero the guess counter
-			\item If incorrect, increment the guess counter. If the guess counter is too high, erase the key from the effacable storage.
-		\end{compactitem}
-	\item If the PIN was correct, the enclave passes the key returned from the storage to the AES engine.
-	\item The application processor sends data to the AES engine to be encrypted or decrypted. \marginnote{Note that the application processor never sees the AES key---it is seen only by the secure enclave and the (hardware) AES engine.} 
+  \item \textbf{Secure boot} (\cref{sec:ios:boot}): making sure that the
+        phone runs only Apple's software, and only recent versions of it.
+  \item \textbf{The Secure Enclave} (\cref{sec:ios:enclave}): hiding all
+        keys and cryptographic operations from the main CPU, gating data
+        decryption on the passcode, defending against exhaustive passcode
+        search, and protecting communication between hardware units.
+  \item \textbf{Data protection} (\cref{sec:ios:dp}): encrypting files
+        in a way that still allows apps to run in the background while the
+        phone is locked.
 \end{compactenum}
 
-\subsection{Biometric Unlock}
-For convenience, however, iPhones do not require entering a PIN on every unlock. A PIN unlock is always required on the first unlock after boot, but afterwards they allow unlocking with a Biometric such as Face/Touch ID. The phone includes dedicated biometrics hardware that is responsible for reporting the \textquote{hash} of the measured face to the secure enclave. The secure enclave then checks this against the stored one, and unlocks the device if there is a match.
+\section{Secure Boot}
+\label{sec:ios:boot}
 
-A possible attack, then, might look something like the following: steal a phone that has been unlocked at least once and relocked (almost always the case). Then, before it runs out of battery and shuts down, replace the Face ID chip with a malicious one that always reports the correct hash. Without protection against replacing the biometric hardware, an attack like this would allow an attacker to access all the data on your phone. To address this, iPhone include yet another shared key between the secure enclave and the biometric hardware: if the Face ID module is replaced, the keys will not match and the phone will refuse to unlock.
+The goal of secure boot is to make sure that an adversary cannot run a
+modified operating system, modified apps, or modified Secure Enclave
+software on the phone.
+
+iOS uses the secure-boot scheme that we saw in the chapter on software
+trust.
+When the phone powers on, the CPU starts executing code from its
+\emph{Boot ROM}.
+The Boot ROM is read-only: its contents are fixed when the chip is
+fabricated, and they include Apple's public signature-verification key.
+The boot sequence is then:
+\[
+  \text{Boot ROM} \;\to\; \text{iBoot} \;\to\; \text{OS kernel} \;\to\; \text{apps}
+\]
+and each stage checks the next one before running it:
+\begin{compactitem}
+  \item The Boot ROM checks that the iBoot boot loader is signed by Apple.
+  \item iBoot checks that the OS kernel is signed by Apple.
+  \item The OS kernel checks that each app is signed by a developer that
+        Apple has approved.
+\end{compactitem}
+The Secure Enclave has its own Boot ROM and goes through a similar
+secure-boot sequence for its own software.
+Frazelle gives a broader discussion of hardware roots of trust and
+secure boot.\autocite{frazelle:boot}
+
+\subsection{Downgrade attacks}
+
+Signature checks alone do not stop an adversary from installing an
+\emph{old} OS kernel.
+An old kernel is still signed by Apple!
+If that old kernel has a known bug, the adversary can install it on the
+stolen phone and then exploit the bug.
+
+\paragraph{Strawman: record versions.}
+One idea is for each boot stage to check version numbers: iBoot could
+refuse to run an OS kernel older than some minimum version.
+But where would the phone store the minimum version number?
+And what would prevent the adversary---who has physical access to the
+phone and can rewrite its flash chips---from modifying the stored
+version number?
+
+\paragraph{Downgrade prevention with the ECID.}
+Each iPhone chip has a unique identifier called the \emph{ECID}.
+Like the Boot ROM, the ECID is read-only and set when the chip is
+fabricated.
+Unlike the UID, the ECID is not a secret.
+
+When a phone installs an update, it sends its ECID to Apple's update
+servers.
+Apple's servers sign the update \emph{for that specific ECID}:
+the signature covers both the software and the phone's ECID.
+During boot, each stage checks not only that the next stage is signed by
+Apple, but also that the signature is for this phone's ECID.
+\marginnote{Apple calls this process \emph{system software
+authorization}, and the signed updates are said to be
+\emph{personalized} to the device. The phone also includes a fresh random
+nonce in its request to Apple's servers, so that a signature that was
+captured once cannot be replayed later.}
+
+Why does this help?
+\begin{compactitem}
+  \item The adversary is unlikely to have a copy of the old software that
+        was signed for the victim's ECID.
+        \marginnote{Members of the jailbreaking community used to save the
+        personalized signatures for their own phones (``SHSH blobs''), so
+        that they could later downgrade to a version of iOS with a known
+        jailbreak. The anti-replay nonce makes this much harder.}
+  \item Apple's update servers will not sign an out-of-date kernel for any
+        ECID.
+\end{compactitem}
+In effect, the ``minimum version'' is enforced by Apple's servers at the
+time of the update, rather than by state stored on the phone that the
+adversary might modify.
+
+\section{The Secure Enclave}
+\label{sec:ios:enclave}
+
+The Secure Enclave has two main jobs:
+\begin{compactitem}
+  \item prevent the main CPU from ever seeing cryptographic keys, and
+  \item defend against passcode guessing.
+\end{compactitem}
+The main CPU asks the Secure Enclave to do things on its behalf---for
+example, to help it decrypt a file---but never gets the keys themselves.
+
+The Secure Enclave is implemented as a separate CPU with its own secure
+boot sequence.
+It shares DRAM with the main CPU and communicates with the main CPU
+through that shared memory.
+Since the main CPU (or an attacker probing the memory bus) can read
+DRAM, the Secure Enclave encrypts the contents of its own memory.
+It also authenticates its memory, to ensure integrity and freshness:
+the main CPU cannot modify the Secure Enclave's memory, or roll it back
+to an older value, without being detected.
+The state for this memory authentication lives in a small on-chip SRAM,
+which is not accessible to the main CPU.
+
+\paragraph{Comparison to SGX.}
+Intel's SGX (Software Guard Extensions), whose enclaves the Foreshadow
+attack in the previous chapter targeted, has a similar goal: hide secrets from a
+kernel that is not very trustworthy.
+It also encrypts and authenticates the memory it uses.
+The Secure Enclave differs from SGX in two ways:
+\begin{compactitem}
+  \item It is a \emph{separate CPU}, rather than a special mode of the
+        main CPU.
+        This makes it much less exposed to side channels through shared
+        micro-architectural state.
+  \item It runs only fixed software from Apple, rather than
+        arbitrary application code.
+\end{compactitem}
+
+\subsection{User authentication}
+
+The overall plan is:
+\begin{compactitem}
+  \item all user data is encrypted;
+  \item decryption is allowed when the phone is unlocked; and
+  \item decryption is forbidden when the phone is locked.
+\end{compactitem}
+
+Why offload authentication onto the Secure Enclave, rather than
+implementing it in the iOS kernel on the main CPU?
+\begin{compactitem}
+  \item To prevent a compromised OS kernel from obtaining decryption keys
+        or the user's fingerprint and face data.
+  \item To prevent a compromised OS kernel from bypassing the limits on
+        passcode retries.
+  \item Because the Secure Enclave can hide keys using memory encryption
+        and authentication, so that directly reading the phone's RAM
+        yields no cryptographic secrets.
+        Encrypting and authenticating all memory would be too costly for
+        the main CPU, but it is acceptable for the small amount of memory
+        that the Secure Enclave uses.
+\end{compactitem}
+
+The primary authentication mechanism is the passcode: the keys that
+decrypt the user's data are computed from the passcode, as we will see
+in \cref{sec:ios:dp}.
+Touch ID and Face ID are additional, more convenient mechanisms.
+Once the user enters the passcode, the Secure Enclave caches the
+resulting decryption keys.
+Later, if the sensor presents a correct fingerprint or face match, the
+Secure Enclave uses these cached keys.
+\marginnote{The phone requires the passcode, rather than a fingerprint or
+face, in several situations: for example, after the phone restarts, if it
+has not been unlocked for 48 hours, or after five failed biometric match
+attempts.}
+
+\subsection{Protecting sensor-to-enclave communication}
+
+The fingerprint and face sensors do not talk to the Secure Enclave
+directly: the main CPU forwards their data. This leads to two possible
+attacks:
+\begin{compactitem}
+  \item A compromised OS on the main CPU records a legitimate fingerprint
+        reading and later \emph{replays} it to the Secure Enclave.
+  \item The adversary replaces the phone's fingerprint sensor with a
+        \emph{fake sensor} that always reports a match.
+        \marginnote{The thief could do this on a phone that has been
+        unlocked once since it was last powered on---which is almost always
+        the case---before its battery runs out.}
+\end{compactitem}
+
+The defense is cryptographic authentication between each sensor and the
+Secure Enclave.
+The sensor has a secret AES key, $K_\text{sensor}$, and the Secure Enclave
+knows the same key; the two are paired when the phone is manufactured.
+The sensor encrypts and authenticates all of the data it sends with this
+key.
+To prevent replay of old readings, the protocol must also include a fresh
+nonce or session identifier.
+\marginnote{Apple's documentation says that the sensor and the Secure
+Enclave use the shared key to set up a fresh session key, and protect
+the session with AES-CCM authenticated encryption.}
+A compromised OS cannot forge or replay readings, and a replacement
+sensor does not know the key.
+
+\paragraph{Aside: facial recognition.}
+The Face ID camera is surprisingly sophisticated.
+It includes an infrared (IR) dot projector and an IR camera.
+The projector shines many IR dots---tens of thousands---in a random
+pattern onto the user's face, and the IR camera reads the pattern and
+reports it to the Secure Enclave.
+The shape of the dot pattern helps distinguish a three-dimensional face
+from a two-dimensional photo of the face.
+
+\section{Data Protection}
+\label{sec:ios:dp}
+
+By \emph{data}, we mean the files stored in flash.
+The attack we worry about is an adversary who takes the phone apart and
+reads the data directly from the flash chips.
+The plan is to encrypt all data stored on the flash chips.
+
+\subsection{Deriving keys from the passcode}
+
+The data-encryption keys are derived from the passcode, rather than
+stored permanently somewhere on the device.
+Why?
+\begin{compactitem}
+  \item So that, after the phone reboots, the keys exist nowhere on the
+        device until the user enters the passcode.
+  \item So that the phone can \emph{forget} the keys when it locks.
+\end{compactitem}
+
+How should the phone derive keys from the passcode?
+There are two dangers:
+\begin{compactitem}
+  \item There are only $10^4$ four-digit passcodes (or $10^6$ six-digit
+        ones), so it is easy to try them all.
+  \item An attacker might extract the flash chips and try all of the
+        passcodes on the attacker's own (fast) machines.
+\end{compactitem}
+Simply hashing the passcode, or stretching it with a slow hash as we did
+for password storage, does not help much: an exhaustive search over
+$10^6$ candidates is cheap even with a slow hash.
+
+\paragraph{The iOS scheme.}
+iOS ties the derivation to the device's UID, which only the Secure
+Enclave's hardware can use.
+The data-encryption key is, roughly,
+\[
+  K_\text{passcode} = \Enc\bigl(\text{UID}, \Enc(\text{UID}, \cdots \Enc(\text{UID}, \text{passcode}) \cdots)\bigr),
+\]
+that is, the result of encrypting the passcode with the UID many times.
+\marginnote{Apple describes this as ``tangling'' the passcode with the UID,
+using a PBKDF2-style construction whose pseudorandom function is AES keyed
+with the UID. The iteration count is calibrated so that one attempt takes
+about 80 milliseconds.}
+Each property of this construction defends against one of the attacks:
+\begin{compactitem}
+  \item \textbf{It depends on the passcode}, so the key exists nowhere on
+        the device after a reboot.
+  \item \textbf{It is computed inside the Secure Enclave}, which limits the
+        number of guesses---for example, by imposing increasing delays
+        after incorrect guesses---regardless of what the main CPU does.
+  \item \textbf{It is slow}, which limits the speed of exhaustive search
+        even by code that can talk to the Secure Enclave directly.
+  \item \textbf{It depends on the UID}, which cannot be extracted from the
+        hardware, so the adversary cannot run the search outside of the
+        device, on many fast machines in parallel.
+\end{compactitem}
+
+\subsection{Challenge: background apps}
+
+When the phone is locked, some apps must still be able to run and read or
+write files.
+For example, the mail app should download email attachments while the
+phone is in your pocket.
+But the phone forgets the decryption keys when it locks!
+
+iOS addresses this challenge with \emph{key wrapping}.
+To \emph{wrap} a key $k_2$ under another key $k_1$ means to encrypt it:
+\[
+  \Enc(k_1, k_2).
+\]
+Anyone who knows $k_1$ can recover $k_2$ by decrypting.
+Key wrapping lets a module that knows $k_2$ delegate access to $k_2$ to a
+module that knows $k_1$: the first module hands out the wrapped key, which
+is useless to anyone who does not know $k_1$.
+It also lets a system store many keys (one per file, say) while keeping
+only a few keys secret.
+
+\subsection{The key hierarchy}
+
+\paragraph{The file-system key.}
+The file system's metadata (directories, inodes, and so on) is encrypted
+with a single key, $K_\text{fs}$.
+The Secure Enclave stores $K_\text{fs}$ wrapped under the UID,
+$\Enc(\text{UID}, K_\text{fs})$.
+At boot time, the Secure Enclave unwraps $K_\text{fs}$ and hands the OS
+kernel a copy wrapped under $K_e$, a key that the Secure Enclave shares
+with the AES engine: $\Enc(K_e, K_\text{fs})$.
+The kernel can then pass $\Enc(K_e, K_\text{fs})$ to the AES engine
+whenever it accesses metadata, without ever seeing $K_\text{fs}$ itself.
+
+Why bother with $K_\text{fs}$ at all?
+\begin{compactitem}
+  \item It makes it possible to erase all data on the phone quickly, by
+        deleting $K_\text{fs}$---or, really, by deleting
+        $\Enc(\text{UID}, K_\text{fs})$.
+  \item Since $K_\text{fs}$ is wrapped under the UID, an adversary cannot
+        move the flash chips into another phone and read them there.
+\end{compactitem}
+
+\paragraph{Per-file keys.}
+Each file's contents are encrypted with a different key, $K_f$.
+The file key is itself wrapped under a \emph{data-protection key},
+$K_\text{dp}$, and the wrapped key $\Enc(K_\text{dp}, K_f)$ is stored
+with the file's metadata (which in turn is encrypted under $K_\text{fs}$).
+\marginnote{Apple calls the data-protection keys \emph{class keys}, since
+each one corresponds to a data-protection class.}
+The data-protection keys are stored only in the Secure Enclave.
+There are different data-protection keys for different levels of
+protection, and each file is assigned to one of these levels.
+
+\subsection{Levels of data protection}
+
+iOS offers four levels of data protection:
+\begin{description}
+  \item[Complete protection.]
+        The file can be decrypted only while the phone is unlocked.
+        The Secure Enclave derives $K_\text{dp}$ for this level from the
+        passcode when the user unlocks the phone, and discards it shortly
+        after the phone locks.
+  \item[Protected unless open.]
+        The file can be written at any time, but read only while the phone
+        is unlocked.
+        This is a special case designed for background downloads, such as
+        email attachments that arrive while the phone is locked.
+        \marginnote{This level uses public-key cryptography: a file can be
+        encrypted using a \emph{public} data-protection key that is always
+        available, but decrypting it later requires the matching secret key,
+        which is derived from the passcode. Apple's implementation uses
+        Elliptic-Curve Diffie-Hellman over Curve25519.}
+  \item[Protected until first user authentication.]
+        The file can be decrypted at any time, provided that the user has
+        unlocked the phone at least once since it last booted.
+        The Secure Enclave derives $K_\text{dp}$ from the passcode on the
+        first unlock and discards it only when the phone powers off.
+        This is the default level for third-party app data.
+  \item[No protection.]
+        The file can be decrypted at any time.
+        $K_\text{dp}$ for this level is derived only from the UID, not from
+        the passcode, so it is available from boot.
+        Even so, this level still protects the data from an adversary who
+        moves the flash chips to another device, and it still allows a
+        fast wipe and secure deletion (\cref{sec:ios:delete}).
+\end{description}
+The background-apps challenge is thus solved by choosing the right level
+for each file: data that a background app must read while the phone is
+locked uses ``protected until first user authentication,'' and data that
+it must write but not read uses ``protected unless open.''
+
+\subsection{Using wrapped file keys}
+
+The file-system code that runs on the main CPU sees only wrapped keys.
+When it needs to read or write a file, it asks the Secure Enclave to
+unwrap the file's key, and the Secure Enclave does so if it currently
+holds the corresponding data-protection key.
+
+But the Secure Enclave never gives the OS kernel the raw key!
+Instead, data is encrypted and decrypted by the hardware AES engine:
+\begin{compactenum}
+  \item The kernel sends $\Enc(K_\text{dp}, K_f)$ to the Secure Enclave.
+  \item If it has $K_\text{dp}$, the Secure Enclave unwraps $K_f$ and
+        re-wraps it under $K_e$, the key it shares with the AES engine.
+  \item The Secure Enclave sends $\Enc(K_e, K_f)$ back to the kernel.
+  \item The kernel programs the AES engine with $\Enc(K_e, K_f)$ whenever
+        it reads or writes blocks of the file. The AES engine unwraps $K_f$
+        internally and encrypts or decrypts the data as it moves between
+        memory and flash.
+\end{compactenum}
+\marginnote{On recent devices, the key that the Secure Enclave shares with
+the AES engine is a fresh, ephemeral key generated at each boot.}
+A compromised kernel can ask the AES engine to decrypt files while the
+phone is unlocked, but it never learns any file key, so it cannot decrypt
+the files after the phone locks or offline.
+
+\paragraph{Touch ID and Face ID.}
+How does the phone obtain data-protection keys when the user unlocks it
+with a fingerprint or face rather than the passcode?
+\begin{compactitem}
+  \item Touch ID and Face ID cannot be used immediately after a reboot;
+        the user must first enter the passcode.
+  \item When the user enters the passcode, the Secure Enclave computes the
+        data-protection keys, and sets aside (encrypted) copies of them
+        for later use with Touch ID or Face ID.
+  \item When the user locks the phone, the Secure Enclave deletes the
+        working copies of the data-protection keys.
+  \item When the sensor later reports a match, the Secure Enclave recovers
+        the keys from the copies it set aside.
+\end{compactitem}
+
+\subsection{Secure data deletion}
+\label{sec:ios:delete}
+
+There are two goals:
+\begin{compactitem}
+  \item allow the user to quickly wipe all data on the phone, and
+  \item (optionally) wipe the phone after 10 failed unlock attempts.
+\end{compactitem}
+The challenge is that it is hard to delete data from flash storage.
+Overwriting all of the flash takes a long time.
+Worse, the flash controller makes copies of data as part of
+\emph{wear-leveling}: to keep any one part of the chip from wearing out,
+it writes updates to fresh locations and leaves the old copies behind
+until it gets around to erasing them.
+Someone who reads the flash chips directly may be able to recover these
+old copies.
+
+iOS solves this with \emph{effaceable storage}: a small region of flash
+that the Secure Enclave accesses directly, using low-level flash
+operations that really do erase the data.
+Effaceable storage holds a few small, critical values, such as
+$\Enc(\text{UID}, K_\text{fs})$.
+Since every other key is (directly or indirectly) wrapped under
+$K_\text{fs}$ or a key derived from the UID, erasing these few values
+makes all of the data on the phone unrecoverable at once.
+This is called \emph{crypto-shredding}: rather than deleting the data, we
+delete the key.
+
+\section{Discussion}
+
+\paragraph{Places to look for weaknesses.}
+Where might an adversary find a way in?
+\begin{compactitem}
+  \item \textbf{The kernel on the main CPU} sees a lot of sensitive
+        material: the passcode as the user types it, decrypted data, web
+        passwords, and so on.
+        The iOS kernel has had bugs that apps can exploit to gain root or
+        kernel privileges on the main CPU.
+        Luckily, an adversary cannot install new malicious apps on a locked
+        phone.
+        Apple also uses hardware features, such as ARM's pointer
+        authentication codes, to make kernel exploits
+        harder.\autocite{corbet:pac,azad:pac}
+        \marginnote{Pointer authentication attaches a short MAC to
+        pointers (in particular, code pointers), so that a corrupted pointer
+        is detected before it is used.}
+  \item \textbf{Boot code} may have bugs that let an adversary boot a
+        kernel that allows passcode guessing.
+        This has happened to the Boot ROM of many iPhone models, to Apple's
+        T2 security chip in Intel-based Macs,\autocite{goodin:t2} and to
+        Intel's own hardware root of trust.\autocite{ermolov:intel}
+        \marginnote{The \ttt{checkm8} exploit, used by the \ttt{checkra1n}
+        jailbreak, exploits a bug in the USB code in the iPhone Boot ROM.
+        Since the Boot ROM is read-only, Apple cannot fix the bug on
+        affected phones. The exploit must be rerun on every boot, though,
+        and it does not by itself bypass the Secure Enclave's passcode
+        protection.}
+  \item \textbf{The USB, WiFi, and cellular-radio software} probably has
+        bugs, and may be active even when the phone is locked.
+  \item \textbf{Apple's private signing keys} must be kept safe, but
+        they must also be used routinely, to sign ``personalized''
+        updates for each device.
+        (Apple likely has several or many private keys.)
+  \item \textbf{The UID} is supposed to be impossible to extract from the
+        hardware.
+        Can an adversary with enough money extract it anyway, for example
+        by imaging the chip?
+\end{compactitem}
+
+\paragraph{Is there a cost to this security?}
+\begin{compactitem}
+  \item The specialized hardware---the Secure Enclave, the fingerprint
+        reader, the AES DMA engine---costs money.
+  \item Having to type a passcode is irritating, and the user needs the
+        passcode in many situations, such as backing up the phone.
+  \item Background activities are awkward while the device is locked.
+  \item If the user forgets the passcode, the data is permanently lost
+        (unless it was backed up).
+\end{compactitem}
+
+\section{Summary}
+
+The iOS design brings together several interesting ideas and techniques:
+\begin{compactitem}
+  \item \textbf{Secure boot}: code signing, and downgrade prevention by
+        personalizing each update to the device's ECID.
+  \item \textbf{The Secure Enclave}: a separate processor that keeps all
+        keys away from the main CPU, enforces passcode-guess limits, and
+        uses encrypted and authenticated communication with the sensors.
+  \item \textbf{Data protection}: per-file keys, key wrapping, a device key
+        (the UID) that cannot leave the hardware, multiple protection levels,
+        and effaceable storage for fast, secure deletion.
+\end{compactitem}
+
+\paragraph{Further reading.}
+Apple's platform-security guide\autocite{apple:platform-security}
+describes these mechanisms, and many others, in much more detail.
+Android phones face similar considerations; Mayrhofer describes how
+Android defends against insider attacks, such as an insider who can sign
+malicious firmware updates.\autocite{mayrhofer:insider}
