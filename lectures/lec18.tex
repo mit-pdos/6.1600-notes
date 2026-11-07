@@ -65,15 +65,15 @@ Here are some potential attacks on a stolen phone:
 \end{compactitem}
 
 The iOS design is reasonably successful against these attacks.
-It is much harder to extract data from a stolen iPhone than it was ten
-years ago---hard enough that law-enforcement agencies, including the FBI,
-have complained about it publicly.
 \marginnote{In 2016, the FBI asked a court to compel Apple to write and
 sign a modified version of iOS that would let the FBI guess the
 passcode of a seized iPhone 5c without limits or delays. This is exactly the
 ``install a modified OS'' attack above: thanks to secure boot, the
 FBI could not mount it without Apple's signing key. The FBI eventually
 dropped the request after a third party found another way into the phone.}
+It is much harder to extract data from a stolen iPhone than it was ten
+years ago---hard enough that law-enforcement agencies, including the FBI,
+have complained about it publicly.
 History suggests, though, that this is not the end of the story:
 researchers and companies that sell phone-unlocking tools continue to
 find weaknesses.
@@ -207,7 +207,7 @@ During boot, each stage checks not only that the next stage is signed by
 Apple, but also that the signature is for this phone's ECID.
 \marginnote{Apple calls this process \emph{system software
 authorization}, and the signed updates are said to be
-\emph{personalized} to the device. The phone also includes a fresh random
+\emph{personalized} to the device. The phone also generates a fresh random
 nonce in its request to Apple's servers, so that a signature that was
 captured once cannot be replayed later.}
 
@@ -218,7 +218,8 @@ Why does this help?
         \marginnote{Members of the jailbreaking community used to save the
         personalized signatures for their own phones (``SHSH blobs''), so
         that they could later downgrade to a version of iOS with a known
-        jailbreak. The anti-replay nonce makes this much harder.}
+        jailbreak. The anti-replay nonce makes this much harder.
+On many devices, though, the nonce is computed from a stored ``generator'' value, so an attacker who can run privileged code on the phone (for example, through a jailbreak or the \ttt{checkm8} Boot ROM bug) can restore the generator that was saved with a blob, which makes the old nonce and the old blob valid again.}
   \item Apple's update servers will not sign an out-of-date kernel for any
         ECID.
 \end{compactitem}
@@ -250,8 +251,7 @@ The state for this memory authentication lives in a small on-chip SRAM,
 which is not accessible to the main CPU.
 
 \paragraph{Comparison to SGX.}
-Intel's SGX (Software Guard Extensions), whose enclaves the Foreshadow
-attack in the previous chapter targeted, has a similar goal: hide secrets from a
+Intel's SGX (Software Guard Extensions) has a similar goal: hide secrets from a
 kernel that is not very trustworthy.
 It also encrypts and authenticates the memory it uses.
 The Secure Enclave differs from SGX in two ways:
@@ -263,6 +263,7 @@ The Secure Enclave differs from SGX in two ways:
   \item It runs only fixed software from Apple, rather than
         arbitrary application code.
 \end{compactitem}
+Intel's SGX was broken by the Foreshadow attack, which is an extension to Meltdown. Foreshadow was able to get Intel CPUs to sign anything!
 
 \subsection{User authentication}
 
