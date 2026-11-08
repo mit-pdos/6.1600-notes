@@ -405,14 +405,14 @@ For the NIST curve P-256, $h = 1$; for Curve25519, $h = 8$.
 
 \paragraph{Point compression.}
 \label{sec:compression}
-Given $x$, the only possible $y$ values are the two square roots $\pm y$ of
-$x^3 + ax + b$, and exactly one of $y$ and $p - y$ is even.
-So a point can be stored as its $x$-coordinate plus one parity bit:
-$33$ bytes for P-256.
 \marginnote{Decompressing requires a square root modulo $p$. When
 $p \equiv 3 \pmod 4$, as for P-256, and $z = w^2$ is a square, then
 $y = z^{(p+1)/4}$ works, since $y^2 = z \cdot z^{(p-1)/2} = z \cdot
 w^{p-1} = z \bmod p$ by Euler's theorem.}
+Given $x$, the only possible $y$ values are the two square roots $\pm y$ of
+$x^3 + ax + b$, and exactly one of $y$ and $p - y$ is even.
+So a point can be stored as its $x$-coordinate plus one parity bit:
+$33$ bytes for P-256.
 
 \section{Scalar multiplication}
 \label{sec:scalarmult}
@@ -447,6 +447,15 @@ every group operation, and inversions are much slower than
 multiplications. Real implementations represent points in
 \emph{projective coordinates} $(X : Y : Z)$, which stand for
 $(X/Z, Y/Z)$, and perform a single inversion at the very end.}
+\marginnote{Projective coordinates also give the point at infinity a
+concrete form. Substituting $x = X/Z$ and $y = Y/Z$ into the curve
+equation and clearing denominators gives
+$Y^2 Z = X^3 + aXZ^2 + bZ^3$. Setting $Z = 0$ forces $X = 0$, so
+$\calO = (0 : 1 : 0)$ is the only point with $Z = 0$. Every vertical
+line $X = cZ$ passes through it. In code, checking that $P \neq \calO$
+means checking that $Z \neq 0$. A point received as an affine pair
+$(x, y)$ that satisfies the curve equation can never be $\calO$; the
+SEC~1 encoding represents $\calO$ by the single byte \texttt{0x00}.}
 
 \paragraph{Side channels.}
 Double-and-add performs an extra addition exactly when a bit of $k$ is
@@ -469,15 +478,15 @@ For all efficient adversaries $\calA$:
    \leq \negl. \]
 \end{definition}
 
-Likewise, ECCDH says that given $(G, [x]G, [y]G)$ it is infeasible to
-compute $[xy]G$, and ECDDH says that for $x, y, z \getsr \{0, \dots, n-1\}$,
-the tuples $(G, [x]G, [y]G, [xy]G)$ and $(G, [x]G, [y]G, [z]G)$ are
-computationally indistinguishable.
 \marginnote{On some special curves, the ECDDH assumption is
 \emph{false} even though ECCDH and ECDLP appear hard: a ``pairing'' on
 the curve lets anyone test whether a tuple has the Diffie-Hellman form.
 Such pairing-friendly curves are useful for advanced constructions such
 as short BLS signatures, but they are never used for plain ElGamal.}
+Likewise, ECCDH says that given $(G, [x]G, [y]G)$ it is infeasible to
+compute $[xy]G$, and ECDDH says that for $x, y, z \getsr \{0, \dots, n-1\}$,
+the tuples $(G, [x]G, [y]G, [xy]G)$ and $(G, [x]G, [y]G, [z]G)$ are
+computationally indistinguishable.
 
 \subsection{Elliptic-curve Diffie-Hellman}
 
@@ -747,6 +756,11 @@ a symmetric key and encrypts the message with an authenticated-encryption
 scheme.
 The construction is identical to hashed ElGamal over $\Z^*_p$; only the
 group has changed.
+\marginnote{As before, $H$ must be applied to a canonical encoding of the
+point, such as its compressed form or just its $x$-coordinate, so that
+both parties hash the same bit string. Standardized versions of this
+scheme also include $R$ and $A$ in the hash input, which simplifies the
+security proof.}
 
 \begin{definition}[Hashed EC ElGamal]
 Let $H \colon E(\Fp) \to \calK'$ be a hash function (modeled as a random
@@ -777,11 +791,6 @@ with key space $\calK'$ and message space $\calM = \zo^*$.
 \end{itemize}
 \end{definition}
 
-\marginnote{As before, $H$ must be applied to a canonical encoding of the
-point, such as its compressed form or just its $x$-coordinate, so that
-both parties hash the same bit string. Standardized versions of this
-scheme also include $R$ and $A$ in the hash input, which simplifies the
-security proof.}
 
 \paragraph{Correctness.}
 The sender computes $k = H([r]A) = H([ra]G)$ and the recipient computes
