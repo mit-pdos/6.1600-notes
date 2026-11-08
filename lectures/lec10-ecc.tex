@@ -6,9 +6,11 @@
 
 When we discussed Diffie-Hellman key exchange and ElGamal encryption,
 we worked in the group $\Z^*_p$ of non-zero integers modulo a prime~$p$.
-At the end of that discussion, we noted that both protocols work
-just as well in \emph{any} group in which the discrete-log problem is hard,
-and that in practice we almost always use \emph{elliptic-curve groups}.
+Both protocols can be expressed using group operations, but their security
+requires the appropriate Diffie-Hellman assumptions, not merely hard discrete
+logarithms: computing a DH shared secret relies on CDH hardness, while
+textbook ElGamal's chosen-plaintext security relies on DDH hardness.
+In practice we usually use suitable \emph{elliptic-curve groups}.
 In this chapter, we will see what an elliptic-curve group actually is,
 why the discrete-log problem in it seems to be so hard,
 and how to run Diffie-Hellman and ElGamal encryption on top of it.
@@ -103,11 +105,11 @@ Every cyclic group of order $n$ has exactly the same abstract structure as
 $(\Z_n, +)$.
 But the discrete-log problem in $(\Z_n, +)$ is trivial: ``$g$ combined
 with itself $x$ times'' is just $x \cdot g \bmod n$, and we can recover
-$x$ by multiplying by $g^{-1} \bmod n$.
+$x$ by multiplying by $g^{-1} \bmod n$ (taking $g$ to be a generator).
 So the hardness of discrete log is not a property of the abstract group.
 It is a property of how the group elements are \emph{represented}.
-Elliptic curves give a representation in which, as far as anyone
-knows, discrete log is as hard as it can possibly be.
+Well-chosen elliptic curves give a representation in which the best known
+classical discrete-log attacks have the generic square-root complexity.
 
 \paragraph{Additive notation.}
 For $\Z^*_p$, we wrote the group operation as multiplication.
@@ -161,9 +163,13 @@ every vertical line.
 
 The remarkable fact about elliptic curves is that their points form a
 group under a simple geometric rule.
-The rule rests on one observation: since the curve is defined by a cubic
-equation, a straight line meets it in exactly three points
-(counting tangent points twice and counting $\calO$ for vertical lines).
+The rule rests on one observation: a line through two real points of the
+curve, or a tangent at a real point, has a third real intersection when
+we count multiplicities and include $\calO$ for vertical lines.
+An ordinary tangent counts twice at its point of tangency; an inflection
+tangent counts three times. An arbitrary real line need not have three
+real intersections; the general three-intersection statement holds over
+the complex projective plane, counting multiplicities.
 \begin{itemize}
   \item \textbf{Adding two distinct points.} To compute $P + Q$, draw the
         line through $P$ and $Q$. It meets the curve at a third point $R'$.
@@ -232,7 +238,8 @@ differentiating $y^2 = x^3 + ax + b$ to obtain $2y \, dy = (3x^2 + a)\, dx$.
 Putting everything together:
 
 \begin{definition}[Elliptic-curve point addition]\label{defn:ecadd}
-Let $P = (x_1, y_1)$ and $Q = (x_2, y_2)$ be points on the curve.
+Let $P$ and $Q$ be points on the curve, possibly $\calO$.
+For affine points, write $P = (x_1, y_1)$ and $Q = (x_2, y_2)$.
 \begin{itemize}[noitemsep]
   \item If $P = \calO$, then $P + Q = Q$. If $Q = \calO$, then $P + Q = P$.
   \item If $x_1 = x_2$ and $y_1 = -y_2$, then $P + Q = \calO$.
@@ -260,7 +267,7 @@ This innocent-looking fact will come back to haunt us in
 
 \begin{theorem}
 The points of an elliptic curve, together with $\calO$, form an abelian
-group under the addition of \cref{defn:ecadd}, with identity $\calO$ and
+group under the addition of Definition~\ref{defn:ecadd}, with identity $\calO$ and
 inverse $-(x, y) = (x, -y)$.
 \end{theorem}
 
@@ -291,7 +298,7 @@ $4a^3 + 27b^2 \neq 0 \bmod p$. The group of $\Fp$-points of the
 elliptic curve $E \colon y^2 = x^3 + ax + b$ is
 \[ E(\Fp) = \{ (x, y) \in \Fp \times \Fp \colon y^2 = x^3 + ax + b \bmod p \}
             \cup \{ \calO \}, \]
-with the group operation given by the formulas of \cref{defn:ecadd},
+with the group operation given by the formulas of Definition~\ref{defn:ecadd},
 where all arithmetic is done modulo $p$.
 \end{definition}
 \marginnote{We need $p > 3$ because the short Weierstrass form
@@ -315,7 +322,7 @@ For example, $x = 5$ gives $125 + 10 + 2 = 137 = 1 \bmod 17$,
 and $1 = 1^2 = 16^2 \bmod 17$, so $(5, 1)$ and $(5, 16)$ are on the curve.
 Doing this for every $x$ gives $18$ points, plus $\calO$, for a total of
 $|E(\F_{17})| = 19$.
-Since $19$ is prime, \cref{cor:primeorder} tells us that every point
+Since $19$ is prime, Corollary~\ref{cor:primeorder} tells us that every point
 other than $\calO$ generates the whole group.
 
 \begin{marginfigure}
@@ -421,12 +428,13 @@ The elliptic-curve analogue of computing $g^x$ is computing $[k]P$ for a
 scalar $k$ of about $256$ bits.
 Adding $P$ to itself $k$ times would take $2^{256}$ steps, but we can use
 the same trick as in square-and-multiply exponentiation.
-Write $k$ in binary as $k = (k_{\ell-1} k_{\ell-2} \cdots k_0)_2$ with
+For $k = 0$, return $\calO$. For $k > 0$, write $k$ in binary as $k = (k_{\ell-1} k_{\ell-2} \cdots k_0)_2$ with
 $k_{\ell-1} = 1$, and process the bits from most to least significant:
 
 \begin{itemize}
   \item $\mathsf{ScalarMult}(k, P) \to [k]P$. (Double-and-add.)
   \begin{itemize}[noitemsep]
+    \item If $k = 0$, output $\calO$ and stop.
     \item Set $R \gets P$.
     \item For $i = \ell - 2$ down to $0$:
     \begin{itemize}[noitemsep]
@@ -442,7 +450,7 @@ $1$; for example, $7 = (111)_2$, so $[7]G$ is computed as
 $G \to [2]G \to [3]G \to [6]G \to [7]G$.
 Double-and-add takes at most $2\ell$ group operations, each costing a
 handful of multiplications in $\Fp$.
-\marginnote{The formulas of \cref{defn:ecadd} need a field inversion for
+\marginnote{The formulas of Definition~\ref{defn:ecadd} need a field inversion for
 every group operation, and inversions are much slower than
 multiplications. Real implementations represent points in
 \emph{projective coordinates} $(X : Y : Z)$, which stand for
@@ -504,6 +512,8 @@ $G$ of prime order $n$.
     \end{itemize}
   \item $\mathsf{Derive}(\sk_A, \pk_B) \to k$.
     \begin{itemize}[noitemsep]
+      \item Check that $\pk_B$ is a valid point in $\langle G\rangle$
+            and $\pk_B \neq \calO$; otherwise output $\bot$.
       \item Output $k \gets [\sk_A]\pk_B \in E(\Fp)$.
     \end{itemize}
 \end{itemize}
@@ -528,10 +538,11 @@ parallelizes well, so it is the algorithm used in practice to attack
 elliptic curves.
 \marginnote{Pollard's rho algorithm takes a pseudorandom walk through the
 group in which each step is a known combination $[\alpha]G + [\beta]Q$.
-After about $\sqrt{\pi n / 4}$ steps, by the birthday paradox, the walk
+After about $\sqrt{\pi n / 2}$ steps in the idealized random-walk model, by the birthday paradox, the walk
 revisits a point, which gives an equation
 $[\alpha]G + [\beta]Q = [\alpha']G + [\beta']Q$ that can be solved
-for~$x$.}
+for~$x$ provided $\beta-\beta' \neq 0 \bmod n$; otherwise the
+attempt must be retried.}
 
 Shoup proved that no generic algorithm can do better than
 $\Omega(\sqrt{n})$,\autocite{Shoup97} so on a curve of $256$-bit prime
@@ -539,14 +550,14 @@ order, generic attacks take about $2^{128}$ operations.
 \marginnote{The largest elliptic-curve discrete-log instances solved in
 public are around $112$ to $117$ bits.}
 
-\paragraph{Why the group order must be prime.}
-If the group order is $n = n_1 n_2$ with $\gcd(n_1, n_2) = 1$, then
+\paragraph{Why we use a large prime-order subgroup.}
+If the order of $G$ is $n = n_1 n_2$ with $\gcd(n_1, n_2) = 1$, then
 $[n_2]G$ has order $n_1$ and $[n_2]Q = [x]([n_2]G)$, so a discrete log in
 the small subgroup of order $n_1$ reveals $x \bmod n_1$. Doing the same
 for $n_2$ and combining with the Chinese Remainder Theorem gives $x$.
 This \emph{Pohlig-Hellman} algorithm\autocite{PohligHellman78} runs in
 time governed by the \emph{largest prime factor} of $n$, which is why $G$
-must have large prime order.
+should be chosen to generate a large prime-order subgroup.
 
 \paragraph{No Number Field Sieve.}
 The sub-exponential attacks on $\Z^*_p$ view group elements as integers
@@ -554,7 +565,7 @@ and exploit the fact that integers often factor into small primes.
 Points on an elliptic curve have no useful analogue of factoring into
 ``small'' points, as Miller observed in his original
 proposal.\autocite{Miller85}
-Almost forty years later, for well-chosen curves over prime fields, the
+More than forty years later, for well-chosen curves over prime fields, the
 best known attacks are still the generic $\sqrt{n}$ ones.
 
 \section{Choosing a curve}
@@ -577,8 +588,11 @@ constant-time ladder that uses only $x$-coordinates.
 $p = 2^{256} - 2^{32} - 977$.
 
 \paragraph{Can we trust the curve?}
-The constant $b$ in P-256 is the SHA-1 hash of a seed, to show that it
-was not chosen maliciously, but the seed itself was never explained.
+The constant $b$ in P-256 is derived from a published seed using SHA-1,
+not simply equal to a hash output. The derivation constructs an integer
+$c$ from hash outputs and chooses $b$ satisfying $b^2c = -27 \bmod p$.
+This makes the derivation verifiable, but does not explain how the seed
+itself was chosen.
 No weakness has ever been found, and P-256 is believed to be secure.
 \marginnote{This concern is not entirely paranoid. The Dual EC DRBG
 pseudorandom generator, standardized by NIST in 2006, used two
@@ -591,7 +605,7 @@ satisfying published criteria, leaving no freedom to hide a backdoor.
 \section{Pitfall: Invalid-curve attacks}
 \label{sec:invalid-curve}
 
-Recall that the addition formulas in \cref{defn:ecadd} never use the
+Recall that the addition formulas in Definition~\ref{defn:ecadd} never use the
 coefficient $b$.
 So if an implementation receives a point $P' = (x', y')$ from the network
 and multiplies it by its secret key without checking that $P'$ lies on
@@ -617,17 +631,20 @@ specification did not require devices to validate the public keys they
 received.\autocite{BihamNeumann19}
 
 \paragraph{\textbf{IMPORTANT}:}
-Every point received from the outside world must be checked to be on the
-curve, and not to be $\calO$, before it is used.
-If the curve has a cofactor $h > 1$, the point must also be checked to
-lie in the subgroup of order $n$, or the protocol must otherwise be
-designed to be safe without the check.
-\marginnote{X25519 avoids the need for explicit checks by design: it
-works only with $x$-coordinates, every $x$ value lies either on
-Curve25519 or on its ``quadratic twist,'' and both groups were chosen to
-have a large prime-order subgroup. The secret scalar is also always a
-multiple of the cofactor $8$, which removes any small-subgroup
-component.}
+For the full-point protocols here, validate received point encodings and
+check curve membership before using them. Public keys and ephemeral DH
+components must not be $\calO$. If the curve has a cofactor $h > 1$,
+these DH inputs must also lie in the subgroup of order $n$, unless the
+protocol is specifically designed to be safe without this check.
+Nonidentity requirements depend on the point's role: textbook ElGamal's
+$C_2$ may legitimately equal $\calO$, for example when $M = -[r]A$.
+\marginnote{X25519 avoids explicit full-point curve-membership checks:
+its $x$-coordinate inputs correspond to Curve25519 or its quadratic
+twist, both with large prime-order subgroups. Clamping makes the scalar
+a multiple of $8$, eliminating small-order components. A purely
+small-order input nevertheless yields an all-zero shared secret.
+Protocols requiring rejection of this predictable secret, including
+HPKE, must check for an all-zero output and abort.}
 
 \section{ElGamal encryption on elliptic curves}
 
@@ -655,6 +672,8 @@ The message space is $\calM = E(\Fp)$.
     \end{itemize}
   \item $\Enc(\pk, M) \to (C_1, C_2)$:
     \begin{itemize}[noitemsep]
+      \item Check that $A$ is a valid point in $\langle G\rangle$
+            and $A \neq \calO$; otherwise output $\bot$.
       \item Choose $r \getsr \{1, \dots, n-1\}$.
       \item Compute $C_1 \gets [r]G$.
       \item Compute $C_2 \gets M + [r]A$.
@@ -716,10 +735,16 @@ Note that the recipient never needed to know that $M = [14]G$; neither
 party has to solve a discrete log.
 
 \paragraph{Encoding messages as points.}
-To encrypt a bit string $m$, we must first map it to a point.
+To encrypt a bit string, first encode it reversibly as a nonnegative
+integer $m$ (preserving its length). Choose a positive integer $K$ and
+restrict $0 \le m < \lfloor p/K \rfloor$.
 Koblitz's method\autocite{Koblitz87} tries $x = mK + j$ for
 $j = 0, 1, \dots, K-1$ until $x^3 + ax + b$ is a square and takes $y$ to be
-its square root; it fails with probability about $2^{-K}$.
+one of its square roots. The bound ensures $x < p$, so decoding recovers
+$m = \lfloor x/K \rfloor$ without modular wraparound.
+If no candidate works, encoding fails. Treating the square tests as
+independent trials suggests a failure rate of about $2^{-K}$; this is a
+heuristic, not a guarantee for every fixed message and curve.
 Hashed ElGamal, below, avoids the issue entirely.
 
 \paragraph{Security.}
@@ -735,8 +760,9 @@ $M$, exactly as with a one-time pad.
 
 Textbook ElGamal is \emph{not} secure against chosen-ciphertext attacks,
 however, because it is \emph{malleable}.
-Given an encryption $(C_1, C_2)$ of an unknown $M$, anyone can produce
-$(C_1, C_2 + M')$, which is a valid encryption of $M + M'$.
+Given an encryption $(C_1, C_2)$ of an unknown $M$, anyone can choose
+$M' \neq \calO$ and produce $(C_1, C_2 + M')$, which is a valid encryption
+of $M + M'$.
 An adversary in the CCA game can submit this modified ciphertext to the
 decryption oracle (it is not equal to the challenge ciphertext), subtract
 $M'$ from the answer, and recover~$M$.
@@ -756,16 +782,19 @@ a symmetric key and encrypts the message with an authenticated-encryption
 scheme.
 The construction is identical to hashed ElGamal over $\Z^*_p$; only the
 group has changed.
-\marginnote{As before, $H$ must be applied to a canonical encoding of the
-point, such as its compressed form or just its $x$-coordinate, so that
-both parties hash the same bit string. Standardized versions of this
-scheme also include $R$ and $A$ in the hash input, which simplifies the
-security proof.}
+\marginnote{Here $H$ must use a canonical, injective point encoding,
+such as the full compressed encoding including the parity bit.
+Hashing only the $x$-coordinate is insecure in this construction:
+$(R,c')$ and $(-R,c')$ would decrypt under the same key, giving a
+chosen-ciphertext attack. Practical constructions also bind the
+encapsulation and recipient public key into key derivation.}
 
 \begin{definition}[Hashed EC ElGamal]
 Let $H \colon E(\Fp) \to \calK'$ be a hash function (modeled as a random
 oracle) and let $(\Enc', \Dec')$ be an authenticated-encryption scheme
 with key space $\calK'$ and message space $\calM = \zo^*$.
+Represent every transmitted point by its unique canonical encoding and
+reject noncanonical encodings; evaluate $H$ on the full point encoding.
 \begin{itemize}
   \item $\Gen() \to (\sk, \pk)$:
     \begin{itemize}[noitemsep]
@@ -775,6 +804,8 @@ with key space $\calK'$ and message space $\calM = \zo^*$.
     \end{itemize}
   \item $\Enc(\pk, m) \to c$:
     \begin{itemize}[noitemsep]
+      \item Check that $A$ is a valid point in $\langle G\rangle$
+            and $A \neq \calO$; otherwise output $\bot$.
       \item Choose $r \getsr \{1, \dots, n-1\}$.
       \item Compute $R \gets [r]G$.
       \item Compute $k \gets H([r]A)$.
@@ -801,12 +832,20 @@ by the correctness of the authenticated-encryption scheme.
 An honestly generated $R = [r]G$ always passes the validity check.
 
 \paragraph{Security.}
-Modeling $H$ as a random oracle, hashed EC ElGamal is secure against
-chosen-ciphertext attacks, assuming that the ECCDH problem is hard and that
-$(\Enc', \Dec')$ is a secure authenticated-encryption scheme; the proof is
-the same as for hashed ElGamal over $\Z^*_p$.
-Changing $R$ changes the key $k$ unpredictably, and changing $c'$ makes
-the authenticated encryption reject, so the scheme is not malleable.
+Modeling $H$ as a random oracle on full, canonically encoded points,
+hashed EC ElGamal is secure against chosen-ciphertext attacks under the
+\emph{strong DH} assumption and the security of the authenticated-encryption
+scheme $(\Enc', \Dec')$. Here strong DH means that, given $A=[a]G$ and
+$R=[r]G$, computing $[ar]G$ remains hard even with an oracle that, on
+inputs $(U,V)$, tests whether $V=[a]U$. The stronger Gap-CDH assumption,
+which grants a general DDH oracle, also suffices. Plain ECCDH hardness
+alone does not supply the standard CCA proof.\footnote{See David Cash,
+Eike Kiltz, and Victor Shoup, ``The Twin Diffie-Hellman Problem and
+Applications,'' EUROCRYPT 2008, Section 1.}
+For nonzero $a$, distinct subgroup points $R$ give distinct shared points;
+full-point hashing avoids the sign ambiguity described in the margin.
+The security proof must also account for adaptive decryption queries,
+which is why the strengthened DH assumption is needed.
 Note the validity check on $R$, though: the proof assumes
 $R \in \langle G \rangle$, and without the check the decryption oracle is
 exactly the oracle that the invalid-curve attack of
@@ -819,5 +858,9 @@ with X25519, HKDF-SHA256, and AES-GCM.
 Encryption takes two scalar multiplications ($[r]G$, which can use a
 precomputed table, and $[r]A$); decryption takes one ($[a]R$). Each takes
 tens of microseconds, versus about a millisecond for an exponentiation
-modulo a $3072$-bit prime, and $R$ adds only $32$ or $33$ bytes to the
-ciphertext, versus $384$ bytes over $\Z^*_p$ at the same security level.
+modulo a $3072$-bit prime, depending on the implementation and hardware.
+The encapsulation uses $32$ bytes with X25519. A compressed P-256 point
+uses $33$ bytes, but HPKE specifies an uncompressed P-256 encoding and
+therefore uses $65$ bytes. These are encapsulation sizes only, excluding
+the authenticated-encryption overhead, compared with a $384$-byte field
+element for a $3072$-bit finite-field instantiation.
