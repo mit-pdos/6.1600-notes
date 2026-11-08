@@ -445,11 +445,6 @@ $k_{\ell-1} = 1$, and process the bits from most to least significant:
   \end{itemize}
 \end{itemize}
 
-Doubling appends a $0$ bit to the scalar and adding $P$ turns it into a
-$1$; for example, $7 = (111)_2$, so $[7]G$ is computed as
-$G \to [2]G \to [3]G \to [6]G \to [7]G$.
-Double-and-add takes at most $2\ell$ group operations, each costing a
-handful of multiplications in $\Fp$.
 \marginnote{The formulas of Definition~\ref{defn:ecadd} need a field inversion for
 every group operation, and inversions are much slower than
 multiplications. Real implementations represent points in
@@ -464,6 +459,11 @@ line $X = cZ$ passes through it. In code, checking that $P \neq \calO$
 means checking that $Z \neq 0$. A point received as an affine pair
 $(x, y)$ that satisfies the curve equation can never be $\calO$; the
 SEC~1 encoding represents $\calO$ by the single byte \texttt{0x00}.}
+Doubling appends a $0$ bit to the scalar and adding $P$ turns it into a
+$1$; for example, $7 = (111)_2$, so $[7]G$ is computed as
+$G \to [2]G \to [3]G \to [6]G \to [7]G$.
+Double-and-add takes at most $2\ell$ group operations, each costing a
+handful of multiplications in $\Fp$.
 
 \paragraph{Side channels.}
 Double-and-add performs an extra addition exactly when a bit of $k$ is
@@ -527,6 +527,13 @@ $x$-coordinate) to obtain a symmetric key, as over $\Z^*_p$.
 \subsection{How hard is the ECDLP?}
 
 \paragraph{Generic attacks.}
+\marginnote{Pollard's rho algorithm takes a pseudorandom walk through the
+group in which each step is a known combination $[\alpha]G + [\beta]Q$.
+After about $\sqrt{\pi n / 2}$ steps in the idealized random-walk model, by the birthday paradox, the walk
+revisits a point, which gives an equation
+$[\alpha]G + [\beta]Q = [\alpha']G + [\beta']Q$ that can be solved
+for~$x$ provided $\beta-\beta' \neq 0 \bmod n$; otherwise the
+attempt must be retried.}
 Some discrete-log algorithms work in \emph{any} group.
 \emph{Baby-step giant-step} writes $x = im + j$ with
 $m = \lceil \sqrt{n} \rceil$, stores $[j]G$ for all $j < m$ in a table,
@@ -536,13 +543,6 @@ Pollard's rho algorithm\autocite{Pollard78} achieves the same
 $O(\sqrt{n})$ running time with only a constant amount of memory, and it
 parallelizes well, so it is the algorithm used in practice to attack
 elliptic curves.
-\marginnote{Pollard's rho algorithm takes a pseudorandom walk through the
-group in which each step is a known combination $[\alpha]G + [\beta]Q$.
-After about $\sqrt{\pi n / 2}$ steps in the idealized random-walk model, by the birthday paradox, the walk
-revisits a point, which gives an equation
-$[\alpha]G + [\beta]Q = [\alpha']G + [\beta']Q$ that can be solved
-for~$x$ provided $\beta-\beta' \neq 0 \bmod n$; otherwise the
-attempt must be retried.}
 
 Shoup proved that no generic algorithm can do better than
 $\Omega(\sqrt{n})$,\autocite{Shoup97} so on a curve of $256$-bit prime
@@ -758,6 +758,12 @@ But $[z]G$ is a uniformly random point that is independent of $M$, so
 $M + [z]G$ is also a uniformly random point that reveals nothing about
 $M$, exactly as with a one-time pad.
 
+\marginnote{Malleability is sometimes a feature. In ``exponential''
+ElGamal, a small integer $m$ is encrypted as the point $[m]G$, and adding
+two ciphertexts component-wise gives an encryption of $[m + m']G$.
+Electronic-voting systems use this to add up encrypted votes, decrypting
+only the final tally, which is small enough that its discrete log can be
+found by brute force.}
 Textbook ElGamal is \emph{not} secure against chosen-ciphertext attacks,
 however, because it is \emph{malleable}.
 Given an encryption $(C_1, C_2)$ of an unknown $M$, anyone can choose
@@ -766,12 +772,6 @@ of $M + M'$.
 An adversary in the CCA game can submit this modified ciphertext to the
 decryption oracle (it is not equal to the challenge ciphertext), subtract
 $M'$ from the answer, and recover~$M$.
-\marginnote{Malleability is sometimes a feature. In ``exponential''
-ElGamal, a small integer $m$ is encrypted as the point $[m]G$, and adding
-two ciphertexts component-wise gives an encryption of $[m + m']G$.
-Electronic-voting systems use this to add up encrypted votes, decrypting
-only the final tally, which is small enough that its discrete log can be
-found by brute force.}
 
 \subsection{Hashed elliptic-curve ElGamal}
 
