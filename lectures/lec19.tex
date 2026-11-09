@@ -22,7 +22,7 @@ is then:
 \begin{quote}
 ``Any bug can be a security bug.''
 \end{quote}
-Protecting the security of computer system thus requires
+Protecting the security of computer systems thus requires
 eliminating software bugs. 
 
 Many bugs can lead to security exploits, but some
@@ -36,7 +36,7 @@ and resource-consumption bugs.
 \section{Memory Corruption}
 
 Memory-corruption bugs show up in languages, such as C and C++, that
-do not guarantee any sort of memory- or type-safety properites.
+do not guarantee any sort of memory- or type-safety properties.
 The two most common types of memory-corruption bugs 
 are: (1) buffer overflows and (2) use-after-free bugs.
 
@@ -54,11 +54,11 @@ void f() {
 
 This code allocates an array of 128 bytes and then uses \ttt{gets} to
 read a string from standard input into the buffer.
-The \ttt{gets} routine will read the input from until it reaches the
+The \ttt{gets} routine will read the input until it reaches the
 end of the string (indicated in C with a zero byte), then it will
 write the corresponding string into the buffer.
 Arrays in C have no length information attached to them, so the \ttt{gets}
-code will happily accept an input strength of any length---possibly much larger
+code will happily accept an input string of any length---possibly much larger
 than 127 bytes.
 
 So, what happens if the input is 
@@ -85,17 +85,17 @@ buf[0]
 ---------------
 \end{verbatim}
 
-\marginnote{You might think that the fact that this problem is caused
+\marginnote{You might think that this problem is caused
 in part by having the stack in C grow down, so that running off the end 
 of the buffer can cause the attacker to overwrite the return address.
 It turns out that similar attacks are possible even on architectures
 in which the stack grows up. The fundamental problem is that the 
 attacker can scribble over data in the stack.}
 Once the \ttt{f} function ends execution, the program will jump to the
-return address sitting after at the end of there buffer.
+return address sitting at the end of the buffer.
 So if an attacker can write data past the end of the \ttt{buf} array, 
 the attacker can overwrite the return address of \ttt{f} on the stack
-and the attack can cause the program to jump to and begin executing
+and the attacker can cause the program to jump to and begin executing
 code at an arbitrary location in memory.
 
 One simple mitigation is to 
@@ -103,10 +103,54 @@ modify the compiler to refuse to compile programs that use
 routines such as \ttt{gets}.
 We discuss other mitigations below.
 
-% TODO: return address examples
-% TODO: stack diagrams---f's frame and gets's frame
+\paragraph{Controlling the return address.}
+What can an attacker actually do once it is able to overwrite the return
+address? A common strategy is to place its own machine code---often
+called \emph{shellcode}, because it frequently just spawns a command
+shell---inside the very bytes that it writes into \ttt{buf}, and then to
+overwrite the return address of \ttt{f} with the address of \ttt{buf}
+itself. When \ttt{f} returns, the program counter jumps into the buffer
+and the attacker's code begins executing with all of the privileges of
+the vulnerable program.
 
-To avoid this kind of \emph{buffer overlow} bug, we need to somehow ensure that
+It is worth looking more carefully at \emph{which} return address the
+attacker overwrites. When \ttt{f} calls \ttt{gets(buf)}, there are two
+stack frames in play at once: the frame for \ttt{f}, which contains
+\ttt{buf} and the return address back into \ttt{f}'s caller, and the
+frame for \ttt{gets}, which contains the return address that \ttt{gets}
+uses to return back into \ttt{f}. On a typical architecture, where the
+stack grows downward, \ttt{gets} fills \ttt{buf} in the direction of
+increasing addresses, so an overflow runs past the end of \ttt{buf} and
+over \ttt{f}'s saved frame pointer and the return address of \ttt{f}'s
+caller:
+\begin{verbatim}
+        ... rest of stack ...
+        ----------------------------
+        return address (f's caller)    ^
+        ----------------------------   |
+        saved frame pointer            |  overflow
+        ----------------------------   |  grows
+ buf -> buf[127]                       |  this way
+        ...                            |
+        buf[0]                         |
+        ----------------------------   <- gets's frame
+        return address (back into f)
+        ----------------------------
+        ... gets's locals ...
+        ----------------------------
+        (stack grows down)
+\end{verbatim}
+
+Having the stack grow downward is not what makes the attack possible.
+Even on an architecture whose stack grows \emph{upward}, an overflow of
+\ttt{buf} would instead run into \ttt{gets}'s frame and overwrite the
+return address that \ttt{gets} uses to return into \ttt{f}. Either way,
+the attacker ends up controlling some return address, and therefore the
+program counter. The fundamental problem is simply that the attacker can
+scribble over control data sitting on the stack right next to the
+buffer.
+
+To avoid this kind of \emph{buffer overflow} bug, we need to somehow ensure that
 \ttt{gets} only writes within the bounds of the buffer. 
 
 \paragraph{Mitigation: Runtime checks}
@@ -140,7 +184,7 @@ void f() {
 	uint32_t n = get_input();
 	if (n * 16 > sz) {
 		// input too long!
-		return
+		return;
 	}
 	for (uint32_t i=0; i < n; i++) {
 		// read record i into buf[i*16] .. buf[i*16+15]
@@ -160,6 +204,39 @@ will pass but our code will still write beyond the end of the buffer.
 To prevent this type of overflow, the program can explicitly check
 for overflow---it's tricky to do, but important when accepting user-provided input.
 
+\paragraph{Mitigation: Stack canaries}
+Rather than trying to prevent an overflow from happening in the first
+place, we can instead try to \emph{detect} it before the corrupted
+return address is ever used. This is the idea behind defenses such as
+StackGuard and gcc's stack-smashing protector. When a function is
+entered, the compiler-generated code pushes a known value---called a
+\emph{canary}---onto the stack, positioned between the local buffers and
+the saved return address. Just before the function returns, the code
+pops the canary and checks that it still holds its original value; if it
+has changed, the program concludes that the stack has been smashed and
+aborts instead of returning.
+\begin{verbatim}
+        ----------------------------
+        return address
+        ----------------------------
+        saved frame pointer
+        ----------------------------
+        CANARY                         ^ overflow must
+        ----------------------------   | overwrite the
+        buf[127]                       | canary before it
+        ...                            | can reach the
+        buf[0]                         | return address
+        ----------------------------
+\end{verbatim}
+Because an overflow that reaches the return address must first write over
+the canary, the check will almost always fail and stop the attack. For
+this to work, the attacker must not be able to guess the canary value, so
+it is typically a random number chosen when the program starts and kept
+secret. Canaries are not a complete defense---an attacker who can read or
+guess the canary value, or who can corrupt the return address without
+writing through the canary, may still succeed---but they raise the bar
+considerably.
+
 \subsection{Use after free}
 Another common type of bug is a use-after-free bug,
 in which a programmer frees a chunk of heap memory and then
@@ -178,7 +255,7 @@ void f() {
 }
 \end{lstlisting}
 If some other thread in the program calls \ttt{malloc} when
-the code is a point \ttt{***}, the other thread of execution
+the code is at point \ttt{***}, the other thread of execution
 may use the array \ttt{req} for something else.
 Then the \ttt{printf} line could print out some other contents
 of memory---possibly exposing cryptographic keys or other
@@ -191,9 +268,41 @@ One way to defend against these bugs is to use a programming language,
 such as Rust, that explicitly associates a ``lifetime'' with each piece
 of memory and can prevent code from accessing free'd memory.
 
+\paragraph{Preventing use-after-free bugs.}
+Use-after-free bugs are, today, among the most prevalent memory-safety
+errors in deployed software. Depending on what the freed memory is
+reused for, they can lead either to the leakage of sensitive data, as in
+the example above, or to the corruption of data the program relies
+on---for example, overwriting a function pointer that is later called.
+Unlike buffer overflows, these bugs are hard to stop with simple range or
+bounds checks: the access itself is in bounds, and the only thing wrong
+with it is its \emph{timing} relative to the \ttt{free}. What we really
+need are \emph{lifetime} checks that track when a piece of memory is
+still valid to use.
 
-% TODO: protecting against this
-% TODO: memory-safe languages
+These lifetime checks can be enforced in one of two broad ways. The first
+is to check lifetimes at compile time through the language's type system,
+as Rust does: the compiler refuses to compile a program that could use
+memory after it has been freed, so the bug can never arise at runtime.
+The second is to add ``band-aid'' checks at runtime that attempt to catch
+accesses to freed memory. These runtime checks are tricky to get right,
+however---once memory has been freed and then reallocated for some other
+purpose, a runtime check can no longer easily tell that accessing it is
+invalid.
+
+\paragraph{Memory-safe languages.}
+Taking a step back, an appealing way to avoid all of these
+memory-corruption bugs is to write code in a language that is memory-safe
+in the first place. This helps, but it is not a complete escape. Suppose
+you write all of your code in Python: the Python runtime itself is
+written in C, many of the library modules you import are written in C,
+and the underlying operating-system kernel is written in C as well. A
+memory-corruption bug anywhere in that stack can still compromise your
+program. The more hopeful development is the emergence of newer languages
+such as Rust, which aim to provide strong memory-safety guarantees while
+remaining suitable for low-level systems code, making it much harder to
+write the kinds of mistakes that lead to memory corruption in the first
+place.
 
 \section{Encoding Bugs}
 Another common source of security bugs comes from encoding and decoding data from and to language data structures.
@@ -237,7 +346,7 @@ automatically to avoid these ``SQL injection'' attacks.
 
 
 \subsection{Cross-Site Scripting}
-Another common behavior is to take input from the user via a form, save it to the database, and later render that input to another user as HTML. For example, a social media site will have each user enter their name when the sign up, and may use some code like the following to render another user's list of friends:
+Another common behavior is to take input from the user via a form, save it to the database, and later render that input to another user as HTML. For example, a social media site will have each user enter their name when they sign up, and may use some code like the following to render another user's list of friends:
 
 \begin{lstlisting}[language=python]
 def render_friends(friends: List[str]):
@@ -248,7 +357,7 @@ def render_friends(friends: List[str]):
 	print("</ul>")
 \end{lstlisting}
 
-If a friend's name is something expected, like \textquote{Alice} or \textquote{Bob}, this works fine. However, what if a friends sets their name to something like \ttt{<script>send_to_adversary(document.cookie)</script>}? Now, the rendered HTML will look something like the following:
+If a friend's name is something expected, like \textquote{Alice} or \textquote{Bob}, this works fine. However, what if a friend sets their name to something like \ttt{<script>send_to_adversary(document.cookie)</script>}? Now, the rendered HTML will look something like the following:
 
 \begin{lstlisting}[language=html]
 <h3>Friends</h3>	
@@ -270,7 +379,21 @@ with the sequences \ttt{&lt;} and \ttt{&gt;}. Now
 that \ttt{&} has a special meaning, we also must escape it as \ttt{&amp;}.
 Modern web frameworks have ``templating'' systems that automate this escaping process.
 
-% TODO: pickling
+\subsection{Decoding: Python Pickling}
+Decoding untrusted data can be just as dangerous as encoding it. Python's
+\ttt{pickle} module, for example, lets a program serialize almost any
+object into a sequence of bytes and later reconstruct it. In order to
+support arbitrary objects, the module lets each object customize how it
+is pickled and, crucially, how it is \emph{unpickled}. As a consequence,
+reconstructing an object from its pickled bytes can cause code to run.
+
+This means that an adversary who can supply the bytes that a program
+unpickles can craft a byte sequence that causes the program to execute
+arbitrary code of the adversary's choosing. The lesson is that
+general-purpose serialization formats like \ttt{pickle} should never be
+used to decode data coming from an untrusted source; instead, one should
+use a format with a simple, well-specified decoder that has no ability to
+invoke arbitrary code.
 
 \subsection{Decoding: Android Apps}
 The application-installation process on Android also suffered from decoding errors. Apps on Android (\ttt{.apk} files) are just renamed ZIP files.
@@ -301,14 +424,14 @@ execution can access the same data at the same time.
 
 \subsection{File system races / Time-of-check-time-of-use (TOCTOU) bugs}
 
-When deadline with files, symbolic links can cause all sorts of chaos.
-A piece of code might want to check that it is deadline with a regular
+When dealing with files, symbolic links can cause all sorts of chaos.
+A piece of code might want to check that it is dealing with a regular
 file---rather than a symbolic link---before opening it.
 A bad way to implement would be like this:
 \begin{lstlisting}[language=c]
 // WRONG
 if(lstat(path, &st) < 0) error();
-if(!S_ISREG(st.st_node)) error();
+if(!S_ISREG(st.st_mode)) error();
 // ***
 int f = open(path, O_RDWR);
 ...
@@ -321,7 +444,7 @@ the regular file with a symbolic link that points to somewhere else.
 file while ensuring that the file is of a particular type.}
 The way to defend against this bug is to change the interface.
 Newer versions of the POSIX file-system APIs enable checking
-for this type of property in a way that defats race conditions.
+for this type of property in a way that defeats race conditions.
 
 
 \section{Resource Usage}
@@ -357,7 +480,20 @@ security even when software bugs arise.
 Techniques such as fuzzing can find bugs before they hit
 production systems.
 
-\paragraph{Catch an Mitigate Bugs at Runtime}
+\paragraph{Catch and Mitigate Bugs at Runtime}
+Even when a bug makes it into a running program, a number of runtime
+defenses can catch it or blunt its impact. For memory-corruption bugs,
+these include the stack canaries discussed above, as well as
+address-space layout randomization (ASLR), which randomizes where code
+and data are placed in memory so that an attacker cannot easily predict
+useful addresses, and marking the stack and other data regions as
+non-executable (NX) so that injected data cannot be run as code. Running
+in a memory-safe language adds its own runtime bounds checking.
+Control-flow integrity (CFI) defends against code-injection attacks by
+ensuring that the program only follows legitimate control-flow paths, and
+taint tracking can catch injection attacks by following untrusted data as
+it flows through the program. We discuss several of these techniques in
+more detail in the next lecture.
 
 \paragraph{Deploy Bug Fixes Quickly}
 A big advance in browser security came from mechanisms
