@@ -141,7 +141,9 @@ easily extract the secret key.
 
 This design does not completely protect us against the compromise of the application.
 In particular, an attacker who compromises our app can still call \ttt{sign()} as much as they like to sign any message they like. 
-At the same time, having the key isolated to this crypto component allows us to add checks inside the crypto component to, for example, reject messages of the wrong type\marginnote{Although in many cases the things we are worried about an attacker asking for signatures of will pass this type check: for example, for a CA, this would still allow an attacker to generate a certificate for their malicious website.}. If our service is a certificate authority, we could set up our crypto component to verify that each message is an actual signature before signing it.
+At the same time, having the key isolated to this crypto component allows us to add checks inside the crypto component to, for example, reject messages of the wrong type\marginnote{Although in many cases the signatures we are most worried about will pass this type check anyway: for example, for a CA, this would still allow an attacker to generate a certificate for their malicious website.}. If our service is a certificate authority, we could set up our crypto component to parse each message and verify that it is a well-formed
+certificate---with the expected structure, our own issuer name, and
+sane validity dates---before signing it.
 
 \begin{figure}
 \begin{verbatim}
@@ -174,7 +176,7 @@ Browser tab  ----- Encoded data-----> JPG/Media codec
 in a separate sandbox.}\label{fig:codec}
 \end{figure}
 
-Isolating codecs may not always be as trivial as \cref{fig:codec} makes it seem.
+Isolating codecs may not always be as trivial as Figure \ref{fig:codec} makes it seem.
 In many cases, codecs require a sophisticated interface to the browser tab: the
 codec library may progressively decode videos as data arrives, for example. 
 Even image decoders progressively decode images, improving resolution as more data arrives. Supporting this functionality without adding vulnerabilities or excessive 
@@ -297,16 +299,101 @@ Client ----> HTTPS  ---> Front-end
 \end{figure}
 
 \section{Example: Web client}
-When you open a PDF attachment in Gmail , you might
-worry that the PDF could exploit some bug in your browser that could steal
-your sensitive Google data.
-To make this kind of attack more difficult, Gmail serves attachments
-and other suspect files from a separate domain (``origin')): \texttt{googleusercontent.com}.
-Code loaded from \texttt{googleusercontent.com} cannot access cookies
-or data for \texttt{google.com}. In this way, even if an attacker can somehow
-run JavaScript in your browser, it cannot easily steal your Google cookies.
+\label{sec:webclient}
+When you open a PDF attachment in Gmail, you might worry that the PDF
+could exploit some bug in your browser and steal your sensitive Google
+data.  To make this kind of attack more difficult, Gmail serves
+attachments and other suspect files from a separate domain
+(``origin''): \texttt{googleusercontent.com}.
+Code loaded from \texttt{googleusercontent.com} cannot access the
+cookies or data belonging to \texttt{google.com}, so even if an attacker
+can somehow run JavaScript in your browser, it cannot easily steal your
+Google cookies.\marginnote{The clearest case is not a PDF at all, but an HTML
+attachment: that is literally a web page that the attacker wrote and
+mailed to you.  If Gmail served it from \texttt{mail.google.com},
+opening it would run the attacker's script inside Google's own
+origin---a stored cross-site scripting bug that requires no exploit at
+all.  Served from a foreign domain, the same attachment is reduced to
+``the attacker hosts a web page,'' which anyone can do anyway.}
+
+\paragraph{What an origin buys us.}
+A browser \emph{origin} is the triple (scheme, host, port), and the
+browser's \emph{same-origin policy} prevents script running in one
+origin from reading another origin's cookies, from inspecting the
+contents of its pages, and from reading the responses to requests that
+it makes to that origin.
+Cookies are scoped by a different rule, which we come to in a moment,
+but it has the same effect here: a cookie set for \texttt{google.com}
+is never sent to, nor visible from, \texttt{googleusercontent.com}.
+So the attacker's code runs with the privileges of
+\texttt{googleusercontent.com}, which amount to nothing of yours: it
+can do whatever it likes to its own page, and has no handle at all on
+your Gmail session.
+
+\paragraph{Why a separate domain?}
+The cheaper options do not work.
+The same-origin policy keys on the \emph{host}, not on the path, so
+serving attachments from \texttt{google.com/attachments/} would place
+them in the \emph{same} origin as Gmail, with full access to your data.
+Serving them from a separate \emph{subdomain} does not work either,
+because cookies are scoped by domain rather than by origin---and the
+subdomain relationship leaks in \emph{both}
+directions.\marginnote{It is worth stating
+explicitly that an \emph{origin} and a \emph{site} are not the same
+thing.  Two subdomains of \texttt{google.com} are different origins but
+the same site, and several browser mechanisms---cookie scoping among
+them---key on the site rather than on the origin.}
+
+Reading down: a cookie set with \texttt{Domain=google.com}---the natural
+choice for a session cookie meant to work across \texttt{mail.},
+\texttt{drive.} and \texttt{docs.}---is sent to \emph{every} subdomain,
+so \texttt{usercontent.google.com} would receive your Google cookies
+despite being a distinct origin.
+Writing up: a host may set a cookie for any ancestor domain, so code
+running at \texttt{usercontent.google.com} could set a
+\texttt{Domain=google.com} cookie that is then delivered to
+\texttt{mail.google.com}.
+%This second direction is the more dangerous of the two, and the one
+%that is easier to overlook.  The \texttt{Cookie} header a browser sends
+%carries only names and values, with no record of which host set each
+%one, so the server has no way to distinguish its own session cookie
+%from one that an attacker tossed into the scope from a subdomain.
+%Marking a cookie \texttt{HttpOnly} does not help here, since that only
+%prevents JavaScript from \emph{reading} it.\marginnote{The direction of
+%the leak follows from how the \texttt{Domain} attribute works.  Omitting
+%it entirely makes the cookie \emph{host-only}: it is returned only to
+%the exact host that set it.  Supplying it broadens the cookie to that
+%domain and everything beneath it, and a host may only name itself or an
+%ancestor---never a sibling, and never a public suffix such as
+%\texttt{com}.  The \texttt{\_\_Host-} name prefix is the modern
+%hardening: a cookie so named is accepted only if it is host-only,
+%\texttt{Secure}, and has \texttt{Path=/}.}
+
+Only a completely separate registrable domain puts the attachment
+outside the cookie scope in both directions.
+
+\paragraph{Two levels of enforcement.}
+Two rather different defenses are at play here.
+The same-origin policy is a policy that the browser \emph{enforces}: it
+stops an attacker who can run script, but it says nothing about an
+attacker who exploits a memory-safety bug in the renderer and runs
+native code, since such an attacker is no longer asking the browser's
+permission for anything.
+What covers that case is the process separation of
+Section \ref{sec:webbrowser}: because \texttt{googleusercontent.com} is a
+separate site, the browser also runs it in a separate process, whose
+address space never contained any \texttt{google.com} cookies to begin
+with.
+The two defenses compose, and an attacker who wants your cookies now
+needs both a bug in the renderer \emph{and} a way out of its
+sandbox.\marginnote{This layering is also why browsers deployed
+per-site processes so urgently in 2018.  The Spectre family of attacks
+allowed an attacker to read across origins \emph{within} a single
+process, which demoted the same-origin policy from a hard boundary to a
+soft one and left the process boundary carrying the weight.}
 
 \section{Example: Web browser}
+\label{sec:webbrowser}
 
 Web browsers today are extraordinarily complicated pieces of software.
 The sensitive data that a browser is trying to protect are things, such as
