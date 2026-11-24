@@ -105,7 +105,7 @@ real one without actually interacting with the real prover.
 
 \section{Graph coloring example}
 
-We will see a zero-knowledge proof for a specific $\NP$-complete language called $\mathsf{3Col}$ which contains the set of all graphs $G=(V,E)$ such that the set of vertices $V$ can be colored by three colors: $C:V\rightarrow\{1,2,3\}$ such that no two adjacent vertices have the same color.  Namely, for every $(u,v)\in E$, $C(u)\neq C(v)$.
+We will see a zero-knowledge proof for a specific NP-complete language called $\mathsf{3Col}$ which contains the set of all graphs $G=(V,E)$ such that the set of vertices $V$ can be colored by three colors: $C:V\rightarrow\{1,2,3\}$ such that no two adjacent vertices have the same color.  Namely, for every $(u,v)\in E$, $C(u)\neq C(v)$.
 
 
 We convert a coloring $C:V\rightarrow\{1,2,3\}$, which is a proof that the graph $G$ is 3-colorable, into a zero-knowledge proof, as follows:
@@ -131,6 +131,38 @@ Is this zero-knowledge?  Yes, the only thing the verifier learned is two distinc
 \begin{remark}
     The above protocol is a physical protocol where the prover sends opaque locked boxes.  Such boxes have a digital analogue.  This is called a commitment scheme.  
 \end{remark}
+
+\section{Commitment Schemes}
+\newcommand{\Com}{\mathsf{Com}}
+\newcommand{\PPT}{\text{p.p.t.}}
+\newcommand{\secp}{\lambda}
+
+\begin{definition} A commitment scheme corresponding to a message space ${\cal M}$ consists of a pair of algorithms $(\Gen,\Com)$:
+\begin{itemize}
+    \item $\Gen$ is a $\PPT$ algorithm that takes as input the security parameter $1^\secp$ and outputs public parameters, denoted by $\pp\in\{0,1\}^N$ where $N=\poly(\secp)$.
+    \item $\Com$ is a polynomial-time computable function that takes an input public parameters $\pp$, a message $m\in{\cal M}$ and randomness $r\getsr\{0,1\}^\secp$ and outputs a commitment $\Com(\pp,m,r)$.
+    \marginnote{One can think of both $\Gen$ and $\Com$ as randomized algorithms.  We chose to explicitly include the randomness of $\Com$, and hence think of it as being deterministic since when the commitment is opened the randomness is revealed}
+\end{itemize}
+The following two properties are required to hold: 
+\begin{itemize}
+    \item {\bf Hiding:} For every $m_0,m_1\in{\cal M}$,
+    \[
+    (\pp,\mathsf{Com}(\pp,m_0,r_0))\approx (\pp,\mathsf{Com}(\pp,m_1,r_1))
+    \]
+    for $\pp\gets\Gen(1^\secp)$ and $r_0,r_1\getsr\{0,1\}^\secp$.\marginnote{Hiding: The Verifier cannot see what is inside the box before it is opened. Mathematically, this means the commitment of message $m_0$ looks just like the commitment of $m_1$ to the Verifier.}
+\item {\bf Binding:} For every $\PPT$ adversary $\A$:
+%\[
+%\Pr_{\pp\gets\Gen(1^\secp)}[A(\pp)= (m_0,r_0,m_1,r_1)\mbox{ s.t. }m_0\neq m_1~~\wedge~~\Com(\pp,m_0,r_0)=\Com(\pp,m_1,r_1)=\negl(\secp).
+%\]
+\begin{equation}
+\begin{aligned}
+\Pr_{pp \gets \text{Gen}(1^\lambda)} & \Bigl[ A(pp) = (m_0, r_0, m_1, r_1) \text{ s.t. } m_0 \neq m_1 \ \wedge \\ 
+& \text{Com}(pp, m_0, r_0) = \text{Com}(pp, m_1, r_1) \Bigr] = \text{negl}(\lambda)
+\end{aligned}
+\end{equation}
+\marginnote{Binding: The probability of a prover successfully "opening" the same box to reveal two different colors ($m_0$ and $m_1$) is negligible.}
+\end{itemize}
+\end{definition}
 
 \section{A hash-based commitment for graph coloring}
 
