@@ -90,7 +90,7 @@ prover, we say the verifier has learned nothing about $x$.
   an efficiently computable function.
 }
 
-One immediate application of zero-knowledge proofs of knowledge is to authentication.
+One immediate application of zero-knowledge proofs of knowledge is authentication.
 The prover's witness $x$ becomes the user's secret key,
 the verifier's $y$ is the user's public key, and the
 function $f$ is a public parameter of the authentication scheme.
@@ -103,7 +103,80 @@ Provided that the MAC is secure, the verifier could not
 produce a simulated transcript that is identical to a
 real one without actually interacting with the real prover.
 
-\section{Discrete-log problem and Schnorr signatures}
+\section{Graph coloring example}
+
+We will see a zero-knowledge proof for a specific $\NP$-complete language called $\mathsf{3Col}$ which contains the set of all graphs $G=(V,E)$ such that the set of vertices $V$ can be colored by three colors: $C:V\rightarrow\{1,2,3\}$ such that no two adjacent vertices have the same color.  Namely, for every $(u,v)\in E$, $C(u)\neq C(v)$.
+
+
+We convert a coloring $C:V\rightarrow\{1,2,3\}$, which is a proof that the graph $G$ is 3-colorable, into a zero-knowledge proof, as follows:
+
+\begin{enumerate}
+    \item The prover does the following:
+    \begin{enumerate}
+    \item Choose a random permutation $\pi:\{1,2,3\}\rightarrow\{1,2,3\}$. 
+    
+    Denote by $V=\{1,2,\ldots,n\}$.
+    \item For every $i\in[n]$ place the color $\pi(C(i))$ in an opaque locked box and send the $n$ locked boxes to the verifier.\marginnote{$C(i)$ is a commitment; the Prover can't change the colors later, but the Verifier can't see inside yet.}
+    
+    \end{enumerate}
+    \item The verifier chooses a random edge $(i,j)\in E$ and sends $(i,j)$ to the prover.
+    \item The prover sends the keys that open only box $i$ and box $j$.
+    \item The verifier accepts if and only if the colors in these boxes are distinct and are legal (i.e., belong to the set $\{1,2,3\}$).
+\end{enumerate} 
+
+  It has completeness~$1$. If the Prover is telling the truth and the graph is 3-colorable, the Verifier will always accept.  The soundness is only $1-\frac{1}{|E|}$, but can be amplified via repetitions. If the Prover is lying, there is at least one edge where the colors are the same.  Each time we repeat we need to choose a fresh permutation.
+
+Is this zero-knowledge?  Yes, the only thing the verifier learned is two distinct random colors. The verifier could have simulated the prover's last message on its own. \marginnote{It may feel like the Verifier is learning something, but they actually aren't. Because the Prover shuffles the colors ($\pi$) every single time they run the protocol, the Verifier only ever sees two random, different colors (e.g., "Box 5 is 1 and Box 9 is 2"). Since the colors change meanings in every round, these numbers provide no information about the overall global coloring of the graph.}
+
+\begin{remark}
+    The above protocol is a physical protocol where the prover sends opaque locked boxes.  Such boxes have a digital analogue.  This is called a commitment scheme.  
+\end{remark}
+
+\section{A hash-based commitment for graph coloring}
+
+\paragraph{Assumptions.}
+Let $\lambda$ be a security parameter, and model
+\[
+H:\{0,1\}^{*}\longrightarrow\{0,1\}^{\lambda}
+\]
+as a random oracle. We consider classical probabilistic
+polynomial-time adversaries. Let $\operatorname{enc}$ be the
+fixed encoding of colors $0,1,2$ as $00,01,10$, respectively.
+
+\paragraph{Commitment and opening.}
+To commit to the color $c_v\in\{0,1,2\}$ of vertex $v$, choose
+a uniformly random secret nonce $s_v\leftarrow\{0,1\}^{\lambda}$
+and send
+\[
+C_v=H\bigl(\operatorname{enc}(c_v)\,\|\,s_v\bigr).
+\]
+Use an independent, fresh nonce for every vertex in every
+iteration. Keep the nonce secret until opening the commitment.
+
+To open $C_v$, reveal $(c_v,s_v)$. The verifier checks that
+$c_v\in\{0,1,2\}$, that $s_v$ has length $\lambda$, and that
+the displayed equality holds. When an edge $(u,v)$ is
+challenged, open both endpoint commitments; the verifier
+also checks that $c_u\ne c_v$.
+
+\paragraph{Security.}
+In the random-oracle model, the secret random nonce makes
+the commitment input infeasible to guess before opening,
+yielding computational hiding. Opening the same commitment
+to two different colors requires a collision in $H$,
+yielding computational binding. Collision resistance alone
+does not imply the hiding property.
+
+With sufficient sequential repetition, these commitments
+give a computational zero-knowledge argument of knowledge
+for graph three-colorability in the random-oracle model.
+The soundness and knowledge guarantees apply to
+computationally bounded provers, rather than to
+computationally unbounded provers. Replacing the random
+oracle with a concrete hash function, such as SHA-256, is
+a heuristic instantiation of this model.
+
+\section{Discrete-log problem and the Schnorr protocol}
 
 As an example of a zero-knowledge proof of knowledge, we will show
 how a prover can convince a verifier that it knows a discrete
@@ -181,131 +254,131 @@ This modified protocol only
 satisfies a weaker flavor of zero knowledge called ``honest-verifier zero knowledge.''
 We won't discuss those details here.
 
+The protocol above is central to Schnorr signatures that are widely used in cryptocurrencies. Further, EdDSA is a deterministic Schnorr variant over Edwards curves, and it's where most people use Schnorr without knowing it. It appears in SSH keys, TLS 1.3, Signal, Tor onion services, and DNSSEC.
 
+% \section{Analysis of Schnorr's protocol}
+% 
+% We will now argue that Schnorr's protocol is really
+% a zero-knowledge proof of knowledge of discrete log.
+% To do this, we must show that the protocol satisfies
+% completeness, soundness, and zero knowledge, as
+% we defined them in \cref{sec:zkdefn}.
+% 
+% The completeness follows by construction.
+% The more challenging steps are proving soundness and zero knowledge.
+% 
+% \subsection{Soundness using an extractor}
+% 
+% We first need to convince ourselves that the protocol is \emph{sound}: that is,
+% if the verifier accepts, the prover really knows $x$.  We can prove
+% soundness by showing that, if there is a (possibly adversarial) prover
+% $P^*$ that can convince our honest verifier to accept, there
+% exists an efficient extractor that can use the cheating prover $P^*$
+% to extract $x$ with some high probability (say, $\gg 1/2$).
+% 
+% For simplicity, assume here that the prover $P^*$ manages to convince
+% the verifier to accept with probability $1$---i.e., for all choices of
+% the verifier's challenge bit $c$ and all choices of the prover's randomness.
+% Then, given a prover algorithm $P^*$,
+% the extractor for Schnorr's protocol works as follows:
+% 
+% \begin{itemize}
+% 
+% \item The extractor runs the prover $P^*$ to get some initial protocol transcript with challenge $c=0$.
+% The transcript consists of $(R, c=0, z)$.
+% 
+% \item The extractor rewinds the state of the prover $P^*$ to just after the point when it
+%       sent the first protocol message $R$ to the verifier.
+% 
+% \item The extractor runs $P^*$ again, but this time feeds its the challenge $c=1$.
+% This produces a second transcript $(R, c=1, z')$.
+% 
+% \item The extractor outputs $z'-z$ as the discrete log $x$.
+% 
+% \end{itemize}
+% 
+% By our assumption---namely, that $P^*$ can convince our honest verifier
+% to accept with probability one---both
+% runs of the prover $P^*$ by the extractor must convince the verifier to accept. (Otherwise,
+% the prover $P^*$ would not convince the verifier in at least one of the two runs of the protocol.)
+% That means that both $g^z=R \in \G$ and that $g^{z'}=RX \in \G$.  Thus, $g^{z'-z}=y \in \G$,
+% which is exactly the definition of what it means for something ($z'-z$
+% in particular) to be the discrete log of $y \in \G$.
+% 
+% Here we have glossed over the details of what happens if the prover
+% convinces the verifier with some non-negligible probability that is
+% nonetheless less than 1.
+% A similar but more involved argument handles that case.
+% 
+% \subsection{Zero-knowledge using a simulator}
+% 
+% Our second task is to show that Schnorr's protocol satisfies zero knowledge.
+% That is, that even a malicious verifier $V^*$ that deviates from
+% the protocol ``learns nothing'' about the prover's witness
+% $x$ as a result of interacting with the prover in the Schnorr protocol.
+% To do this, given a malicious verifier algorithm $V^*$, we construct a \emph{simulator} algorithm.
+% The simulator's job
+% is to produce a transcript of the prover-verifier interaction that is
+% indistinguishable from a true prover-verifier interaction.
+% Crucially, in the simulated interaction, the simulator \emph{does not know} the witness $x$,
+% while in the real prover-verifier interaction, the prover \emph{does know} the witness $x$.
+% 
+% Given the verifier $V^*$, 
+% we construct this simulator as follows:
+% 
+% \begin{itemize}
+% 
+%   \item Make a guess $c' \getsr \{0,1\}$ of the verifier's challenge bit.
+% 
+%   \item Choose the third protocol message $z \getsr \Z_q$ at random.
+% 
+%   \item Set the first message to $R \gets g^z y^{-c'} \in \G$.
+% 
+%   \item Run the verifier $V^*$ on first message $R$.
+%         The verifier outputs a challenge $c$.
+%   \item If $c=c'$, output $(R, c, z)$ as the simulated transcript.
+%         This happens with probability $1/2$.
+% 
+% \item Otherwise, retry.  This happens with probability $1/2$ as well.
+% 
+% \end{itemize}
+% 
+% Both the extractor and simulator constructions rely crucially on being
+% able to rewind the prover or verifier and try again. 
+% In a real prover-verifier interaction, the verifier cannot rewind the prover
+% and the prover cannot rewind the verifier.
+% This is why the existence of an extractor does \emph{not} mean that
+% in a real protocol interaction the verifier can extract the witness
+% $x$ from the prover.
+% 
 
-\section{Analysis of Schnorr's protocol}
-
-We will now argue that Schnorr's protocol is really
-a zero-knowledge proof of knowledge of discrete log.
-To do this, we must show that the protocol satisfies
-completeness, soundness, and zero knowledge, as
-we defined them in \cref{sec:zkdefn}.
-
-The completeness follows by construction.
-The more challenging steps are proving soundness and zero knowledge.
-
-\subsection{Soundness using an extractor}
-
-We first need to convince ourselves that the protocol is \emph{sound}: that is,
-if the verifier accepts, the prover really knows $x$.  We can prove
-soundness by showing that, if there is a (possibly adversarial) prover
-$P^*$ that can convince our honest verifier to accept, there
-exists an efficient extractor that can use the cheating prover $P^*$
-to extract $x$ with some high probability (say, $\gg 1/2$).
-
-For simplicity, assume here that the prover $P^*$ manages to convince
-the verifier to accept with probability $1$---i.e., for all choices of
-the verifier's challenge bit $c$ and all choices of the prover's randomness.
-Then, given a prover algorithm $P^*$,
-the extractor for Schnorr's protocol works as follows:
-
-\begin{itemize}
-
-\item The extractor runs the prover $P^*$ to get some initial protocol transcript with challenge $c=0$.
-The transcript consists of $(R, c=0, z)$.
-
-\item The extractor rewinds the state of the prover $P^*$ to just after the point when it
-      sent the first protocol message $R$ to the verifier.
-
-\item The extractor runs $P^*$ again, but this time feeds its the challenge $c=1$.
-This produces a second transcript $(R, c=1, z')$.
-
-\item The extractor outputs $z'-z$ as the discrete log $x$.
-
-\end{itemize}
-
-By our assumption---namely, that $P^*$ can convince our honest verifier
-to accept with probability one---both
-runs of the prover $P^*$ by the extractor must convince the verifier to accept. (Otherwise,
-the prover $P^*$ would not convince the verifier in at least one of the two runs of the protocol.)
-That means that both $g^z=R \in \G$ and that $g^{z'}=RX \in \G$.  Thus, $g^{z'-z}=y \in \G$,
-which is exactly the definition of what it means for something ($z'-z$
-in particular) to be the discrete log of $y \in \G$.
-
-Here we have glossed over the details of what happens if the prover
-convinces the verifier with some non-negligible probability that is
-nonetheless less than 1.
-A similar but more involved argument handles that case.
-
-\subsection{Zero-knowledge using a simulator}
-
-Our second task is to show that Schnorr's protocol satisfies zero knowledge.
-That is, that even a malicious verifier $V^*$ that deviates from
-the protocol ``learns nothing'' about the prover's witness
-$x$ as a result of interacting with the prover in the Schnorr protocol.
-To do this, given a malicious verifier algorithm $V^*$, we construct a \emph{simulator} algorithm.
-The simulator's job
-is to produce a transcript of the prover-verifier interaction that is
-indistinguishable from a true prover-verifier interaction.
-Crucially, in the simulated interaction, the simulator \emph{does not know} the witness $x$,
-while in the real prover-verifier interaction, the prover \emph{does know} the witness $x$.
-
-Given the verifier $V^*$, 
-we construct this simulator as follows:
-
-\begin{itemize}
-
-  \item Make a guess $c' \getsr \{0,1\}$ of the verifier's challenge bit.
-
-  \item Choose the third protocol message $z \getsr \Z_q$ at random.
-
-  \item Set the first message to $R \gets g^z y^{-c'} \in \G$.
-
-  \item Run the verifier $V^*$ on first message $R$.
-        The verifier outputs a challenge $c$.
-  \item If $c=c'$, output $(R, c, z)$ as the simulated transcript.
-        This happens with probability $1/2$.
-
-\item Otherwise, retry.  This happens with probability $1/2$ as well.
-
-\end{itemize}
-
-Both the extractor and simulator constructions rely crucially on being
-able to rewind the prover or verifier and try again. 
-In a real prover-verifier interaction, the verifier cannot rewind the prover
-and the prover cannot rewind the verifier.
-This is why the existence of an extractor does \emph{not} mean that
-in a real protocol interaction the verifier can extract the witness
-$x$ from the prover.
-
-
-\section{Fiat-Shamir heuristic and Schnorr signatures}
-\label{sec:hvzk}
-
-One challenge with Schnorr's protocol as we have presented it,
-and zero-knowledge proof systems more generally,
-is that they are interactive.
-They require the prover and verifier to send messages back and forth.
-A clever trick, called the Fiat-Shamir heuristic, allows us to turn interactive
-zero-knowledge proofs into non-interactive proofs, provided that
-\begin{itemize}
-  \item we use a cryptographic hash function that we model as a random oracle, and
-  \item the verifier only sends the prover independent random values.\marginnote{In Schnorr's protocol,
-    the verifier's challenge is just a random bit, so it satisfies this second property.}
-\end{itemize}
-The idea is that, whenever the protocol expects the verifier to send a challenge to the
-prover, we can instead derive the challenge just as a hash of the protocol transcript so far.
-The prover can then execute the zero-knowledge
-protocol against a synthetic verifier (the hash function), and produce
-a transcript.  The prover can now send this transcript to the verifier,
-and if the verifier can confirm that indeed all of the challenges were
-correctly computed using a cryptographic hash function, such as 
-SHA-256, it's sound to accept this transcript as a proof.
-
-We can use this Fiat-Shamir heuristic to construct a (regular,
-non-interactive) signature scheme from an (interactive) zero-knowledge
-proof of knowledge for the discrete-log problem.
-The elliptic-curve signatures used in practice today
-effectively take the Schnorr protocol for proof of knowledge of discrete log
-using challenge space $\Z_q$, and apply the Fiat-Shamir heuristic to it.
-The resulting signature scheme is called the \emph{Schnorr signature scheme}.
+% \section{Fiat-Shamir heuristic and Schnorr signatures}
+% \label{sec:hvzk}
+% 
+% One challenge with Schnorr's protocol as we have presented it,
+% and zero-knowledge proof systems more generally,
+% is that they are interactive.
+% They require the prover and verifier to send messages back and forth.
+% A clever trick, called the Fiat-Shamir heuristic, allows us to turn interactive
+% zero-knowledge proofs into non-interactive proofs, provided that
+% \begin{itemize}
+%   \item we use a cryptographic hash function that we model as a random oracle, and
+%   \item the verifier only sends the prover independent random values.\marginnote{In Schnorr's protocol,
+%     the verifier's challenge is just a random bit, so it satisfies this second property.}
+% \end{itemize}
+% The idea is that, whenever the protocol expects the verifier to send a challenge to the
+% prover, we can instead derive the challenge just as a hash of the protocol transcript so far.
+% The prover can then execute the zero-knowledge
+% protocol against a synthetic verifier (the hash function), and produce
+% a transcript.  The prover can now send this transcript to the verifier,
+% and if the verifier can confirm that indeed all of the challenges were
+% correctly computed using a cryptographic hash function, such as 
+% SHA-256, it's sound to accept this transcript as a proof.
+% 
+% We can use this Fiat-Shamir heuristic to construct a (regular,
+% non-interactive) signature scheme from an (interactive) zero-knowledge
+% proof of knowledge for the discrete-log problem.
+% The elliptic-curve signatures used in practice today
+% effectively take the Schnorr protocol for proof of knowledge of discrete log
+% using challenge space $\Z_q$, and apply the Fiat-Shamir heuristic to it.
+% The resulting signature scheme is called the \emph{Schnorr signature scheme}.
