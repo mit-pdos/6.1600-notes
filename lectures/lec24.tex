@@ -173,10 +173,10 @@ H:\{0,1\}^{*}\longrightarrow\{0,1\}^{\lambda}
 \]
 as a random oracle. We consider classical probabilistic
 polynomial-time adversaries. Let $\operatorname{enc}$ be the
-fixed encoding of colors $0,1,2$ as $00,01,10$, respectively.
+fixed encoding of colors $1,2,3$ as $01,10,11$, respectively.
 
 \paragraph{Commitment and opening.}
-To commit to the color $c_v\in\{0,1,2\}$ of vertex $v$, choose
+To commit to the color $c_v\in\{1,2,3\}$ of vertex $v$, choose
 a uniformly random secret nonce $s_v\leftarrow\{0,1\}^{\lambda}$
 and send
 \[
@@ -186,7 +186,7 @@ Use an independent, fresh nonce for every vertex in every
 iteration. Keep the nonce secret until opening the commitment.
 
 To open $C_v$, reveal $(c_v,s_v)$. The verifier checks that
-$c_v\in\{0,1,2\}$, that $s_v$ has length $\lambda$, and that
+$c_v\in\{1,2,3\}$, that $s_v$ has length $\lambda$, and that
 the displayed equality holds. When an edge $(u,v)$ is
 challenged, open both endpoint commitments; the verifier
 also checks that $c_u\ne c_v$.
