@@ -214,7 +214,7 @@ As an example of a zero-knowledge proof of knowledge, we will show
 how a prover can convince a verifier that it knows a discrete
 log, without revealing it. 
 
-\section{Reminder: The discrete-log problem}
+\paragraph{Reminder: The discrete-log problem}
 We recall the discrete-log problem.
 The problem is parameterized by 
 a group $\G$ of prime order $q$,
@@ -223,9 +223,6 @@ Then, given a group element $y = g^x \in \G$, for $x \getsr \Z_q$,
 the discrete-log problem is to find the value of $x\in \Zq$.
 We have already seen the discrete-log problem in
 the context of Diffie-Hellman key exchange and elliptic-curve signatures.
-
-
-\section{Schnorr's protocol for proving knowledge of discrete logs}
 
 In Schnorr's protocol, the prover and verifier both hold the
 generator $g \in \G$ and the group order $q$.
@@ -245,8 +242,7 @@ The protocol goes as follows:
       and sends the challenge to the prover.
 
 \item The prover sends back a response $z \in \Z_q$, chosen as follows: \marginnote{In
-  the true Schnorr protocol, the verifier samples $c \getsr \Z_q$, as we
-    discuss in \cref{sec:hvzk}}
+  the true Schnorr protocol, the verifier samples $c \getsr \Z_q$. % as we discuss in \cref{sec:hvzk}}
   \begin{itemize}
     \item If $c=0$, the prover sets $z \gets r \in \Z_q$.
     \item If $c=1$, the prover sets $z \gets r+x\in \Z_q$.
