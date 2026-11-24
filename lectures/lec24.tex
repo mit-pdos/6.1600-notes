@@ -6,7 +6,11 @@ primitives to systems security.  These primitives have provided security,
 but in a very all-or-nothing sense: in order to provide broadly applicable
 security, our definitions required that a certain party (with the key)
 could either completely decrypt the message, learning the message
-contents, or cannot do anything with the message at all.
+contents, or could not do anything with the message at all.
+Zero-knowledge proofs, the subject of this lecture, give a much
+finer-grained guarantee: one party can convince another that a
+statement about its secret is true, while revealing nothing else
+about the secret.
 
 \section{Zero-knowledge proofs of knowledge}
 
@@ -69,9 +73,10 @@ a prover might ``know'' $x$ without storing it literally in its memory,
 perhaps storing it in base64-encoded form.
 A more meaningful definition of knowledge, which is the one we will use,
 thinks of knowledge in terms of extractability.
-That is, we say that a prover knows $x$ if there is an efficient 
-algorithm that extracts $x$ by interacting with the prover and 
-observing the prover's internal state.
+That is, we say that a prover knows $x$ if there is an efficient
+algorithm, called an \emph{extractor}, that outputs $x$ given the
+ability to run the prover and to \emph{rewind} it to an earlier
+point in its execution.
 
 We also must pin down what it means for the verifier to
 learn nothing through an interaction with the prover.
@@ -87,7 +92,7 @@ prover, we say the verifier has learned nothing about $x$.
   will not be able to cover here.
   One surprising fact is that there exist zero-knowledge proofs of knowledge
   for \emph{any} choice of the public function $f$, provided that it is
-  an efficiently computable function.
+  an efficiently computable function and that one-way functions exist.
 }
 
 One immediate application of zero-knowledge proofs of knowledge is authentication.
@@ -96,12 +101,15 @@ the verifier's $y$ is the user's public key, and the
 function $f$ is a public parameter of the authentication scheme.
 The authentication protocols we've seen so far, such as challenge-response protocols using MACs or signatures,
 do not quite satisfy the notions of soundness and zero-knowledge we use here.
-For example, in a MAC-based challenge-response protocol, 
-the server learns the MAC of a
-server-chosen challenge value under the client's (prover's) secret key.
-Provided that the MAC is secure, the verifier could not 
-produce a simulated transcript that is identical to a
-real one without actually interacting with the real prover.
+For example, in a signature-based challenge-response protocol,
+the verifier learns the client's (prover's) signature on a
+verifier-chosen challenge value.
+Provided that the signature scheme is secure, the verifier could not
+produce a simulated transcript that is indistinguishable from a
+real one without actually interacting with the real prover:
+it walks away with a valid signature that it could not have produced itself.
+A MAC-based protocol is no better: there the verifier must already
+hold the client's secret key in order to check the MAC.
 
 \section{Graph coloring example}
 
@@ -116,7 +124,7 @@ We convert a coloring $C:V\rightarrow\{1,2,3\}$, which is a proof that the graph
     \item Choose a random permutation $\pi:\{1,2,3\}\rightarrow\{1,2,3\}$. 
     
     Denote by $V=\{1,2,\ldots,n\}$.
-    \item For every $i\in[n]$ place the color $\pi(C(i))$ in an opaque locked box and send the $n$ locked boxes to the verifier.\marginnote{$C(i)$ is a commitment; the Prover can't change the colors later, but the Verifier can't see inside yet.}
+    \item For every $i\in[n]$ place the color $\pi(C(i))$ in an opaque locked box and send the $n$ locked boxes to the verifier.\marginnote{Each locked box is a \emph{commitment} to the color $\pi(C(i))$: the Prover can't change the colors later, but the Verifier can't see inside yet.}
     
     \end{enumerate}
     \item The verifier chooses a random edge $(i,j)\in E$ and sends $(i,j)$ to the prover.
@@ -124,24 +132,32 @@ We convert a coloring $C:V\rightarrow\{1,2,3\}$, which is a proof that the graph
     \item The verifier accepts if and only if the colors in these boxes are distinct and are legal (i.e., belong to the set $\{1,2,3\}$).
 \end{enumerate} 
 
-  It has completeness~$1$. If the Prover is telling the truth and the graph is 3-colorable, the Verifier will always accept.  The soundness is only $1-\frac{1}{|E|}$, but can be amplified via repetitions. If the Prover is lying, there is at least one edge where the colors are the same.  Each time we repeat we need to choose a fresh permutation.
+  This protocol has completeness~$1$: if the graph is 3-colorable and the Prover follows the protocol, the Verifier always accepts.
+If the graph is not 3-colorable, then whatever colors the Prover locks in the boxes, at least one edge has endpoints with the same color or with a color outside $\{1,2,3\}$, so the Verifier catches a cheating Prover with probability at least $\frac{1}{|E|}$.
+The soundness error is therefore at most $1-\frac{1}{|E|}$.
+We can reduce it by repetition: after $k$ independent repetitions the soundness error is at most $(1-\frac{1}{|E|})^k \le e^{-k/|E|}$, so $k=\lambda|E|$ repetitions bring it below $2^{-\lambda}$.
+Each repetition must use a fresh permutation $\pi$ and fresh locked boxes, and the repetitions are run one after another (sequentially).
 
-Is this zero-knowledge?  Yes, the only thing the verifier learned is two distinct random colors. The verifier could have simulated the prover's last message on its own. \marginnote{It may feel like the Verifier is learning something, but they actually aren't. Because the Prover shuffles the colors ($\pi$) every single time they run the protocol, the Verifier only ever sees two random, different colors (e.g., "Box 5 is 1 and Box 9 is 2"). Since the colors change meanings in every round, these numbers provide no information about the overall global coloring of the graph.}
+Is this zero-knowledge?  Yes: in each repetition, the verifier only learns the colors of the two endpoints of one edge, and since $\pi$ is random, these are just two distinct random colors.
+To make this precise, we construct a simulator that does not know a coloring.
+The simulator guesses an edge $(i,j)$, locks two distinct random colors in boxes $i$ and $j$ (and arbitrary colors in the other boxes), and runs the verifier.
+If the verifier challenges $(i,j)$, the simulator opens those two boxes; otherwise, it rewinds the verifier and tries again.
+Because the boxes hide their contents, even a malicious verifier's choice of edge is essentially independent of the simulator's guess, so the simulator succeeds after about $|E|$ attempts on average. \marginnote{It may feel like the Verifier is learning something, but they actually aren't. Because the Prover shuffles the colors ($\pi$) every single time they run the protocol, the Verifier only ever sees two random, different colors (e.g., ``Box 5 is 1 and Box 9 is 2''). Since the colors change meanings in every round, these numbers provide no information about the overall global coloring of the graph.}
 
 \begin{remark}
     The above protocol is a physical protocol where the prover sends opaque locked boxes.  Such boxes have a digital analogue.  This is called a commitment scheme.  
 \end{remark}
 
 \section{Commitment Schemes}
-\newcommand{\Com}{\mathsf{Com}}
-\newcommand{\PPT}{\text{p.p.t.}}
-\newcommand{\secp}{\lambda}
+\providecommand{\Com}{\mathsf{Com}}
+\providecommand{\PPT}{\text{p.p.t.}}
+\providecommand{\secp}{\lambda}
 
 \begin{definition} A commitment scheme corresponding to a message space ${\cal M}$ consists of a pair of algorithms $(\Gen,\Com)$:
 \begin{itemize}
     \item $\Gen$ is a $\PPT$ algorithm that takes as input the security parameter $1^\secp$ and outputs public parameters, denoted by $\pp\in\{0,1\}^N$ where $N=\poly(\secp)$.
-    \item $\Com$ is a polynomial-time computable function that takes an input public parameters $\pp$, a message $m\in{\cal M}$ and randomness $r\getsr\{0,1\}^\secp$ and outputs a commitment $\Com(\pp,m,r)$.
-    \marginnote{One can think of both $\Gen$ and $\Com$ as randomized algorithms.  We chose to explicitly include the randomness of $\Com$, and hence think of it as being deterministic since when the commitment is opened the randomness is revealed}
+    \item $\Com$ is a polynomial-time computable function that takes as input public parameters $\pp$, a message $m\in{\cal M}$ and randomness $r\getsr\{0,1\}^\secp$ and outputs a commitment $\Com(\pp,m,r)$.
+    \marginnote{One can think of both $\Gen$ and $\Com$ as randomized algorithms.  We chose to explicitly include the randomness of $\Com$, and hence think of it as being deterministic since when the commitment is opened the randomness is revealed.}
 \end{itemize}
 The following two properties are required to hold: 
 \begin{itemize}
@@ -156,11 +172,11 @@ The following two properties are required to hold:
 %\]
 \begin{equation}
 \begin{aligned}
-\Pr_{pp \gets \text{Gen}(1^\lambda)} & \Bigl[ A(pp) = (m_0, r_0, m_1, r_1) \text{ s.t. } m_0 \neq m_1 \ \wedge \\ 
-& \text{Com}(pp, m_0, r_0) = \text{Com}(pp, m_1, r_1) \Bigr] = \text{negl}(\lambda)
+\Pr_{\pp \gets \Gen(1^\secp)} & \Bigl[ \A(\pp) = (m_0, r_0, m_1, r_1) \text{ s.t. } m_0 \neq m_1 \ \wedge \\
+& \Com(\pp, m_0, r_0) = \Com(\pp, m_1, r_1) \Bigr] \le \negl(\secp)
 \end{aligned}
 \end{equation}
-\marginnote{Binding: The probability of a prover successfully "opening" the same box to reveal two different colors ($m_0$ and $m_1$) is negligible.}
+\marginnote{Binding: The probability of a prover successfully ``opening'' the same box to reveal two different colors ($m_0$ and $m_1$) is negligible.}
 \end{itemize}
 \end{definition}
 
@@ -169,7 +185,7 @@ The following two properties are required to hold:
 \paragraph{Assumptions.}
 Let $\lambda$ be a security parameter, and model
 \[
-H:\{0,1\}^{*}\longrightarrow\{0,1\}^{\lambda}
+H:\{0,1\}^{*}\longrightarrow\{0,1\}^{2\lambda}
 \]
 as a random oracle. We consider classical probabilistic
 polynomial-time adversaries. Let $\operatorname{enc}$ be the
@@ -180,12 +196,12 @@ To commit to the color $c_v\in\{1,2,3\}$ of vertex $v$, choose
 a uniformly random secret nonce $s_v\leftarrow\{0,1\}^{\lambda}$
 and send
 \[
-C_v=H\bigl(\operatorname{enc}(c_v)\,\|\,s_v\bigr).
+\mathsf{cm}_v=H\bigl(\operatorname{enc}(c_v)\,\|\,s_v\bigr).
 \]
 Use an independent, fresh nonce for every vertex in every
 iteration. Keep the nonce secret until opening the commitment.
 
-To open $C_v$, reveal $(c_v,s_v)$. The verifier checks that
+To open $\mathsf{cm}_v$, reveal $(c_v,s_v)$. The verifier checks that
 $c_v\in\{1,2,3\}$, that $s_v$ has length $\lambda$, and that
 the displayed equality holds. When an edge $(u,v)$ is
 challenged, open both endpoint commitments; the verifier
@@ -195,8 +211,10 @@ also checks that $c_u\ne c_v$.
 In the random-oracle model, the secret random nonce makes
 the commitment input infeasible to guess before opening,
 yielding computational hiding. Opening the same commitment
-to two different colors requires a collision in $H$,
-yielding computational binding. Collision resistance alone
+to two different colors requires a collision in $H$, yielding computational binding.
+(This is why $H$ has $2\lambda$-bit outputs: a generic birthday
+attack finds a collision in an $\ell$-bit hash function after
+about $2^{\ell/2}$ evaluations.) Collision resistance alone
 does not imply the hiding property.
 
 With sufficient sequential repetition, these commitments
@@ -220,7 +238,7 @@ The problem is parameterized by
 a group $\G$ of prime order $q$,
 generated by a value $g \in \G$.\marginnote{In cryptographic settings, $q$ is a big prime.}
 Then, given a group element $y = g^x \in \G$, for $x \getsr \Z_q$,
-the discrete-log problem is to find the value of $x\in \Zq$.
+the discrete-log problem is to find the value of $x\in \Z_q$.
 We have already seen the discrete-log problem in
 the context of Diffie-Hellman key exchange and elliptic-curve signatures.
 
@@ -230,8 +248,8 @@ In addition the prover holds a secret value $x \in \Z_q$, the verifier
 holds a public value $y \in \G$.
 The prover must convince the verifier that it knows the discrete log of $y$
 base $g$: that is, that it knows $x$ such that $y=g^x \in \G$.
-The prover wants to prove this to the verifier this without revealing
-anything about else about its secret value $x$.
+The prover wants to prove this to the verifier without revealing
+anything else about its secret value $x$.
 
 The protocol goes as follows:
 \begin{itemize}
@@ -263,7 +281,7 @@ $z \getsr \Z_q$ at random, and just compute $R$ as $(g^z)(y^c)^{-1}\in \G$.
 \paragraph{Reducing soundness error.}
 In any given interaction of the protocol, the prover could falsely
 convince the verifier that it knows $x$, using the attack we just
-described. The prover only will succeed in this attack with probability $\frac 12$,
+described. The prover will only succeed in this attack with probability $\frac 12$,
 which is exactly the probability that the prover guesses the verifier's challenge
 $c$ in advance.
 By repeating this protocol $\lambda$ times and accepting only if all $\lambda$
@@ -282,7 +300,15 @@ This modified protocol only
 satisfies a weaker flavor of zero knowledge called ``honest-verifier zero knowledge.''
 We won't discuss those details here.
 
-The protocol above is central to Schnorr signatures that are widely used in cryptocurrencies. Further, EdDSA is a deterministic Schnorr variant over Edwards curves, and it's where most people use Schnorr without knowing it. It appears in SSH keys, TLS 1.3, Signal, Tor onion services, and DNSSEC.
+Applying the \emph{Fiat--Shamir heuristic} to the version of this
+protocol with challenges $c \in \Z_q$---that is, replacing the verifier's
+random challenge with a hash of $R$, the public key $y$, and a message---turns
+it into a non-interactive signature scheme, the \emph{Schnorr signature scheme}.
+Schnorr signatures are widely used in cryptocurrencies.
+EdDSA (e.g., Ed25519) is a deterministic Schnorr variant over Edwards curves,
+and it is where most people use Schnorr signatures without knowing it:
+it is used for SSH keys and Tor onion services, Signal uses a close
+variant (XEdDSA), and TLS~1.3 and DNSSEC support it as well.
 
 % \section{Analysis of Schnorr's protocol}
 % 
@@ -318,7 +344,7 @@ The protocol above is central to Schnorr signatures that are widely used in cryp
 % \item The extractor rewinds the state of the prover $P^*$ to just after the point when it
 %       sent the first protocol message $R$ to the verifier.
 % 
-% \item The extractor runs $P^*$ again, but this time feeds its the challenge $c=1$.
+% \item The extractor runs $P^*$ again, but this time feeds it the challenge $c=1$.
 % This produces a second transcript $(R, c=1, z')$.
 % 
 % \item The extractor outputs $z'-z$ as the discrete log $x$.
@@ -329,7 +355,7 @@ The protocol above is central to Schnorr signatures that are widely used in cryp
 % to accept with probability one---both
 % runs of the prover $P^*$ by the extractor must convince the verifier to accept. (Otherwise,
 % the prover $P^*$ would not convince the verifier in at least one of the two runs of the protocol.)
-% That means that both $g^z=R \in \G$ and that $g^{z'}=RX \in \G$.  Thus, $g^{z'-z}=y \in \G$,
+% That means that both $g^z=R \in \G$ and that $g^{z'}=Ry \in \G$.  Thus, $g^{z'-z}=y \in \G$,
 % which is exactly the definition of what it means for something ($z'-z$
 % in particular) to be the discrete log of $y \in \G$.
 % 
