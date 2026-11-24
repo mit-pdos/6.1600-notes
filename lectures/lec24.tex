@@ -241,8 +241,8 @@ The protocol goes as follows:
 \item The verifier picks a challenge bit $c$ at random, either 0 or 1,
       and sends the challenge to the prover.
 
-\item The prover sends back a response $z \in \Z_q$, chosen as follows: \marginnote{In
-  the true Schnorr protocol, the verifier samples $c \getsr \Z_q$. % as we discuss in \cref{sec:hvzk}}
+\item The prover sends back a response $z \in \Z_q$, chosen as follows: \marginnote{In the true Schnorr protocol, the verifier samples $c \getsr \Z_q$.} % as we discuss in \cref{sec:hvzk}
+
   \begin{itemize}
     \item If $c=0$, the prover sets $z \gets r \in \Z_q$.
     \item If $c=1$, the prover sets $z \gets r+x\in \Z_q$.
