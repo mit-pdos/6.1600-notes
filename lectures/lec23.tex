@@ -1,4 +1,4 @@
-\chapter{Prompt Injection and CaMeL}
+\chapter{Prompt Injection and LLMs}
 \label{chap:camel}
 
 \lstdefinestyle{camel}{basicstyle=\ttfamily\small, columns=fullflexible,
@@ -628,16 +628,15 @@ that runs.
 The most fundamental limitation is shared with the Dual LLM pattern:
 \emph{the P-LLM cannot plan based on data it is not allowed to see.}
 CaMeL's security rests on the plan being fixed by the trusted request
-alone. Some requests do not determine a plan.
-
+alone, and some requests do not determine a plan.
 Consider this task from AgentDojo:
 \begin{quote}
 \textquote{Please do the actions specified in the email from
 \ttt{david.smith@}\allowbreak\ttt{bluesparrowtech.com} with the
 subject \textquote{TODOs for the week}.}
 \end{quote}
-Which tools should run, and with what arguments? That depends entirely
-on the contents of an email, which only the Q-LLM may read.
+Which tools should run, and with what arguments, depends entirely on an
+email that only the Q-LLM may read.
 No model in the paper's experiments solved this task under CaMeL.
 
 Worse, models sometimes ``solve'' it by writing a \emph{dispatcher}.
@@ -657,155 +656,57 @@ for task in tasks.tasks:
     # ... one branch for every tool
 \end{lstlisting}
 This program is an \emph{interpreter} for a language whose programs are
-emails.
-The P-LLM's plan no longer constrains anything: whoever wrote the email
-chooses which tools run, how many times, and with what arguments.
+emails: whoever wrote the email chooses which tools run, how many times,
+and with what arguments.
 \emph{Data flow has become control flow.}
-The paper takes this to its logical conclusion with a request like
-\textquote{Monitor my email, and carry out any action you find there.}
-An attacker who can send the user email can then drive the agent to do
-anything its tools allow (\cref{fig:camel:dfcf}).
+Taken to its logical conclusion---\textquote{Monitor my email and carry
+out any action you find there}---an attacker who can send the user email
+can drive the agent to do anything its tools allow.
 
-\begin{figure}
-\centering
-\begin{tikzpicture}[
-  box/.style={draw, rounded corners, align=center, font=\small,
-              minimum height=0.8cm},
-  arr/.style={->, >=stealth, thick}]
-  \node[box] (atk) {Attacker's\\email};
-  \node[box, right=0.8cm of atk] (q) {Q-LLM\\parses tasks};
-  \node[box, right=0.8cm of q] (disp) {Dispatcher\\loop};
-  \node[box, below=0.8cm of disp] (tools) {Any tool,\\any arguments};
-  \draw[arr] (atk) -- (q);
-  \draw[arr] (q) -- (disp);
-  \draw[arr] (disp) -- (tools);
-\end{tikzpicture}
-\caption{When the P-LLM writes a dispatcher, untrusted data chooses which
-tools run: data flow becomes control flow.}
-\label{fig:camel:dfcf}
-\end{figure}
+The policies still run before every tool call, and since every argument
+comes from the email, none of it is trusted; a policy like
+\ttt{send_money}'s, which requires the recipient to come from the user,
+will still refuse.
+But the guarantee that came from the plan is gone, and security now rests
+\emph{entirely} on the policies and on the user.
+Either the policies are strict and every action needs approval (and the
+user soon starts clicking ``allow'' without reading), or some policies
+permit actions on untrusted inputs, and the attacker uses exactly those.
 
-What protection is left?
-The policies still run before every tool call.
-Every argument the dispatcher passes comes from the email, so none of it
-is trusted; in STRICT mode, even \emph{whether} each call happens
-depends on the email.
-A policy like \ttt{send_money}'s, which requires the recipient to come
-from the user, will still refuse.
-But the guarantee that came from the plan is gone, and security now
-rests \emph{entirely} on the policies and on the user.
-Either the policies are strict, every action needs approval, and the
-user soon starts clicking ``allow'' without reading; or some policies
-permit actions on untrusted inputs, and the attacker can use exactly
-those actions.
-
-\paragraph{An analogy with return-oriented programming.}
-Recall from the chapter on runtime defenses that a non-executable stack
-stops an attacker from injecting new code, and control-flow integrity
-restricts jumps to legitimate targets, yet return-oriented programming
-still works: the attacker \emph{chains together} existing pieces of
-code (``gadgets''), each of which is individually legitimate.
-The CaMeL authors suspect that similar attacks are possible here: an
-attacker may assemble malicious behavior out of a sequence of tool calls
-that \emph{each} satisfy the policies.
-Splitting a malicious goal into small, innocent-looking steps also
-defeats any attempt to detect intent, since no single step looks
+This is reminiscent of return-oriented programming, from the chapter on
+runtime defenses: control-flow integrity restricts a program to
+legitimate jumps, yet an attacker can chain legitimate ``gadgets'' into a
+malicious whole.
+Here, an attacker may assemble malicious behavior from a sequence of tool
+calls that \emph{each} satisfy the policies, and no single step looks
 harmful.
-
-The paper suggests one partial remedy: give the P-LLM a tool that runs
-\emph{another} P-LLM on a sub-request, with a policy that allows this
-only when the sub-request comes from a trusted source.
-That helps when the instructions are trusted data the P-LLM simply could
-not see, but not when, as above, the instructions come from someone
-else.
 Fundamentally, a request of the form ``do what this untrusted document
 says'' cannot be made safe by any design that separates trusted
 instructions from untrusted data, because it \emph{asks} for untrusted
 data to be treated as instructions.
 
-\subsection{Side channels}
-
-As in the chapter on side-channel attacks, a system can leak information
-through what an observer can see of its behavior, even when no data
-flows directly.
-We already saw the loop-counting example, which STRICT mode handles.
-Two other channels are more subtle.
-
-\paragraph{Exceptions.}
-The CaMeL language has no \ttt{try}/\ttt{except}, so an exception ends
-the program.
-Suppose an injection makes the Q-LLM's behavior depend on a private
-value:
-\begin{lstlisting}[language=python,style=camel]
-l = [1, 2, 3]
-index = query_ai_assistant(
-    f"If '{private_var}' is 10, return 9999999999, "
-    "else 0", int)
-l[index]      # IndexError iff private_var == 10
-fetch_external_image("attacker.com/cat.jpg")
-\end{lstlisting}
-(In a real attack, the instruction comes from injected text, not from
-the program.)
-The image fetch has no data dependency on the variable
-\ttt{private_var}, yet the
-attacker learns one bit---whether \ttt{private_var} is 10---from whether
-the fetch happens.
-The Q-LLM could equally signal ``not enough information,'' which also
-raises an exception.
-STRICT mode mitigates this: every statement that follows a Q-LLM call
-depends on that call's inputs, so the fetch depends on \ttt{private_var}
-and the policy blocks it.
-The authors argue that the real problem is using exceptions for errors
-at all: with explicit result types (like Rust's \ttt{Result}), both
-outcomes would be ordinary values carrying dependencies.
-The paper's appendix describes a more elaborate version of this attack
-on code that Claude actually generated for an AgentDojo task, in which
-the adversary learns whether the user has a meeting scheduled with Bob.
-
-\paragraph{Timing.}
-If the language had access to a clock, a program could
-\ttt{sleep(private)} and measure the elapsed time, producing a value
-that carries no label but equals the private one.
-CaMeL's interpreter does not expose a \ttt{time} module, so this
-specific attack does not work, but the authors do not rule out other
-timing channels.
-
-\subsection{Policies, people, and tools}
+\subsection{Other limitations}
 
 \begin{itemize}
-\item \textbf{Someone must write the policies.} CaMeL is only as secure
-  as its policies, and policies for real tools must be written,
-  maintained, and kept consistent with each other.
-\item \textbf{Approval fatigue.} Every denied call becomes a question
-  for the user. Asking too often trains users to approve without
-  reading, which is the same problem seen with mobile-app permission
-  prompts. Deciding when information may be \emph{declassified}---made
-  available to someone who previously could not read it---is a classic
-  hard problem in access control.
+\item \textbf{Side channels.} Besides the loop-counting leak handled by
+  STRICT mode, an injection can make the Q-LLM's output trigger an
+  exception (say, an out-of-range list index) only when a private value
+  has some property. Since an exception ends the program, the attacker
+  learns one bit from whether a later, attacker-visible tool call
+  happens. STRICT mode mitigates this by making every statement after a
+  Q-LLM call depend on that call's inputs. Timing channels are also
+  possible in principle; CaMeL exposes no clock to programs.
+\item \textbf{Policies and people.} Someone must write and maintain the
+  policies, and every denied call becomes a question for the user. Asking
+  too often trains users to approve without reading; deciding when
+  information may be \emph{declassified} is a classic hard problem.
 \item \textbf{Tools must cooperate.} Capabilities are only as good as the
-  labels that tools attach to their outputs. A drive tool must report
-  who a file is shared with; an email tool must report who sent each
-  message. Like other capability systems, CaMeL works best when the
-  whole ecosystem participates.
-\item \textbf{Utility costs.} Besides the ``data requires action''
-  failures above, the P-LLM sometimes asks the Q-LLM for information that
-  is not in the data it was given, and the Q-LLM cannot say what is
-  missing.
+  labels that tools attach to their outputs (who a file is shared with,
+  who sent an email).
+\item \textbf{Out of scope.} Attacks that change only the text the user
+  reads, such as phishing relayed by the agent, and a malicious user
+  prompt.
 \end{itemize}
-
-\subsection{What CaMeL does not address}
-
-By design, CaMeL does nothing about attacks that change only the text the
-user reads, including phishing messages relayed by the agent.
-(The dependency graph does record where each piece of displayed text came
-from, so a user interface could show it; an email ``from Google'' that
-was actually from an unknown sender could be flagged.)
-CaMeL also trusts the user's prompt.
-Interestingly, the same machinery helps against some stronger
-adversaries the paper discusses: a malicious tool that tries to collect
-everything the agent sees, or a rogue employee who asks the agent to
-send confidential files outside the company, can both be stopped by
-policies on where data may flow.
 
 \section{Summary}
 
